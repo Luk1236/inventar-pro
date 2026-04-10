@@ -2174,9 +2174,12 @@ async def import_articles(
     for i, row in enumerate(rows):
         try:
             # Validate required fields
-            if not row.get("name") or not row.get("inventory_code"):
-                errors.append(f"Zeile {i+2}: name und inventory_code sind Pflichtfelder")
+            if not row.get("name"):
+                errors.append(f"Zeile {i+2}: name ist ein Pflichtfeld")
                 continue
+            # Auto-generate inventory_code if not provided (consistent with API)
+            if not row.get("inventory_code"):
+                row["inventory_code"] = f"ART-{str(uuid.uuid4())[:6].upper()}"
             # Check duplicate inventory_code
             existing = await db.articles.find_one({"inventory_code": row["inventory_code"]})
             if existing:
