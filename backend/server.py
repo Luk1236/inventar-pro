@@ -380,7 +380,7 @@ class ArticleCreate(BaseModel):
     category_id: Optional[str] = None  # Made optional
     supplier_id: Optional[str] = None
     serial_number: Optional[str] = Field(None, max_length=100)
-    inventory_code: str = Field(..., max_length=100)
+    inventory_code: Optional[str] = None
     base_unit: str = Field("Stück", max_length=50)
     current_stock: int = 0
     min_stock_level: int = 0
@@ -1882,9 +1882,19 @@ async def sync_now(current_user: User = Depends(get_current_user)):
 # Articles
 @api_router.post("/articles", response_model=Article)
 async def create_article(article_data: ArticleCreate, current_user: User = Depends(require_permission(Permission.CREATE_ARTICLE))):
-    # Generate QR code (in production, would use actual QR generation)
-    qr_code = f"ART-{article_data.inventory_code}"
-    
+    # Auto-generate inventory_code if not provided
+    if not article_data.inventory_code:
+        short_id = str(uuid.uuid4())[:6].upper()
+        article_data.inventory_code = f"ART-{short_id}"
+
+    # Check for duplicate inventory_code
+    existing_code = await db.articles.find_one({"inventory_code": article_data.inventory_code})
+    if existing_code:
+        raise HTTPException(status_code=409, detail=f"Inventarnummer '{article_data.inventory_code}' bereits vorhanden")
+
+    # Use inventory_code directly as QR code (it already has the prefix)
+    qr_code = article_data.inventory_code
+
     article = Article(**article_data.dict(), qr_code=qr_code)
     await db.articles.insert_one(article.dict())
     await manager.broadcast(json.dumps({"type": "article_created", "id": str(article.id)}))
