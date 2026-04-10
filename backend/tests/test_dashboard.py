@@ -39,5 +39,6 @@ async def test_top_rented_articles_format(client, auth_headers):
     assert resp.status_code == 200
     top = resp.json().get("top_rented_articles", [])
     for item in top:
+        assert "id" in item, f"Missing 'id' in {item}"
         assert "name" in item, f"Missing 'name' in {item}"
         assert "booking_count" in item, f"Missing 'booking_count' in {item}"
