@@ -3144,7 +3144,12 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
 
     total_articles = await db.articles.count_documents({})
     low_stock_articles = await db.articles.count_documents({
-        "$expr": {"$lte": ["$current_stock", "$min_stock_level"]}
+        "$expr": {
+            "$and": [
+                {"$gt": ["$min_stock_level", 0]},
+                {"$lt": ["$current_stock", "$min_stock_level"]}
+            ]
+        }
     })
     
     # Get articles needing maintenance
@@ -3184,7 +3189,7 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
     # Total inventory value — computed server-side via aggregation, no full collection load
     _value_pipeline = [
         {"$project": {"value": {"$multiply": [
-            {"$ifNull": ["$rental_price", 0]},
+            {"$ifNull": ["$price_per_unit", 0]},
             {"$ifNull": ["$current_stock", 0]}
         ]}}},
         {"$group": {"_id": None, "total": {"$sum": "$value"}}}
