@@ -1,6 +1,4 @@
 # backend/tests/conftest.py
-import asyncio
-import pytest
 import pytest_asyncio
 import uuid
 from datetime import datetime, timezone
@@ -12,14 +10,6 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 TEST_DB_NAME = "inventory_test"
-
-
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create a single event loop for the entire test session."""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest_asyncio.fixture(scope="session")
