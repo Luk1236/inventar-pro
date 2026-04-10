@@ -2241,6 +2241,19 @@ async def import_articles(
             errors.append(f"Zeile {i+2}: {str(e)}")
     return {"imported": imported, "errors": errors}
 
+@api_router.get("/articles/archived")
+async def get_archived_articles_v2(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=500),
+    current_user: User = Depends(get_current_user)
+):
+    skip = (page - 1) * page_size
+    items = await db.articles.find({"archived": True}).sort("created_at", -1).skip(skip).limit(page_size).to_list(page_size)
+    for item in items:
+        item["id"] = str(item.get("_id", item.get("id", "")))
+        item.pop("_id", None)
+    return items
+
 @api_router.get("/articles/{article_id}", response_model=Article)
 async def get_article(article_id: str, current_user: User = Depends(get_current_user)):
     article = await db.articles.find_one({"id": article_id})
