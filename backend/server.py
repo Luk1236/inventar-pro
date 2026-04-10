@@ -3212,7 +3212,32 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
     movements_last_7_days = await db.movements.count_documents({
         "created_at": {"$gte": seven_days_ago}
     })
-    
+
+    # Top 10 most-booked articles
+    _top_pipeline = [
+        {"$group": {"_id": "$article_id", "booking_count": {"$sum": 1}}},
+        {"$sort": {"booking_count": -1}},
+        {"$limit": 10},
+    ]
+    _top_results = await db.bookings.aggregate(_top_pipeline).to_list(10)
+    top_rented = []
+    for entry in _top_results:
+        _art = await db.articles.find_one({"id": entry["_id"]}, {"name": 1})
+        top_rented.append({
+            "id": entry["_id"],
+            "name": _art["name"] if _art else "Unbekannt",
+            "booking_count": entry["booking_count"],
+        })
+
+    # Pending invoices
+    _inv_pipeline = [
+        {"$match": {"payment_status": {"$nin": ["paid", "bezahlt"]}}},
+        {"$group": {"_id": None, "total": {"$sum": "$total_amount"}, "count": {"$sum": 1}}},
+    ]
+    _inv_result = await db.invoices.aggregate(_inv_pipeline).to_list(1)
+    pending_invoices_total = round(float(_inv_result[0]["total"]), 2) if _inv_result else 0.0
+    pending_invoices_count = _inv_result[0]["count"] if _inv_result else 0
+
     result = {
         "total_articles": total_articles,
         "low_stock_articles": low_stock_articles,
@@ -3227,6 +3252,9 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
         "events_this_month": events_this_month,
         "total_inventory_value": round(total_inventory_value, 2),
         "movements_last_7_days": movements_last_7_days,
+        "top_rented_articles": top_rented,
+        "pending_invoices_total": pending_invoices_total,
+        "pending_invoices_count": pending_invoices_count,
     }
     # F9: Store result in cache
     _dashboard_cache = result
