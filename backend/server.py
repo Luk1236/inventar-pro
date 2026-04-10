@@ -3753,7 +3753,9 @@ async def create_booking(booking_data: BookingCreate, current_user: User = Depen
             event["event_name"],
             "Neue Buchung"
         )
-    
+
+    await manager.broadcast(json.dumps({"type": "booking_created", "id": str(booking.id)}))
+
     return booking
 
 @api_router.get("/bookings", response_model=List[Booking])
@@ -3849,7 +3851,9 @@ async def cancel_booking(booking_id: str, current_user: User = Depends(get_curre
                 event["event_name"],
                 "Buchung storniert"
             )
-    
+
+    await manager.broadcast(json.dumps({"type": "booking_cancelled", "id": booking_id}))
+
     return {"message": "Booking cancelled successfully"}
 
 
