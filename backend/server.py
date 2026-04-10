@@ -921,7 +921,7 @@ class InvoiceItem(BaseModel):
 class Invoice(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     invoice_number: str  # Auto-generated
-    event_id: str
+    event_id: Optional[str] = None
     customer_id: str
     items: List[InvoiceItem]
     subtotal: float
@@ -940,7 +940,8 @@ class Invoice(BaseModel):
     public_token: Optional[str] = None
 
 class InvoiceCreate(BaseModel):
-    event_id: str
+    event_id: Optional[str] = None
+    customer_id: Optional[str] = None
     notes: Optional[str] = None
     due_days: int = Field(14, ge=0, le=365)  # max 1 year payment term
 
@@ -3677,7 +3678,15 @@ async def create_booking(booking_data: BookingCreate, current_user: User = Depen
     article = await db.articles.find_one({"id": booking_data.article_id})
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
-    
+
+    # Early stock check — before insert to give clear error message
+    article_stock = article.get("current_stock", 0)
+    if article_stock < booking_data.quantity:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nicht genug Bestand. Verfügbar: {article_stock}, angefragt: {booking_data.quantity}"
+        )
+
     # Determine dates
     pickup_date = booking_data.pickup_date or event["start_date"]
     return_date = booking_data.return_date or event["end_date"]
@@ -3720,9 +3729,11 @@ async def create_booking(booking_data: BookingCreate, current_user: User = Depen
     if stock_result.modified_count == 0:
         # Buchung rückgängig machen – kein Bestand mehr verfügbar
         await db.bookings.delete_one({"id": booking.id})
+        # Get current stock for error message
+        current_article = await db.articles.find_one({"id": booking_data.article_id})
         raise HTTPException(
             status_code=400,
-            detail="Nicht genug Bestand – ein anderer Vorgang hat den Bestand gleichzeitig verändert."
+            detail=f"Nicht genug Bestand (Race Condition). Verfügbarer Bestand: {current_article.get('current_stock', 0)}"
         )
     
     # Send notification to customer
@@ -4104,48 +4115,67 @@ async def delete_quote(quote_id: str, current_user: User = Depends(get_current_u
 # Invoice Management
 @api_router.post("/invoices", response_model=Invoice)
 async def create_invoice(invoice_data: InvoiceCreate, current_user: User = Depends(get_current_user)):
-    # Get event
-    event = await db.events.find_one({"id": invoice_data.event_id})
-    if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
-    
-    # Get bookings for this event
-    bookings = await db.bookings.find({"event_id": invoice_data.event_id, "status": "booked"}).to_list(1000)
-    if not bookings:
-        raise HTTPException(status_code=400, detail="No bookings found for this event")
-    
-    # Calculate invoice items
-    items = []
-    subtotal = 0.0
-    
-    for booking in bookings:
-        article = await db.articles.find_one({"id": booking["article_id"]})
-        if article:
-            unit_price = article.get("price", 0.0)
-            quantity = booking["quantity"]
-            total_price = unit_price * quantity
-            
-            items.append({
-                "article_id": article["id"],
-                "article_name": article["name"],
-                "quantity": quantity,
-                "unit_price": unit_price,
-                "total_price": total_price
-            })
-            subtotal += total_price
-    
+    # Determine customer_id
+    customer_id = invoice_data.customer_id
+
+    # Get event if provided
+    if invoice_data.event_id:
+        event = await db.events.find_one({"id": invoice_data.event_id})
+        if not event:
+            raise HTTPException(status_code=404, detail="Event not found")
+
+        # Use customer_id from event if not provided in request
+        if not customer_id:
+            customer_id = event["customer_id"]
+
+        # Get bookings for this event
+        bookings = await db.bookings.find({"event_id": invoice_data.event_id, "status": "booked"}).to_list(1000)
+        if not bookings:
+            raise HTTPException(status_code=400, detail="No bookings found for this event")
+
+        # Calculate invoice items
+        items = []
+        subtotal = 0.0
+
+        for booking in bookings:
+            article = await db.articles.find_one({"id": booking["article_id"]})
+            if article:
+                unit_price = article.get("price", 0.0)
+                quantity = booking["quantity"]
+                total_price = unit_price * quantity
+
+                items.append({
+                    "article_id": article["id"],
+                    "article_name": article["name"],
+                    "quantity": quantity,
+                    "unit_price": unit_price,
+                    "total_price": total_price
+                })
+                subtotal += total_price
+    else:
+        # Free invoice without event
+        if not customer_id:
+            raise HTTPException(status_code=400, detail="customer_id is required for free invoices (without event)")
+        items = []
+        subtotal = 0.0
+
+    # Validate customer exists
+    customer = await db.customers.find_one({"id": customer_id})
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
     # Calculate tax
     tax_amount = subtotal * 0.19  # 19% MwSt
     total_amount = subtotal + tax_amount
-    
+
     # Generate invoice number
     invoice_number = await generate_invoice_number()
-    
+
     # Create invoice
     invoice = Invoice(
         invoice_number=invoice_number,
         event_id=invoice_data.event_id,
-        customer_id=event["customer_id"],
+        customer_id=customer_id,
         items=items,
         subtotal=subtotal,
         tax_amount=tax_amount,
@@ -4154,7 +4184,7 @@ async def create_invoice(invoice_data: InvoiceCreate, current_user: User = Depen
         due_date=datetime.now(timezone.utc) + timedelta(days=invoice_data.due_days),
         created_by=current_user.id
     )
-    
+
     await db.invoices.insert_one(invoice.dict())
     return invoice
 
