@@ -4,16 +4,39 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { Alert } from 'react-native';
 
-// Leere URL ('') = Nginx-Betrieb: relative URLs werden verwendet
-const BACKEND_URL: string =
+// Default URL from env/config
+const DEFAULT_BACKEND_URL: string =
   Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL ??
   process.env.EXPO_PUBLIC_BACKEND_URL ??
-  'http://localhost:8000';
+  'http://localhost:8002';
+
+// Runtime override (set by settings screen or Electron bridge)
+let _runtimeBackendUrl: string | null = null;
+
+export function setBackendUrl(url: string): void {
+  _runtimeBackendUrl = url.replace(/\/$/, '');
+}
+
+export function getBackendUrl(): string {
+  return _runtimeBackendUrl ?? DEFAULT_BACKEND_URL;
+}
+
+// On startup: load persisted server URL from AsyncStorage
+AsyncStorage.getItem('server_url').then((url) => {
+  if (url) _runtimeBackendUrl = url;
+}).catch(() => {});
+
+// Electron bridge: load from Electron settings if running in desktop
+if (typeof window !== 'undefined' && (window as any).__electronBridge) {
+  (window as any).__electronBridge.getSettings().then((settings: any) => {
+    if (settings?.serverUrl) _runtimeBackendUrl = settings.serverUrl.replace(/\/$/, '');
+  }).catch(() => {});
+}
 
 // API versioning handled server-side; clients use /api/ directly
 
 // L4 — Warn early if backend URL is misconfigured (web builds use '' intentionally)
-if (!BACKEND_URL && typeof window === 'undefined') {
+if (!DEFAULT_BACKEND_URL && typeof window === 'undefined') {
   console.warn(
     '[ApiService] EXPO_PUBLIC_BACKEND_URL is not set. ' +
     'Requests will use relative paths — this only works when served behind Nginx.'
@@ -124,7 +147,7 @@ class ApiService {
         return null;
       }
 
-      const response = await fetch(`${BACKEND_URL}${API_PREFIX}/refresh-token`, {
+      const response = await fetch(`${getBackendUrl()}/api/refresh-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: refreshToken }),
@@ -212,7 +235,7 @@ class ApiService {
         : await this.getAuthHeaders();
 
       const resolvedEndpoint = endpoint;
-      const response = await fetch(`${BACKEND_URL}${resolvedEndpoint}`, {
+      const response = await fetch(`${getBackendUrl()}${resolvedEndpoint}`, {
         ...options,
         headers: { ...headers, ...options.headers },
         signal: controller.signal,
