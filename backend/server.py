@@ -2480,7 +2480,8 @@ async def update_storage_location(
     if not existing_location:
         raise HTTPException(status_code=404, detail="Storage location not found")
     
-    # Update fields
+    # Update fields — preserve the original id
+    location_update.id = location_id
     location_update.qr_code = f"LOC-{location_update.zone_id}-{location_update.name}"
     await db.storage_locations.update_one(
         {"id": location_id},
