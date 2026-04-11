@@ -1,4 +1,10 @@
 @echo off
+where node >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo FEHLER: Node.js ist nicht installiert.
+    echo Bitte von https://nodejs.org herunterladen und installieren.
+    exit /b 1
+)
 echo === Inventar Pro Windows Build ===
 echo.
 echo [1/3] Expo Web-Build erstellen...
@@ -23,5 +29,6 @@ if %ERRORLEVEL% NEQ 0 (
 )
 echo.
 echo === Build abgeschlossen ===
-echo Installer: electron\dist\InventarPro Setup 1.0.0.exe
+echo Installer: electron\dist\Inventar Pro Setup 1.0.0.exe
+for %%F in ("dist\Inventar Pro Setup 1.0.0.exe") do echo Dateigroesse: %%~zF Bytes
 pause
