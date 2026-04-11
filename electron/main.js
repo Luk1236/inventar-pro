@@ -39,7 +39,6 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: false,
     },
     show: false,
   });
@@ -55,19 +54,6 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    // On first launch: inject server URL prompt if not configured
-    if (!settings.serverUrl) {
-      mainWindow.webContents.once('did-finish-load', () => {
-        mainWindow.webContents.executeJavaScript(`
-          (function() {
-            var url = prompt('Inventar Pro Server-URL eingeben:\\n\\nBeispiele:\\n• Lokal: http://192.168.1.100:8002\\n• Internet: https://xxx.cfargotunnel.com', 'http://192.168.1.100:8002');
-            if (url) {
-              window.__pendingServerUrl = url.trim().replace(/\\/$/, '');
-            }
-          })();
-        `).catch(() => {});
-      });
-    }
   });
 
   mainWindow.on('closed', () => {

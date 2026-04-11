@@ -9673,14 +9673,14 @@ async def delete_communication_log(log_id: str, current_user: User = Depends(get
 
 @app.post("/api/articles/{article_id}/archive")
 async def archive_article(article_id: str, current_user: User = Depends(get_current_user)):
-    result = await db.articles.update_one({"_id": article_id}, {"$set": {"archived": True}})
+    result = await db.articles.update_one({"id": article_id}, {"$set": {"archived": True, "deleted": True}})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Artikel nicht gefunden")
     return {"message": "Artikel archiviert"}
 
 @app.post("/api/articles/{article_id}/unarchive")
 async def unarchive_article(article_id: str, current_user: User = Depends(get_current_user)):
-    result = await db.articles.update_one({"_id": article_id}, {"$set": {"archived": False}})
+    result = await db.articles.update_one({"id": article_id}, {"$set": {"archived": False, "deleted": False}})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Artikel nicht gefunden")
     return {"message": "Artikel aus Archiv entfernt"}
