@@ -337,7 +337,7 @@ class Article(BaseModel):
     category_id: Optional[str] = None  # Made optional
     supplier_id: Optional[str] = None
     serial_number: Optional[str] = None
-    inventory_code: str
+    inventory_code: Optional[str] = None
     base_unit: str = "Stück"
     current_stock: int = 0
     min_stock_level: int = 0
@@ -2244,7 +2244,10 @@ async def import_articles(
 
 @api_router.get("/articles/archived", response_model=List[Article])
 async def get_archived_articles_v2(current_user: User = Depends(get_current_user)):
-    articles = await db.articles.find({"archived": True}).sort("created_at", -1).to_list(1000)
+    # V7: Soft-deleted articles are stored with deleted=True (not archived=True)
+    articles = await db.articles.find(
+        {"$or": [{"deleted": True}, {"archived": True}]}
+    ).sort("created_at", -1).to_list(1000)
     return [Article(**{k: v for k, v in a.items() if k != "_id"}) for a in articles]
 
 @api_router.get("/articles/{article_id}", response_model=Article)
