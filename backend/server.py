@@ -9704,14 +9704,14 @@ async def get_archived_storage_locations(
 
 @app.post("/api/storage-locations/{location_id}/archive")
 async def archive_storage_location(location_id: str, current_user: User = Depends(get_current_user)):
-    result = await db.storage_locations.update_one({"_id": location_id}, {"$set": {"archived": True}})
+    result = await db.storage_locations.update_one({"id": location_id}, {"$set": {"archived": True}})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Lagerort nicht gefunden")
     return {"message": "Lagerort archiviert"}
 
 @app.post("/api/storage-locations/{location_id}/unarchive")
 async def unarchive_storage_location(location_id: str, current_user: User = Depends(get_current_user)):
-    result = await db.storage_locations.update_one({"_id": location_id}, {"$set": {"archived": False}})
+    result = await db.storage_locations.update_one({"id": location_id}, {"$set": {"archived": False}})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Lagerort nicht gefunden")
     return {"message": "Lagerort aus Archiv entfernt"}

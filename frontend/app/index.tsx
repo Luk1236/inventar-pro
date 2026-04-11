@@ -25,6 +25,7 @@ import apiService from '../services/apiService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GlobalSearch from '../components/GlobalSearch';
 import { useTheme } from '../contexts/ThemeContext';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 
 const { width } = Dimensions.get('window');
@@ -68,6 +69,9 @@ interface DashboardStats {
   overdue_returns?: number;
   open_repairs?: number;
   ready_packlists?: number;
+  top_rented_articles?: Array<{ id: string; name: string; booking_count: number }>;
+  pending_invoices_count?: number;
+  pending_invoices_total?: number;
 }
 
 export default function Index() {
@@ -675,6 +679,17 @@ export default function Index() {
     }, [isLoggedIn])
   );
 
+  // P2-T1: Auto-refresh dashboard when articles/bookings/events change via WebSocket
+  useWebSocket((msg) => {
+    if ([
+      'article_created', 'article_updated', 'article_deleted',
+      'booking_created', 'booking_cancelled',
+      'event_created', 'event_updated',
+    ].includes(msg.type)) {
+      loadDashboardStats();
+    }
+  });
+
   const reloadUserData = async () => {
     try {
       const userData = await AsyncStorage.getItem('user');
@@ -843,7 +858,7 @@ export default function Index() {
     } catch (error: any) {
       const msg = error.message || 'Anmeldung fehlgeschlagen';
       if (msg === 'NO_INTERNET' || msg === 'TIMEOUT') {
-        setAuthError('Backend nicht erreichbar. Läuft der Server auf Port 8000?');
+        setAuthError('Backend nicht erreichbar. Läuft der Server auf Port 8002?');
       } else {
         setAuthError(msg);
       }
@@ -1270,6 +1285,44 @@ export default function Index() {
             <Text style={styles.quickLabel}>Einstellungen</Text>
           </TouchableOpacity>
         </View>
+
+        {/* ===== DASHBOARD STATS WIDGETS ===== */}
+
+        {/* Inventory Value */}
+        {stats?.total_inventory_value !== undefined && (
+          <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 16, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: isDark ? 0.12 : 0.04, shadowRadius: 8, elevation: 2 }]}>
+            <Text style={{ fontSize: 22, fontWeight: '700', color: colors.text }}>
+              {`€ ${(stats.total_inventory_value ?? 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>Inventarwert</Text>
+          </View>
+        )}
+
+        {/* Pending Invoices */}
+        {stats?.pending_invoices_count !== undefined && (
+          <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 16, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: isDark ? 0.12 : 0.04, shadowRadius: 8, elevation: 2 }]}>
+            <Text style={{ fontSize: 22, fontWeight: '700', color: colors.text }}>
+              {stats.pending_invoices_count ?? 0}
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>
+              {`Offene Rechnungen${stats.pending_invoices_total ? ` (€ ${(stats.pending_invoices_total).toLocaleString('de-DE', { minimumFractionDigits: 2 })})` : ''}`}
+            </Text>
+          </View>
+        )}
+
+        {/* Top 10 rented articles */}
+        {stats?.top_rented_articles && stats.top_rented_articles.length > 0 && (
+          <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 16, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: isDark ? 0.12 : 0.04, shadowRadius: 8, elevation: 2 }]}>
+            <Text style={[styles.sectionTitle, { marginTop: 0, marginLeft: 0, marginBottom: 10 }]}>Top 10 meist-gebuchte Artikel</Text>
+            {stats.top_rented_articles.map((item, index) => (
+              <View key={item.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 3 }}>
+                <Text style={{ width: 24, color: colors.textSecondary, fontSize: 13 }}>{index + 1}.</Text>
+                <Text style={{ flex: 1, color: colors.text, fontSize: 14 }} numberOfLines={1}>{item.name}</Text>
+                <Text style={{ color: '#007AFF', fontSize: 14, fontWeight: '600' }}>{item.booking_count}x</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* ===== ACCORDION NAVIGATION ===== */}
 
