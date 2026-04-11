@@ -3008,11 +3008,15 @@ async def get_repair_ticket(
     ticket = await db.repair_tickets.find_one({"id": ticket_id})
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket nicht gefunden")
-    
+
+    ticket.pop("_id", None)
+
     # Get article info
     article = await db.articles.find_one({"id": ticket.get("article_id")})
+    if article:
+        article.pop("_id", None)
     ticket["article"] = article
-    
+
     return ticket
 
 @api_router.put("/repair-tickets/{ticket_id}")
