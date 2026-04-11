@@ -9132,6 +9132,7 @@ async def create_serial_number(sn: SerialNumber, current_user: dict = Depends(ge
     doc = sn.dict()
     doc["_id"] = doc["id"]
     await db.serial_numbers.insert_one(doc)
+    doc.pop("_id", None)
     return doc
 
 @app.put("/api/serial-numbers/{sn_id}")
