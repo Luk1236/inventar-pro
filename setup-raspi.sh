@@ -4,6 +4,7 @@
 # Aufruf: bash setup-raspi.sh
 
 set -e
+set -o pipefail
 
 INSTALL_DIR="/opt/inventarpro"
 SERVICE_USER="inventarpro"
@@ -106,7 +107,10 @@ mkdir -p "$INSTALL_DIR"
 # Skript-Verzeichnis ermitteln (auch bei Aufruf mit 'bash setup-raspi.sh')
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-cp -r "$SCRIPT_DIR/backend/"* "$INSTALL_DIR/"
+if [ ! -d "$SCRIPT_DIR/backend" ]; then
+  error "backend/-Verzeichnis nicht gefunden in $SCRIPT_DIR"
+fi
+cp -r "$SCRIPT_DIR/backend/." "$INSTALL_DIR/"
 
 # .env anlegen (falls nicht vorhanden)
 if [ ! -f "$INSTALL_DIR/.env" ]; then
@@ -202,7 +206,12 @@ fi
 # Optional: Cloudflare Tunnel
 # ────────────────────────────────────────────
 echo ""
-read -p "Cloudflare Tunnel einrichten für Internet-Zugang? (j/n): " SETUP_TUNNEL
+if [ -t 0 ]; then
+  read -p "Cloudflare Tunnel einrichten für Internet-Zugang? (j/n): " SETUP_TUNNEL
+else
+  SETUP_TUNNEL="n"
+  info "Nicht-interaktiver Modus — Cloudflare Tunnel übersprungen"
+fi
 if [[ "$SETUP_TUNNEL" == "j" || "$SETUP_TUNNEL" == "J" ]]; then
   if [ -f "$SCRIPT_DIR/setup-cloudflare-tunnel.sh" ]; then
     bash "$SCRIPT_DIR/setup-cloudflare-tunnel.sh"
