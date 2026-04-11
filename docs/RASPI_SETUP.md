@@ -5,6 +5,7 @@
 - Raspberry Pi 5 (oder Pi 4), 64-bit Raspberry Pi OS
 - Internet-Verbindung auf dem Pi
 - SSH-Zugang vom PC zum Pi
+  > SSH aktivieren: Raspberry Pi Imager → Erweiterte Optionen → SSH aktivieren (vor dem Flashen)
 
 ## Schritt 1: Pi-IP herausfinden
 
@@ -18,19 +19,29 @@ Notiere die IP-Adresse (z.B. `192.168.1.100`).
 
 **Option A — SCP (empfohlen):**
 
-Auf dem Windows-PC in einer PowerShell/CMD ausführen:
+Auf dem Windows-PC in einer PowerShell/CMD ausführen (Pfad anpassen!):
 ```powershell
-scp -r "C:\Users\lukas\OneDrive\Desktop\Final-main(1)\Final-main" pi@192.168.1.100:~/inventarpro
+# Ersetze den Pfad durch den tatsächlichen Speicherort des Projekts auf deinem PC
+scp -r "C:\Pfad\zum\Projekt\Final-main" pi@192.168.1.100:~/inventarpro
 ```
-Passwort eingeben wenn gefragt.
+
+Nach dem Kopieren auf dem Pi prüfen:
+```bash
+ls ~/inventarpro/setup-raspi.sh
+```
+Falls nicht vorhanden: `mv ~/inventarpro/Final-main/* ~/inventarpro/` ausführen.
 
 **Option B — USB-Stick:**
 1. Projekt-Ordner auf USB-Stick kopieren
 2. USB in Pi stecken
 3. Auf dem Pi:
 ```bash
-mkdir ~/inventarpro
-cp -r /media/pi/USB-STICK/Final-main/* ~/inventarpro/
+# Mount-Pfad des USB-Sticks ermitteln:
+lsblk -o NAME,MOUNTPOINT | grep media
+# Beispiel-Ausgabe: sda1  /media/pi/USBSTICK
+# Dann kopieren (Pfad anpassen):
+mkdir -p ~/inventarpro
+cp -r /media/pi/USBSTICK/Final-main/. ~/inventarpro/
 ```
 
 ## Schritt 3: Setup-Script ausführen
@@ -126,3 +137,9 @@ sudo ufw status
 python3 --version
 # Muss 3.10+ sein
 ```
+
+## Cloudflare Tunnel (Internet-Zugang von außen)
+
+Für den Zugriff auf das Backend von außerhalb des Heimnetzwerks (z.B. über Mobilfunk):
+
+→ Siehe [cloudflare-tunnel-setup.md](cloudflare-tunnel-setup.md)
