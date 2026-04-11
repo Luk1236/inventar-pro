@@ -8172,9 +8172,13 @@ async def create_vehicle(
 ):
     """Create a new vehicle"""
     try:
-        vehicle = Vehicle(**vehicle_data.dict())
-        await db.vehicles.insert_one(vehicle.dict())
-        return vehicle
+        import uuid as uuid_module
+        doc = vehicle_data.dict()
+        doc["id"] = str(uuid_module.uuid4())
+        doc["_id"] = doc["id"]
+        doc["created_at"] = datetime.utcnow().isoformat()
+        await db.vehicles.insert_one(doc)
+        return doc
     except Exception as e:
         raise HTTPException(status_code=500, detail="Interner Serverfehler. Details wurden protokolliert.")
 
@@ -9054,10 +9058,19 @@ async def get_vehicles(current_user: dict = Depends(get_current_user)):
 
 @app.post("/api/vehicles")
 async def create_vehicle(vehicle: Vehicle, current_user: dict = Depends(get_current_user)):
-    doc = vehicle.dict()
-    doc["_id"] = doc["id"]
-    await db.vehicles.insert_one(doc)
-    return doc
+    try:
+        doc = vehicle.dict()
+        doc["_id"] = doc["id"]
+        # Convert datetime to ISO format string for JSON serialization
+        if "created_at" in doc and isinstance(doc["created_at"], datetime):
+            doc["created_at"] = doc["created_at"].isoformat()
+        await db.vehicles.insert_one(doc)
+        return doc
+    except Exception as e:
+        import traceback
+        print(f"ERROR in create_vehicle: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Interner Serverfehler. Details wurden protokolliert.")
 
 @app.put("/api/vehicles/{vehicle_id}")
 async def update_vehicle(vehicle_id: str, vehicle: VehicleCreate, current_user: dict = Depends(get_current_user)):
