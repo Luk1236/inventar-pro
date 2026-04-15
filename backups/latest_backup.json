@@ -1,0 +1,2491 @@
+{
+  "timestamp": "2026-02-23T21:40:23.020906",
+  "database": "test_database",
+  "collections": {
+    "categories": [
+      {
+        "_id": "6971357e82317cd10c07f909",
+        "id": "0aca649f-fb49-40ed-88c4-ecbadd989e2c",
+        "name": "Aufio",
+        "description": null,
+        "parent_id": null,
+        "created_at": "2026-01-21T20:22:22.992000"
+      }
+    ],
+    "customers": [
+      {
+        "_id": "69713af65484e53fc41dfb43",
+        "id": "4bd08e55-bca3-43f9-8b54-4aa74e725aa5",
+        "customer_number": "CUST-2026-0001",
+        "company_name": "Ww",
+        "contact_person": "Yfj",
+        "phone": "494348848",
+        "email": "lukas.bootz@gmx.de",
+        "address_street": "",
+        "address_zip": "",
+        "address_city": "",
+        "address_country": "Deutschland",
+        "payment_terms": "",
+        "contract_info": "",
+        "notes": "",
+        "is_active": true,
+        "created_at": "2026-01-21T20:45:42.927000",
+        "updated_at": "2026-01-21T20:45:42.927000"
+      }
+    ],
+    "movements": [
+      {
+        "_id": "68b204f5c36738f309f14b0d",
+        "id": "b1815797-b4aa-4243-a68d-30fddaf557ac",
+        "article_id": "a86bf461-b89f-40d2-88b9-cf589b18abb4",
+        "movement_type": "IN",
+        "quantity": 10,
+        "from_location_id": null,
+        "to_location_id": "f5db1e97-6874-4ba9-9d7b-86f19d13303b",
+        "user_id": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "reason": "Initial stock",
+        "reference_number": "PO-2025-001",
+        "created_at": "2025-08-29T19:52:21.168000"
+      },
+      {
+        "_id": "68b204f5c36738f309f14b0e",
+        "id": "ab87b7a2-b720-4538-8e0b-47db0d62835b",
+        "article_id": "a86bf461-b89f-40d2-88b9-cf589b18abb4",
+        "movement_type": "OUT",
+        "quantity": 3,
+        "from_location_id": "f5db1e97-6874-4ba9-9d7b-86f19d13303b",
+        "to_location_id": null,
+        "user_id": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "reason": "Event rental",
+        "reference_number": "RENT-2025-001",
+        "created_at": "2025-08-29T19:52:21.268000"
+      },
+      {
+        "_id": "68ce55ec6f3728b3f226f106",
+        "id": "4de0104c-8fd2-4a27-83cc-bffb622d9566",
+        "article_id": "cc32d094-1c5c-44f8-9a93-d65c45a8e2c5",
+        "movement_type": "IN",
+        "quantity": 10,
+        "from_location_id": null,
+        "to_location_id": "f7815bae-a272-410a-8c89-1c19d38ad02d",
+        "user_id": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "reason": "Initial stock",
+        "reference_number": "PO-2025-001",
+        "created_at": "2025-09-20T07:21:16.414000"
+      },
+      {
+        "_id": "68ce55ec6f3728b3f226f107",
+        "id": "a832bc60-d19e-4792-bfb6-e272c561ba75",
+        "article_id": "cc32d094-1c5c-44f8-9a93-d65c45a8e2c5",
+        "movement_type": "OUT",
+        "quantity": 3,
+        "from_location_id": "f7815bae-a272-410a-8c89-1c19d38ad02d",
+        "to_location_id": null,
+        "user_id": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "reason": "Event rental",
+        "reference_number": "RENT-2025-001",
+        "created_at": "2025-09-20T07:21:16.481000"
+      },
+      {
+        "_id": "68ee7100403e7e44be9556ce",
+        "id": "d3ff736c-bbe0-4896-af04-0d3de852d5ac",
+        "article_id": "ea4664f9-b7a1-4458-9d30-0f1ba02c339d",
+        "movement_type": "IN",
+        "quantity": 10,
+        "from_location_id": null,
+        "to_location_id": "e88be7e9-16ad-4704-93a5-01e830b9712d",
+        "user_id": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "reason": "Initial stock",
+        "reference_number": "PO-2025-001",
+        "created_at": "2025-10-14T15:49:20.803000"
+      },
+      {
+        "_id": "68ee7100403e7e44be9556cf",
+        "id": "4eaf666e-8ecd-4a19-9102-6627ae3e21cf",
+        "article_id": "ea4664f9-b7a1-4458-9d30-0f1ba02c339d",
+        "movement_type": "OUT",
+        "quantity": 3,
+        "from_location_id": "e88be7e9-16ad-4704-93a5-01e830b9712d",
+        "to_location_id": null,
+        "user_id": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "reason": "Event rental",
+        "reference_number": "RENT-2025-001",
+        "created_at": "2025-10-14T15:49:20.867000"
+      },
+      {
+        "_id": "68ee7b09394cbf44bacc914d",
+        "id": "41098744-c0b7-4418-808a-a2e2d7232957",
+        "article_id": "b3679ff9-d2ce-4594-831b-ba9e819e46e3",
+        "movement_type": "IN",
+        "quantity": 10,
+        "from_location_id": null,
+        "to_location_id": "b9d091cc-7e66-42d7-9ff5-838e5952c9d0",
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "reason": "Initial stock",
+        "reference_number": "PO-2025-001",
+        "created_at": "2025-10-14T16:32:09.084000"
+      },
+      {
+        "_id": "68ee7b09394cbf44bacc914e",
+        "id": "bee22f36-75dd-4be0-a295-f3bc10b90e73",
+        "article_id": "b3679ff9-d2ce-4594-831b-ba9e819e46e3",
+        "movement_type": "OUT",
+        "quantity": 3,
+        "from_location_id": "b9d091cc-7e66-42d7-9ff5-838e5952c9d0",
+        "to_location_id": null,
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "reason": "Event rental",
+        "reference_number": "RENT-2025-001",
+        "created_at": "2025-10-14T16:32:09.144000"
+      },
+      {
+        "_id": "68ee7b49b04530a36d4cc64d",
+        "id": "b0de6dce-7ab3-4fa2-9609-38d05af99567",
+        "article_id": "950c84b9-0f38-483e-b368-23be7f976de5",
+        "movement_type": "IN",
+        "quantity": 10,
+        "from_location_id": null,
+        "to_location_id": null,
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "reason": "Test stock for booking",
+        "reference_number": null,
+        "created_at": "2025-10-14T16:33:13.515000"
+      },
+      {
+        "_id": "68ee7b51b04530a36d4cc654",
+        "id": "7c545e28-2b84-40d5-ad45-05a905706608",
+        "article_id": "9c455b94-8060-456b-b1b7-4e87b13c5d1e",
+        "movement_type": "IN",
+        "quantity": 10,
+        "from_location_id": null,
+        "to_location_id": "96e81ec2-344f-4f68-9c08-658d98265fd3",
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "reason": "Initial stock",
+        "reference_number": "PO-2025-001",
+        "created_at": "2025-10-14T16:33:21.414000"
+      },
+      {
+        "_id": "68ee7b51b04530a36d4cc655",
+        "id": "aa3746db-ef13-4f02-bf54-e2f42a8359bf",
+        "article_id": "9c455b94-8060-456b-b1b7-4e87b13c5d1e",
+        "movement_type": "OUT",
+        "quantity": 3,
+        "from_location_id": "96e81ec2-344f-4f68-9c08-658d98265fd3",
+        "to_location_id": null,
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "reason": "Event rental",
+        "reference_number": "RENT-2025-001",
+        "created_at": "2025-10-14T16:33:21.521000"
+      },
+      {
+        "_id": "690e20e9973c7798cd0b3583",
+        "id": "ed118eab-46ac-4837-ac39-68f4030ac05e",
+        "article_id": "2df92f26-6e17-4351-9729-84766375237b",
+        "movement_type": "IN",
+        "quantity": 10,
+        "from_location_id": null,
+        "to_location_id": "2c22242e-3e75-4a26-b410-e9a9b781e45c",
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "reason": "Initial stock",
+        "reference_number": "PO-2025-001",
+        "created_at": "2025-11-07T16:40:09.594000"
+      },
+      {
+        "_id": "690e20e9973c7798cd0b3584",
+        "id": "3914c050-73a3-4add-9306-ec5877d5a224",
+        "article_id": "2df92f26-6e17-4351-9729-84766375237b",
+        "movement_type": "OUT",
+        "quantity": 3,
+        "from_location_id": "2c22242e-3e75-4a26-b410-e9a9b781e45c",
+        "to_location_id": null,
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "reason": "Event rental",
+        "reference_number": "RENT-2025-001",
+        "created_at": "2025-11-07T16:40:09.668000"
+      },
+      {
+        "_id": "690e218f1d07883a2bc6324c",
+        "id": "40c99765-a00f-485f-b473-0c8a9e2506d6",
+        "article_id": "b7badc18-7dfc-42ee-b5e9-59aa258f4ddd",
+        "movement_type": "IN",
+        "quantity": 10,
+        "from_location_id": null,
+        "to_location_id": "6f5f42ff-8464-40ff-acba-efadb63a1dd0",
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "reason": "Initial stock",
+        "reference_number": "PO-2025-001",
+        "created_at": "2025-11-07T16:42:55.260000"
+      },
+      {
+        "_id": "690e218f1d07883a2bc6324d",
+        "id": "e445cf08-ac3e-4e52-b4db-a15fe97c8e0f",
+        "article_id": "b7badc18-7dfc-42ee-b5e9-59aa258f4ddd",
+        "movement_type": "OUT",
+        "quantity": 3,
+        "from_location_id": "6f5f42ff-8464-40ff-acba-efadb63a1dd0",
+        "to_location_id": null,
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "reason": "Event rental",
+        "reference_number": "RENT-2025-001",
+        "created_at": "2025-11-07T16:42:55.323000"
+      },
+      {
+        "_id": "693342580924b8487a66aaf6",
+        "id": "67ec4bff-183d-4ec1-a61a-fa82f0864c59",
+        "article_id": "8285a55a-db9e-46ca-985b-dc64c7b46efb",
+        "movement_type": "IN",
+        "quantity": 10,
+        "from_location_id": null,
+        "to_location_id": "032f24e2-8900-404d-8761-7d708b03e713",
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "reason": "Initial stock",
+        "reference_number": "PO-2025-001",
+        "created_at": "2025-12-05T20:36:40.114000"
+      },
+      {
+        "_id": "693342580924b8487a66aaf7",
+        "id": "f8e46507-66a1-4f4d-9a30-f285276a8e94",
+        "article_id": "8285a55a-db9e-46ca-985b-dc64c7b46efb",
+        "movement_type": "OUT",
+        "quantity": 3,
+        "from_location_id": "032f24e2-8900-404d-8761-7d708b03e713",
+        "to_location_id": null,
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "reason": "Event rental",
+        "reference_number": "RENT-2025-001",
+        "created_at": "2025-12-05T20:36:40.137000"
+      },
+      {
+        "_id": "69341d8ce31a5e63eb78f63a",
+        "id": "deb69033-e5b4-4644-9302-c5254bed2dec",
+        "article_id": "8d909441-b79c-47fe-a3f2-f1880e47a701",
+        "movement_type": "IN",
+        "quantity": 10,
+        "from_location_id": null,
+        "to_location_id": "9d453c61-baf8-4edb-a8bc-e1ece0fce567",
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "reason": "Initial stock",
+        "reference_number": "PO-2025-001",
+        "created_at": "2025-12-06T12:11:56.915000"
+      },
+      {
+        "_id": "69341d8de31a5e63eb78f63b",
+        "id": "81c2111b-58f2-4073-bbb8-523b402067e4",
+        "article_id": "8d909441-b79c-47fe-a3f2-f1880e47a701",
+        "movement_type": "OUT",
+        "quantity": 3,
+        "from_location_id": "9d453c61-baf8-4edb-a8bc-e1ece0fce567",
+        "to_location_id": null,
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "reason": "Event rental",
+        "reference_number": "RENT-2025-001",
+        "created_at": "2025-12-06T12:11:57.154000"
+      }
+    ],
+    "refresh_tokens": [
+      {
+        "_id": "699b68c14a3e81ecda4970bf",
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJBZG1pbiIsImV4cCI6MTc3MjM5NzM3NywidHlwZSI6InJlZnJlc2gifQ.UOY6mev0mfieOM-PX3ZkzSejGJfa5zuhEDvOvNR_xaY",
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "created_at": "2026-02-22T20:36:17.811000",
+        "expires_at": "2026-03-01T20:36:17.811000",
+        "is_revoked": true
+      },
+      {
+        "_id": "699c9b8d754e5ef889b7cfc4",
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJBZG1pbiIsImV4cCI6MTc3MjQ3NTkxNywidHlwZSI6InJlZnJlc2gifQ.m7IYOlxsDerMfcuU_si-qgiDtUIaD4qRh38QQu92e-U",
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "created_at": "2026-02-23T18:25:17.901000",
+        "expires_at": "2026-03-02T18:25:17.901000",
+        "is_revoked": false
+      },
+      {
+        "_id": "699c9bac754e5ef889b7cfc5",
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJBZG1pbiIsImV4cCI6MTc3MjQ3NTk0OCwidHlwZSI6InJlZnJlc2gifQ.KH8AjptVQhbhtVNlG7QmsqNaN_qeAcbNWQAzXFfmz2g",
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "created_at": "2026-02-23T18:25:48.075000",
+        "expires_at": "2026-03-02T18:25:48.075000",
+        "is_revoked": false
+      },
+      {
+        "_id": "699cc901506b18e188232689",
+        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJBZG1pbiIsImV4cCI6MTc3MjQ4NzU1MywidHlwZSI6InJlZnJlc2gifQ.BNtrvPMSx_YvW73Jjx6ZsK6cSqr0D3G_cYsejEpYzzs",
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "created_at": "2026-02-23T21:39:13.663000",
+        "expires_at": "2026-03-02T21:39:13.663000",
+        "is_revoked": false
+      }
+    ],
+    "articles": [
+      {
+        "_id": "69713ab05484e53fc41dfb42",
+        "id": "7b94bdb4-74d4-4cef-9534-4ad3e02badea",
+        "name": "Qw",
+        "description": "",
+        "category_id": "0aca649f-fb49-40ed-88c4-ecbadd989e2c",
+        "supplier_id": null,
+        "serial_number": null,
+        "inventory_code": "ART-263559-46",
+        "base_unit": "St\u00fcck",
+        "current_stock": 0,
+        "min_stock_level": 0,
+        "price_per_unit": 0.0,
+        "rental_price": null,
+        "rental_price_day": null,
+        "rental_price_week": null,
+        "rental_price_month": null,
+        "weight_kg": null,
+        "power_watt": null,
+        "power_type": null,
+        "operating_hours": 0.0,
+        "max_operating_hours": null,
+        "rental_factor_weekend": 1.5,
+        "rental_factor_week": 3.0,
+        "is_sub_rental": false,
+        "sub_rental_supplier_id": null,
+        "sub_rental_cost": null,
+        "status": "OK",
+        "storage_location_id": "",
+        "last_maintenance": null,
+        "next_maintenance": null,
+        "maintenance_interval_days": null,
+        "image_base64": "",
+        "images": [],
+        "qr_code": "ART-ART-263559-46",
+        "created_at": "2026-01-21T20:44:32.334000",
+        "updated_at": "2026-01-21T20:44:32.334000"
+      }
+    ],
+    "maintenance_checklists": [
+      {
+        "_id": "68ce55ed6f3728b3f226f111",
+        "id": "be0b0387-4d1b-4896-8a9e-96089f9b1471",
+        "name": "Audio Equipment Inspection Checklist",
+        "description": "Standard checklist for audio equipment maintenance",
+        "category_ids": [
+          "52618f0e-bb68-4303-8053-b2e766e55f67"
+        ],
+        "items": [
+          {
+            "title": "Visual inspection for damage",
+            "required": true,
+            "type": "checkbox",
+            "description": "Check for cracks, dents, or other visible damage"
+          },
+          {
+            "title": "Cable connection test",
+            "required": true,
+            "type": "checkbox",
+            "description": "Test all input/output connections"
+          },
+          {
+            "title": "Sound quality test",
+            "required": true,
+            "type": "checkbox",
+            "description": "Perform audio quality assessment"
+          },
+          {
+            "title": "Battery level check",
+            "required": false,
+            "type": "measurement",
+            "description": "Check battery voltage if applicable"
+          },
+          {
+            "title": "Cleaning status",
+            "required": true,
+            "type": "checkbox",
+            "description": "Clean equipment exterior and connections"
+          }
+        ],
+        "created_by": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "is_template": true,
+        "created_at": "2025-09-20T07:21:17.228000"
+      },
+      {
+        "_id": "68ce55ed6f3728b3f226f112",
+        "id": "dc8bed2d-c6b3-421e-ad41-c2d53bd1e0e7",
+        "name": "Category-Specific Checklist",
+        "description": "Checklist for specific equipment category",
+        "category_ids": [
+          "52618f0e-bb68-4303-8053-b2e766e55f67"
+        ],
+        "items": [
+          {
+            "title": "Category-specific check 1",
+            "required": true,
+            "type": "checkbox"
+          },
+          {
+            "title": "Category-specific check 2",
+            "required": true,
+            "type": "checkbox"
+          }
+        ],
+        "created_by": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "is_template": true,
+        "created_at": "2025-09-20T07:21:17.618000"
+      },
+      {
+        "_id": "68ee7101403e7e44be9556d9",
+        "id": "6f6a6c70-34a8-499b-818e-514ec7229bcb",
+        "name": "Audio Equipment Inspection Checklist",
+        "description": "Standard checklist for audio equipment maintenance",
+        "category_ids": [
+          "d52f9691-6e10-4574-92f8-bf77e7ed71ac"
+        ],
+        "items": [
+          {
+            "title": "Visual inspection for damage",
+            "required": true,
+            "type": "checkbox",
+            "description": "Check for cracks, dents, or other visible damage"
+          },
+          {
+            "title": "Cable connection test",
+            "required": true,
+            "type": "checkbox",
+            "description": "Test all input/output connections"
+          },
+          {
+            "title": "Sound quality test",
+            "required": true,
+            "type": "checkbox",
+            "description": "Perform audio quality assessment"
+          },
+          {
+            "title": "Battery level check",
+            "required": false,
+            "type": "measurement",
+            "description": "Check battery voltage if applicable"
+          },
+          {
+            "title": "Cleaning status",
+            "required": true,
+            "type": "checkbox",
+            "description": "Clean equipment exterior and connections"
+          }
+        ],
+        "created_by": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "is_template": true,
+        "created_at": "2025-10-14T15:49:21.291000"
+      },
+      {
+        "_id": "68ee7101403e7e44be9556da",
+        "id": "01d3c3a7-766c-4fba-9fef-c6ff63c49666",
+        "name": "Category-Specific Checklist",
+        "description": "Checklist for specific equipment category",
+        "category_ids": [
+          "d52f9691-6e10-4574-92f8-bf77e7ed71ac"
+        ],
+        "items": [
+          {
+            "title": "Category-specific check 1",
+            "required": true,
+            "type": "checkbox"
+          },
+          {
+            "title": "Category-specific check 2",
+            "required": true,
+            "type": "checkbox"
+          }
+        ],
+        "created_by": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "is_template": true,
+        "created_at": "2025-10-14T15:49:21.347000"
+      },
+      {
+        "_id": "68ee7149403e7e44be9556e3",
+        "id": "fe953f34-ba56-4c66-b170-373dd1282c87",
+        "name": "Audio Equipment Inspection Checklist",
+        "description": "Standard checklist for audio equipment maintenance",
+        "category_ids": [
+          "56862917-9bfe-4e93-8d4e-c1c2ca32d836"
+        ],
+        "items": [
+          {
+            "title": "Check power cables",
+            "required": true,
+            "type": "checkbox"
+          },
+          {
+            "title": "Test audio output",
+            "required": true,
+            "type": "checkbox"
+          },
+          {
+            "title": "Clean exterior",
+            "required": false,
+            "type": "checkbox"
+          },
+          {
+            "title": "Record signal level",
+            "required": true,
+            "type": "measurement"
+          }
+        ],
+        "created_by": "68cd4045-0c8f-4ebb-a5c4-941421267d3f",
+        "is_template": true,
+        "created_at": "2025-10-14T15:50:33.629000"
+      },
+      {
+        "_id": "68ee7b09394cbf44bacc9158",
+        "id": "4920194f-68b1-46a3-aeca-3c60fc1fd285",
+        "name": "Audio Equipment Inspection Checklist",
+        "description": "Standard checklist for audio equipment maintenance",
+        "category_ids": [
+          "227ffe6d-5605-4ca0-81d3-78e07d8578ef"
+        ],
+        "items": [
+          {
+            "title": "Visual inspection for damage",
+            "required": true,
+            "type": "checkbox",
+            "description": "Check for cracks, dents, or other visible damage"
+          },
+          {
+            "title": "Cable connection test",
+            "required": true,
+            "type": "checkbox",
+            "description": "Test all input/output connections"
+          },
+          {
+            "title": "Sound quality test",
+            "required": true,
+            "type": "checkbox",
+            "description": "Perform audio quality assessment"
+          },
+          {
+            "title": "Battery level check",
+            "required": false,
+            "type": "measurement",
+            "description": "Check battery voltage if applicable"
+          },
+          {
+            "title": "Cleaning status",
+            "required": true,
+            "type": "checkbox",
+            "description": "Clean equipment exterior and connections"
+          }
+        ],
+        "created_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "is_template": true,
+        "created_at": "2025-10-14T16:32:09.645000"
+      },
+      {
+        "_id": "68ee7b09394cbf44bacc9159",
+        "id": "19a138f8-f5d5-4454-bcd4-f5baf9218480",
+        "name": "Category-Specific Checklist",
+        "description": "Checklist for specific equipment category",
+        "category_ids": [
+          "227ffe6d-5605-4ca0-81d3-78e07d8578ef"
+        ],
+        "items": [
+          {
+            "title": "Category-specific check 1",
+            "required": true,
+            "type": "checkbox"
+          },
+          {
+            "title": "Category-specific check 2",
+            "required": true,
+            "type": "checkbox"
+          }
+        ],
+        "created_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "is_template": true,
+        "created_at": "2025-10-14T16:32:09.695000"
+      },
+      {
+        "_id": "68ee7b52b04530a36d4cc65f",
+        "id": "8a3361ec-5fb5-4584-a188-d60c27fa6ecb",
+        "name": "Audio Equipment Inspection Checklist",
+        "description": "Standard checklist for audio equipment maintenance",
+        "category_ids": [
+          "c9a7e570-4333-40ac-af57-753e7abb6237"
+        ],
+        "items": [
+          {
+            "title": "Visual inspection for damage",
+            "required": true,
+            "type": "checkbox",
+            "description": "Check for cracks, dents, or other visible damage"
+          },
+          {
+            "title": "Cable connection test",
+            "required": true,
+            "type": "checkbox",
+            "description": "Test all input/output connections"
+          },
+          {
+            "title": "Sound quality test",
+            "required": true,
+            "type": "checkbox",
+            "description": "Perform audio quality assessment"
+          },
+          {
+            "title": "Battery level check",
+            "required": false,
+            "type": "measurement",
+            "description": "Check battery voltage if applicable"
+          },
+          {
+            "title": "Cleaning status",
+            "required": true,
+            "type": "checkbox",
+            "description": "Clean equipment exterior and connections"
+          }
+        ],
+        "created_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "is_template": true,
+        "created_at": "2025-10-14T16:33:22.250000"
+      },
+      {
+        "_id": "68ee7b52b04530a36d4cc660",
+        "id": "7e01a673-0d3c-40ab-baa5-9f4bbf83c7ef",
+        "name": "Category-Specific Checklist",
+        "description": "Checklist for specific equipment category",
+        "category_ids": [
+          "c9a7e570-4333-40ac-af57-753e7abb6237"
+        ],
+        "items": [
+          {
+            "title": "Category-specific check 1",
+            "required": true,
+            "type": "checkbox"
+          },
+          {
+            "title": "Category-specific check 2",
+            "required": true,
+            "type": "checkbox"
+          }
+        ],
+        "created_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "is_template": true,
+        "created_at": "2025-10-14T16:33:22.264000"
+      },
+      {
+        "_id": "690e20ea973c7798cd0b358e",
+        "id": "d1366047-6c79-471f-9ea4-56e12166a042",
+        "name": "Audio Equipment Inspection Checklist",
+        "description": "Standard checklist for audio equipment maintenance",
+        "category_ids": [
+          "ebb8ed90-9cb8-4fb2-9ef5-43b98696a1db"
+        ],
+        "items": [
+          {
+            "title": "Visual inspection for damage",
+            "required": true,
+            "type": "checkbox",
+            "description": "Check for cracks, dents, or other visible damage"
+          },
+          {
+            "title": "Cable connection test",
+            "required": true,
+            "type": "checkbox",
+            "description": "Test all input/output connections"
+          },
+          {
+            "title": "Sound quality test",
+            "required": true,
+            "type": "checkbox",
+            "description": "Perform audio quality assessment"
+          },
+          {
+            "title": "Battery level check",
+            "required": false,
+            "type": "measurement",
+            "description": "Check battery voltage if applicable"
+          },
+          {
+            "title": "Cleaning status",
+            "required": true,
+            "type": "checkbox",
+            "description": "Clean equipment exterior and connections"
+          }
+        ],
+        "created_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "is_template": true,
+        "created_at": "2025-11-07T16:40:10.347000"
+      },
+      {
+        "_id": "690e20ea973c7798cd0b358f",
+        "id": "d9c21e91-7feb-41c4-9ea0-980aab966229",
+        "name": "Category-Specific Checklist",
+        "description": "Checklist for specific equipment category",
+        "category_ids": [
+          "ebb8ed90-9cb8-4fb2-9ef5-43b98696a1db"
+        ],
+        "items": [
+          {
+            "title": "Category-specific check 1",
+            "required": true,
+            "type": "checkbox"
+          },
+          {
+            "title": "Category-specific check 2",
+            "required": true,
+            "type": "checkbox"
+          }
+        ],
+        "created_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "is_template": true,
+        "created_at": "2025-11-07T16:40:10.362000"
+      },
+      {
+        "_id": "690e218f1d07883a2bc63257",
+        "id": "f130a96a-6925-4d68-ab59-0b49678630fb",
+        "name": "Audio Equipment Inspection Checklist",
+        "description": "Standard checklist for audio equipment maintenance",
+        "category_ids": [
+          "6272db11-88e5-498f-b495-4f3b65a0fc9a"
+        ],
+        "items": [
+          {
+            "title": "Visual inspection for damage",
+            "required": true,
+            "type": "checkbox",
+            "description": "Check for cracks, dents, or other visible damage"
+          },
+          {
+            "title": "Cable connection test",
+            "required": true,
+            "type": "checkbox",
+            "description": "Test all input/output connections"
+          },
+          {
+            "title": "Sound quality test",
+            "required": true,
+            "type": "checkbox",
+            "description": "Perform audio quality assessment"
+          },
+          {
+            "title": "Battery level check",
+            "required": false,
+            "type": "measurement",
+            "description": "Check battery voltage if applicable"
+          },
+          {
+            "title": "Cleaning status",
+            "required": true,
+            "type": "checkbox",
+            "description": "Clean equipment exterior and connections"
+          }
+        ],
+        "created_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "is_template": true,
+        "created_at": "2025-11-07T16:42:55.940000"
+      },
+      {
+        "_id": "690e218f1d07883a2bc63258",
+        "id": "15c573a4-b779-4abf-98a9-447ea7bb56c1",
+        "name": "Category-Specific Checklist",
+        "description": "Checklist for specific equipment category",
+        "category_ids": [
+          "6272db11-88e5-498f-b495-4f3b65a0fc9a"
+        ],
+        "items": [
+          {
+            "title": "Category-specific check 1",
+            "required": true,
+            "type": "checkbox"
+          },
+          {
+            "title": "Category-specific check 2",
+            "required": true,
+            "type": "checkbox"
+          }
+        ],
+        "created_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "is_template": true,
+        "created_at": "2025-11-07T16:42:55.951000"
+      },
+      {
+        "_id": "693342590924b8487a66ab01",
+        "id": "14efe993-7f3c-423d-b3dc-86c272af68ca",
+        "name": "Audio Equipment Inspection Checklist",
+        "description": "Standard checklist for audio equipment maintenance",
+        "category_ids": [
+          "6ad7fddb-d1fd-441a-aef9-7327840cae5b"
+        ],
+        "items": [
+          {
+            "title": "Visual inspection for damage",
+            "required": true,
+            "type": "checkbox",
+            "description": "Check for cracks, dents, or other visible damage"
+          },
+          {
+            "title": "Cable connection test",
+            "required": true,
+            "type": "checkbox",
+            "description": "Test all input/output connections"
+          },
+          {
+            "title": "Sound quality test",
+            "required": true,
+            "type": "checkbox",
+            "description": "Perform audio quality assessment"
+          },
+          {
+            "title": "Battery level check",
+            "required": false,
+            "type": "measurement",
+            "description": "Check battery voltage if applicable"
+          },
+          {
+            "title": "Cleaning status",
+            "required": true,
+            "type": "checkbox",
+            "description": "Clean equipment exterior and connections"
+          }
+        ],
+        "created_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "is_template": true,
+        "created_at": "2025-12-05T20:36:41.013000"
+      },
+      {
+        "_id": "693342590924b8487a66ab02",
+        "id": "641f1fd0-0c85-475a-9445-57f1ade2b44f",
+        "name": "Category-Specific Checklist",
+        "description": "Checklist for specific equipment category",
+        "category_ids": [
+          "6ad7fddb-d1fd-441a-aef9-7327840cae5b"
+        ],
+        "items": [
+          {
+            "title": "Category-specific check 1",
+            "required": true,
+            "type": "checkbox"
+          },
+          {
+            "title": "Category-specific check 2",
+            "required": true,
+            "type": "checkbox"
+          }
+        ],
+        "created_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "is_template": true,
+        "created_at": "2025-12-05T20:36:41.026000"
+      },
+      {
+        "_id": "69341d90e31a5e63eb78f645",
+        "id": "d3d094e4-bc09-438f-bd56-bd0f2c241488",
+        "name": "Audio Equipment Inspection Checklist",
+        "description": "Standard checklist for audio equipment maintenance",
+        "category_ids": [
+          "11f14f90-bfe2-46e3-97ef-5b72c0d8f373"
+        ],
+        "items": [
+          {
+            "title": "Visual inspection for damage",
+            "required": true,
+            "type": "checkbox",
+            "description": "Check for cracks, dents, or other visible damage"
+          },
+          {
+            "title": "Cable connection test",
+            "required": true,
+            "type": "checkbox",
+            "description": "Test all input/output connections"
+          },
+          {
+            "title": "Sound quality test",
+            "required": true,
+            "type": "checkbox",
+            "description": "Perform audio quality assessment"
+          },
+          {
+            "title": "Battery level check",
+            "required": false,
+            "type": "measurement",
+            "description": "Check battery voltage if applicable"
+          },
+          {
+            "title": "Cleaning status",
+            "required": true,
+            "type": "checkbox",
+            "description": "Clean equipment exterior and connections"
+          }
+        ],
+        "created_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "is_template": true,
+        "created_at": "2025-12-06T12:12:00.324000"
+      },
+      {
+        "_id": "69341d90e31a5e63eb78f646",
+        "id": "da47cb96-51d0-467b-af72-b25287021792",
+        "name": "Category-Specific Checklist",
+        "description": "Checklist for specific equipment category",
+        "category_ids": [
+          "11f14f90-bfe2-46e3-97ef-5b72c0d8f373"
+        ],
+        "items": [
+          {
+            "title": "Category-specific check 1",
+            "required": true,
+            "type": "checkbox"
+          },
+          {
+            "title": "Category-specific check 2",
+            "required": true,
+            "type": "checkbox"
+          }
+        ],
+        "created_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "is_template": true,
+        "created_at": "2025-12-06T12:12:00.447000"
+      }
+    ],
+    "bundles": [
+      {
+        "_id": "698b8b5047c19ee096e8fe91",
+        "id": "0f6e16a7-9770-471c-babd-45383801d762",
+        "name": "Test PA-Set",
+        "description": "Ein Test-Bundle f\u00fcr PA Equipment",
+        "bundle_code": "PA-001",
+        "category": "PA",
+        "items": [
+          {
+            "article_id": "7b94bdb4-74d4-4cef-9534-4ad3e02badea",
+            "quantity": 2,
+            "is_optional": false
+          }
+        ],
+        "total_items": 2,
+        "total_weight_kg": 0.0,
+        "total_power_watt": 0,
+        "rental_price_day": 0.0,
+        "rental_price_week": 0.0,
+        "rental_price_month": 0.0,
+        "bundle_discount_percent": 10.0,
+        "is_active": true,
+        "image_base64": null,
+        "created_at": "2026-02-10T19:47:28.341000",
+        "updated_at": "2026-02-10T19:47:28.341000",
+        "created_by": "b71c6669-9e8d-49aa-adda-305d49769b2c"
+      },
+      {
+        "_id": "6995f900fb8dce1c09e9a18e",
+        "id": "5a0f8fe1-57ce-4cd0-876d-779c6409f614",
+        "name": "Licht-Paket Standard",
+        "description": "Basis Licht-Set f\u00fcr kleine Events",
+        "bundle_code": "LT-001",
+        "category": "Licht",
+        "items": [
+          {
+            "article_id": "7b94bdb4-74d4-4cef-9534-4ad3e02badea",
+            "quantity": 4,
+            "is_optional": false
+          }
+        ],
+        "total_items": 4,
+        "total_weight_kg": 0.0,
+        "total_power_watt": 0,
+        "rental_price_day": 0.0,
+        "rental_price_week": 0.0,
+        "rental_price_month": 0.0,
+        "bundle_discount_percent": 15.0,
+        "is_active": true,
+        "image_base64": null,
+        "created_at": "2026-02-18T17:38:08.323000",
+        "updated_at": "2026-02-18T17:38:08.323000",
+        "created_by": "b71c6669-9e8d-49aa-adda-305d49769b2c"
+      }
+    ],
+    "storage_locations": [],
+    "maintenance_records": [
+      {
+        "_id": "68ce55ec6f3728b3f226f10e",
+        "id": "50ba3b19-9f5c-47d7-b778-292462f98212",
+        "task_id": "0a0b4745-e3db-4fcf-ac3f-cd41492e5473",
+        "article_id": "cc32d094-1c5c-44f8-9a93-d65c45a8e2c5",
+        "performed_by": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "work_description": "Performed comprehensive inspection and cleaning. Replaced worn components.",
+        "parts_used": [
+          {
+            "name": "Air Filter",
+            "quantity": 1,
+            "cost": 15.5
+          },
+          {
+            "name": "Cleaning Solution",
+            "quantity": 1,
+            "cost": 8.99
+          }
+        ],
+        "cost": 24.49,
+        "before_images": [
+          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+        ],
+        "after_images": [
+          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+        ],
+        "next_maintenance_date": "2025-12-19T07:21:16.840000",
+        "status_after": "OK",
+        "notes": "Equipment is in excellent condition after maintenance",
+        "created_at": "2025-09-20T07:21:16.847000"
+      },
+      {
+        "_id": "68ce55ed6f3728b3f226f10f",
+        "id": "e66f1d06-286e-4f58-b8ba-dffd1af98c2e",
+        "task_id": "0a0b4745-e3db-4fcf-ac3f-cd41492e5473",
+        "article_id": "cc32d094-1c5c-44f8-9a93-d65c45a8e2c5",
+        "performed_by": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "work_description": "Found critical defect during inspection",
+        "parts_used": null,
+        "cost": 0.0,
+        "before_images": null,
+        "after_images": null,
+        "next_maintenance_date": null,
+        "status_after": "defekt",
+        "notes": "Equipment requires major repair before use",
+        "created_at": "2025-09-20T07:21:17.125000"
+      },
+      {
+        "_id": "68ce55ed6f3728b3f226f110",
+        "id": "e410c223-dd14-4b63-a2a6-e6b1b63941fc",
+        "task_id": "0a0b4745-e3db-4fcf-ac3f-cd41492e5473",
+        "article_id": "cc32d094-1c5c-44f8-9a93-d65c45a8e2c5",
+        "performed_by": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "work_description": "Equipment blocked pending safety review",
+        "parts_used": null,
+        "cost": null,
+        "before_images": null,
+        "after_images": null,
+        "next_maintenance_date": null,
+        "status_after": "gesperrt",
+        "notes": "Blocked until safety certification",
+        "created_at": "2025-09-20T07:21:17.179000"
+      },
+      {
+        "_id": "68ee7101403e7e44be9556d6",
+        "id": "71a67f16-cb14-4783-bf90-ffc3e567a49e",
+        "task_id": "5a463dc0-5032-4a51-89c9-2e52a2d17a96",
+        "article_id": "ea4664f9-b7a1-4458-9d30-0f1ba02c339d",
+        "performed_by": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "work_description": "Performed comprehensive inspection and cleaning. Replaced worn components.",
+        "parts_used": [
+          {
+            "name": "Air Filter",
+            "quantity": 1,
+            "cost": 15.5
+          },
+          {
+            "name": "Cleaning Solution",
+            "quantity": 1,
+            "cost": 8.99
+          }
+        ],
+        "cost": 24.49,
+        "before_images": [
+          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+        ],
+        "after_images": [
+          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+        ],
+        "next_maintenance_date": "2026-01-12T15:49:21.183000",
+        "status_after": "OK",
+        "notes": "Equipment is in excellent condition after maintenance",
+        "created_at": "2025-10-14T15:49:21.189000"
+      },
+      {
+        "_id": "68ee7101403e7e44be9556d7",
+        "id": "1ad4684b-f4c7-47c3-95d6-6e7997d4c39e",
+        "task_id": "5a463dc0-5032-4a51-89c9-2e52a2d17a96",
+        "article_id": "ea4664f9-b7a1-4458-9d30-0f1ba02c339d",
+        "performed_by": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "work_description": "Found critical defect during inspection",
+        "parts_used": null,
+        "cost": 0.0,
+        "before_images": null,
+        "after_images": null,
+        "next_maintenance_date": null,
+        "status_after": "defekt",
+        "notes": "Equipment requires major repair before use",
+        "created_at": "2025-10-14T15:49:21.206000"
+      },
+      {
+        "_id": "68ee7101403e7e44be9556d8",
+        "id": "ef5bfb51-1f04-4a34-baa9-51e3557e0208",
+        "task_id": "5a463dc0-5032-4a51-89c9-2e52a2d17a96",
+        "article_id": "ea4664f9-b7a1-4458-9d30-0f1ba02c339d",
+        "performed_by": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "work_description": "Equipment blocked pending safety review",
+        "parts_used": null,
+        "cost": null,
+        "before_images": null,
+        "after_images": null,
+        "next_maintenance_date": null,
+        "status_after": "gesperrt",
+        "notes": "Blocked until safety certification",
+        "created_at": "2025-10-14T15:49:21.215000"
+      },
+      {
+        "_id": "68ee7149403e7e44be9556e2",
+        "id": "73d9f58a-58e2-4b08-846b-186f452da8a5",
+        "task_id": "c7388d7b-f51a-4eb9-99f9-e29317ff7c01",
+        "article_id": "bfeefb61-3887-4c0c-b3b5-d32e17dde846",
+        "performed_by": "68cd4045-0c8f-4ebb-a5c4-941421267d3f",
+        "work_description": "Performed routine maintenance: cleaned components, checked connections, tested audio quality",
+        "parts_used": [
+          {
+            "name": "Cleaning Kit",
+            "quantity": 1,
+            "cost": 15.99
+          },
+          {
+            "name": "Cable Ties",
+            "quantity": 3,
+            "cost": 2.5
+          }
+        ],
+        "cost": 18.49,
+        "before_images": null,
+        "after_images": null,
+        "next_maintenance_date": null,
+        "status_after": "OK",
+        "notes": "Equipment in excellent condition after maintenance",
+        "created_at": "2025-10-14T15:50:33.520000"
+      },
+      {
+        "_id": "68ee7b09394cbf44bacc9155",
+        "id": "c8568300-c507-404d-96eb-bffc0fb02908",
+        "task_id": "4f96956a-7820-4ca7-bc30-2b568fcb6b10",
+        "article_id": "b3679ff9-d2ce-4594-831b-ba9e819e46e3",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "work_description": "Performed comprehensive inspection and cleaning. Replaced worn components.",
+        "parts_used": [
+          {
+            "name": "Air Filter",
+            "quantity": 1,
+            "cost": 15.5
+          },
+          {
+            "name": "Cleaning Solution",
+            "quantity": 1,
+            "cost": 8.99
+          }
+        ],
+        "cost": 24.49,
+        "before_images": [
+          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+        ],
+        "after_images": [
+          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+        ],
+        "next_maintenance_date": "2026-01-12T16:32:09.496000",
+        "status_after": "OK",
+        "notes": "Equipment is in excellent condition after maintenance",
+        "created_at": "2025-10-14T16:32:09.503000"
+      },
+      {
+        "_id": "68ee7b09394cbf44bacc9156",
+        "id": "d2233661-24a8-46ff-ac1f-130b54a52407",
+        "task_id": "4f96956a-7820-4ca7-bc30-2b568fcb6b10",
+        "article_id": "b3679ff9-d2ce-4594-831b-ba9e819e46e3",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "work_description": "Found critical defect during inspection",
+        "parts_used": null,
+        "cost": 0.0,
+        "before_images": null,
+        "after_images": null,
+        "next_maintenance_date": null,
+        "status_after": "defekt",
+        "notes": "Equipment requires major repair before use",
+        "created_at": "2025-10-14T16:32:09.513000"
+      },
+      {
+        "_id": "68ee7b09394cbf44bacc9157",
+        "id": "98ec22db-891d-48cf-915b-aa96bc990a4a",
+        "task_id": "4f96956a-7820-4ca7-bc30-2b568fcb6b10",
+        "article_id": "b3679ff9-d2ce-4594-831b-ba9e819e46e3",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "work_description": "Equipment blocked pending safety review",
+        "parts_used": null,
+        "cost": null,
+        "before_images": null,
+        "after_images": null,
+        "next_maintenance_date": null,
+        "status_after": "gesperrt",
+        "notes": "Blocked until safety certification",
+        "created_at": "2025-10-14T16:32:09.565000"
+      },
+      {
+        "_id": "68ee7b52b04530a36d4cc65c",
+        "id": "61e0168e-accc-4fd0-9dbc-e4cfc396af25",
+        "task_id": "c3945fea-ec26-47e3-9b8f-242d48ff7678",
+        "article_id": "9c455b94-8060-456b-b1b7-4e87b13c5d1e",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "work_description": "Performed comprehensive inspection and cleaning. Replaced worn components.",
+        "parts_used": [
+          {
+            "name": "Air Filter",
+            "quantity": 1,
+            "cost": 15.5
+          },
+          {
+            "name": "Cleaning Solution",
+            "quantity": 1,
+            "cost": 8.99
+          }
+        ],
+        "cost": 24.49,
+        "before_images": [
+          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+        ],
+        "after_images": [
+          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+        ],
+        "next_maintenance_date": "2026-01-12T16:33:22.087000",
+        "status_after": "OK",
+        "notes": "Equipment is in excellent condition after maintenance",
+        "created_at": "2025-10-14T16:33:22.095000"
+      },
+      {
+        "_id": "68ee7b52b04530a36d4cc65d",
+        "id": "c997f168-6941-4da3-bfdc-b76ca1681a61",
+        "task_id": "c3945fea-ec26-47e3-9b8f-242d48ff7678",
+        "article_id": "9c455b94-8060-456b-b1b7-4e87b13c5d1e",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "work_description": "Found critical defect during inspection",
+        "parts_used": null,
+        "cost": 0.0,
+        "before_images": null,
+        "after_images": null,
+        "next_maintenance_date": null,
+        "status_after": "defekt",
+        "notes": "Equipment requires major repair before use",
+        "created_at": "2025-10-14T16:33:22.108000"
+      },
+      {
+        "_id": "68ee7b52b04530a36d4cc65e",
+        "id": "feae6574-357b-4255-9a51-2c3bdf6eae66",
+        "task_id": "c3945fea-ec26-47e3-9b8f-242d48ff7678",
+        "article_id": "9c455b94-8060-456b-b1b7-4e87b13c5d1e",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "work_description": "Equipment blocked pending safety review",
+        "parts_used": null,
+        "cost": null,
+        "before_images": null,
+        "after_images": null,
+        "next_maintenance_date": null,
+        "status_after": "gesperrt",
+        "notes": "Blocked until safety certification",
+        "created_at": "2025-10-14T16:33:22.162000"
+      },
+      {
+        "_id": "690e20ea973c7798cd0b358b",
+        "id": "7db422bb-ed7d-4ade-829f-9a3a4997e0dd",
+        "task_id": "e15337f3-d362-424b-b231-70f124f06f19",
+        "article_id": "2df92f26-6e17-4351-9729-84766375237b",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "work_description": "Performed comprehensive inspection and cleaning. Replaced worn components.",
+        "parts_used": [
+          {
+            "name": "Air Filter",
+            "quantity": 1,
+            "cost": 15.5
+          },
+          {
+            "name": "Cleaning Solution",
+            "quantity": 1,
+            "cost": 8.99
+          }
+        ],
+        "cost": 24.49,
+        "before_images": [
+          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+        ],
+        "after_images": [
+          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+        ],
+        "next_maintenance_date": "2026-02-05T16:40:10.252000",
+        "status_after": "OK",
+        "notes": "Equipment is in excellent condition after maintenance",
+        "created_at": "2025-11-07T16:40:10.259000"
+      },
+      {
+        "_id": "690e20ea973c7798cd0b358c",
+        "id": "be056fbf-9bb4-4e5d-8392-d2b935e86a09",
+        "task_id": "e15337f3-d362-424b-b231-70f124f06f19",
+        "article_id": "2df92f26-6e17-4351-9729-84766375237b",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "work_description": "Found critical defect during inspection",
+        "parts_used": null,
+        "cost": 0.0,
+        "before_images": null,
+        "after_images": null,
+        "next_maintenance_date": null,
+        "status_after": "defekt",
+        "notes": "Equipment requires major repair before use",
+        "created_at": "2025-11-07T16:40:10.277000"
+      },
+      {
+        "_id": "690e20ea973c7798cd0b358d",
+        "id": "9f499f9f-1c47-4ac2-a589-37c9bd8f6bbc",
+        "task_id": "e15337f3-d362-424b-b231-70f124f06f19",
+        "article_id": "2df92f26-6e17-4351-9729-84766375237b",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "work_description": "Equipment blocked pending safety review",
+        "parts_used": null,
+        "cost": null,
+        "before_images": null,
+        "after_images": null,
+        "next_maintenance_date": null,
+        "status_after": "gesperrt",
+        "notes": "Blocked until safety certification",
+        "created_at": "2025-11-07T16:40:10.293000"
+      },
+      {
+        "_id": "690e218f1d07883a2bc63254",
+        "id": "6051db1a-3580-451a-ad3d-1c2f77f99039",
+        "task_id": "e4a3b754-a3bd-41c6-9a93-c8204742b290",
+        "article_id": "b7badc18-7dfc-42ee-b5e9-59aa258f4ddd",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "work_description": "Performed comprehensive inspection and cleaning. Replaced worn components.",
+        "parts_used": [
+          {
+            "name": "Air Filter",
+            "quantity": 1,
+            "cost": 15.5
+          },
+          {
+            "name": "Cleaning Solution",
+            "quantity": 1,
+            "cost": 8.99
+          }
+        ],
+        "cost": 24.49,
+        "before_images": [
+          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+        ],
+        "after_images": [
+          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+        ],
+        "next_maintenance_date": "2026-02-05T16:42:55.826000",
+        "status_after": "OK",
+        "notes": "Equipment is in excellent condition after maintenance",
+        "created_at": "2025-11-07T16:42:55.833000"
+      },
+      {
+        "_id": "690e218f1d07883a2bc63255",
+        "id": "bab26e98-e529-4114-9638-7b349f6d5991",
+        "task_id": "e4a3b754-a3bd-41c6-9a93-c8204742b290",
+        "article_id": "b7badc18-7dfc-42ee-b5e9-59aa258f4ddd",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "work_description": "Found critical defect during inspection",
+        "parts_used": null,
+        "cost": 0.0,
+        "before_images": null,
+        "after_images": null,
+        "next_maintenance_date": null,
+        "status_after": "defekt",
+        "notes": "Equipment requires major repair before use",
+        "created_at": "2025-11-07T16:42:55.846000"
+      },
+      {
+        "_id": "690e218f1d07883a2bc63256",
+        "id": "cf11cbfa-cf9a-458a-9572-926f97c4ebf6",
+        "task_id": "e4a3b754-a3bd-41c6-9a93-c8204742b290",
+        "article_id": "b7badc18-7dfc-42ee-b5e9-59aa258f4ddd",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "work_description": "Equipment blocked pending safety review",
+        "parts_used": null,
+        "cost": null,
+        "before_images": null,
+        "after_images": null,
+        "next_maintenance_date": null,
+        "status_after": "gesperrt",
+        "notes": "Blocked until safety certification",
+        "created_at": "2025-11-07T16:42:55.857000"
+      },
+      {
+        "_id": "693342580924b8487a66aafe",
+        "id": "62a654db-07b1-4ee2-ab28-88966f6f00b5",
+        "task_id": "0676a145-27e9-4551-97f4-59dc12830b2d",
+        "article_id": "8285a55a-db9e-46ca-985b-dc64c7b46efb",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "work_description": "Performed comprehensive inspection and cleaning. Replaced worn components.",
+        "parts_used": [
+          {
+            "name": "Air Filter",
+            "quantity": 1,
+            "cost": 15.5
+          },
+          {
+            "name": "Cleaning Solution",
+            "quantity": 1,
+            "cost": 8.99
+          }
+        ],
+        "cost": 24.49,
+        "before_images": [
+          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+        ],
+        "after_images": [
+          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+        ],
+        "next_maintenance_date": "2026-03-05T20:36:40.865000",
+        "status_after": "OK",
+        "notes": "Equipment is in excellent condition after maintenance",
+        "created_at": "2025-12-05T20:36:40.870000"
+      },
+      {
+        "_id": "693342580924b8487a66aaff",
+        "id": "8d622fa3-e3d2-47f5-a6c2-5ccb7aa47d73",
+        "task_id": "0676a145-27e9-4551-97f4-59dc12830b2d",
+        "article_id": "8285a55a-db9e-46ca-985b-dc64c7b46efb",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "work_description": "Found critical defect during inspection",
+        "parts_used": null,
+        "cost": 0.0,
+        "before_images": null,
+        "after_images": null,
+        "next_maintenance_date": null,
+        "status_after": "defekt",
+        "notes": "Equipment requires major repair before use",
+        "created_at": "2025-12-05T20:36:40.884000"
+      },
+      {
+        "_id": "693342580924b8487a66ab00",
+        "id": "15c55a0f-9547-43b0-8cb8-7c152794e46d",
+        "task_id": "0676a145-27e9-4551-97f4-59dc12830b2d",
+        "article_id": "8285a55a-db9e-46ca-985b-dc64c7b46efb",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "work_description": "Equipment blocked pending safety review",
+        "parts_used": null,
+        "cost": null,
+        "before_images": null,
+        "after_images": null,
+        "next_maintenance_date": null,
+        "status_after": "gesperrt",
+        "notes": "Blocked until safety certification",
+        "created_at": "2025-12-05T20:36:40.935000"
+      },
+      {
+        "_id": "69341d8fe31a5e63eb78f642",
+        "id": "a0e0c85b-6768-45f4-9107-97a0b704e1a9",
+        "task_id": "5f68045f-7520-4d61-b764-205aeef7a622",
+        "article_id": "8d909441-b79c-47fe-a3f2-f1880e47a701",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "work_description": "Performed comprehensive inspection and cleaning. Replaced worn components.",
+        "parts_used": [
+          {
+            "name": "Air Filter",
+            "quantity": 1,
+            "cost": 15.5
+          },
+          {
+            "name": "Cleaning Solution",
+            "quantity": 1,
+            "cost": 8.99
+          }
+        ],
+        "cost": 24.49,
+        "before_images": [
+          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+        ],
+        "after_images": [
+          "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+        ],
+        "next_maintenance_date": "2026-03-06T12:11:59.544000",
+        "status_after": "OK",
+        "notes": "Equipment is in excellent condition after maintenance",
+        "created_at": "2025-12-06T12:11:59.598000"
+      },
+      {
+        "_id": "69341d8fe31a5e63eb78f643",
+        "id": "afdf7040-cf42-4004-8e90-6d63eaa40d20",
+        "task_id": "5f68045f-7520-4d61-b764-205aeef7a622",
+        "article_id": "8d909441-b79c-47fe-a3f2-f1880e47a701",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "work_description": "Found critical defect during inspection",
+        "parts_used": null,
+        "cost": 0.0,
+        "before_images": null,
+        "after_images": null,
+        "next_maintenance_date": null,
+        "status_after": "defekt",
+        "notes": "Equipment requires major repair before use",
+        "created_at": "2025-12-06T12:11:59.720000"
+      },
+      {
+        "_id": "69341d8fe31a5e63eb78f644",
+        "id": "5a752420-6b1d-4910-8c0b-abb4fc1247e7",
+        "task_id": "5f68045f-7520-4d61-b764-205aeef7a622",
+        "article_id": "8d909441-b79c-47fe-a3f2-f1880e47a701",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "work_description": "Equipment blocked pending safety review",
+        "parts_used": null,
+        "cost": null,
+        "before_images": null,
+        "after_images": null,
+        "next_maintenance_date": null,
+        "status_after": "gesperrt",
+        "notes": "Blocked until safety certification",
+        "created_at": "2025-12-06T12:11:59.839000"
+      }
+    ],
+    "maintenance_tasks": [],
+    "bookings": [],
+    "events": [
+      {
+        "_id": "69713b3f5484e53fc41dfb44",
+        "id": "ec2f8990-7513-44fe-94ce-2c50f67a72c3",
+        "event_number": "EVT-2026-001",
+        "customer_id": "4bd08e55-bca3-43f9-8b54-4aa74e725aa5",
+        "event_type": "Konzert",
+        "event_name": "Ldhv",
+        "description": null,
+        "location": "Offenburg",
+        "location_type": "Indoor",
+        "start_date": "2026-07-12T00:00:00",
+        "end_date": "2026-08-01T00:00:00",
+        "setup_date": null,
+        "teardown_date": null,
+        "status": "planned",
+        "total_value": null,
+        "notes": null,
+        "created_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "created_at": "2026-01-21T20:46:55.056000",
+        "updated_at": "2026-01-21T20:46:55.056000"
+      }
+    ],
+    "audit_logs": [
+      {
+        "_id": "6971343982317cd10c07f908",
+        "id": "d3f06357-18f9-4720-9916-8d0bb4b09cd4",
+        "timestamp": "2026-01-21T20:16:57.328230",
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "username": "Admin",
+        "action": "database_reset",
+        "entity_type": "system",
+        "entity_id": "all",
+        "details": "Entire database reset - all data deleted"
+      }
+    ],
+    "users": [
+      {
+        "_id": "68b204f3c36738f309f14b05",
+        "id": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "email": "admin@inventory.com",
+        "username": "admin_user",
+        "role": "admin",
+        "is_active": true,
+        "created_at": "2025-08-29T19:52:19.531000",
+        "hashed_password": "$2b$12$zBqUeKFcKEYd509DS3pAK.Sm.T9jvy2.xw3nTEFtQJetz4eFCoiCC"
+      },
+      {
+        "_id": "68b204f3c36738f309f14b06",
+        "id": "a3e16221-212b-4944-9f6c-4b9b04922c7b",
+        "email": "lager@inventory.com",
+        "username": "lager_user",
+        "role": "lager",
+        "is_active": true,
+        "created_at": "2025-08-29T19:52:19.791000",
+        "hashed_password": "$2b$12$m.DOCKruwAyfOooqM18SgeK30p5bKTiwxYXh4IamqRr6FWmKCliKy"
+      },
+      {
+        "_id": "68b204f4c36738f309f14b07",
+        "id": "6103bcf9-148c-4dca-99c5-bf9ad0668349",
+        "email": "tech@inventory.com",
+        "username": "tech_user",
+        "role": "techniker",
+        "is_active": true,
+        "created_at": "2025-08-29T19:52:20.040000",
+        "hashed_password": "$2b$12$8N8WPeuX41iLe.LiJUWZ3.1jJQ9GO4u8tUW.xfeth22Jjo8OSvvui"
+      },
+      {
+        "_id": "68cfeb07ba4698b12f5ead29",
+        "id": "16094802-cc91-453d-b47f-7412ff3d4851",
+        "email": "Lukas.bootz@gmx.de",
+        "username": "Lukas ",
+        "role": "admin",
+        "is_active": true,
+        "created_at": "2025-09-21T12:09:43.115000",
+        "hashed_password": "$2b$12$uDZ.ukbrB9n5GZKuPH62eupgYBbHILjHLjvep1Y5bGPmVkVehsx3G"
+      },
+      {
+        "_id": "68cfef04ba4698b12f5ead2a",
+        "id": "9d33cead-d8c0-45f2-a9fb-032b3790743e",
+        "email": "Lukas.bootz@gmx.d",
+        "username": "Lukas",
+        "role": "admin",
+        "is_active": true,
+        "created_at": "2025-09-21T12:26:44.637000",
+        "hashed_password": "$2b$12$fYPsa9oktWU7fGOnFxPGlOlo5sWqk274mHrt2HACOnKuSTNOOiWwO"
+      },
+      {
+        "_id": "68cff1b6ba4698b12f5ead2b",
+        "id": "482f67d2-9115-4104-9e44-11906d01116f",
+        "email": "luk.boo@gmx.de",
+        "username": "test",
+        "role": "lager",
+        "is_active": true,
+        "created_at": "2025-09-21T12:38:14.230000",
+        "hashed_password": "$2b$12$XB7kvnkHjWA2dhGLdlEZw.1dfzZscskGymAPwqBZlHY/Aow6V43Ay"
+      },
+      {
+        "_id": "68ee7148403e7e44be9556df",
+        "id": "68cd4045-0c8f-4ebb-a5c4-941421267d3f",
+        "email": "test_maintenance@example.com",
+        "username": "test_user_maintenance",
+        "role": "admin",
+        "is_active": true,
+        "created_at": "2025-10-14T15:50:32.781000",
+        "hashed_password": "$2b$12$Q6HERX.cAblRlNhYoNqe8eJczs/y7NBAlPbLHzqm252FbXuQr55Sq"
+      },
+      {
+        "_id": "68ee771b12dc1e472c5c7573",
+        "id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "username": "Admin",
+        "email": "admin@inventory.system",
+        "role": "admin",
+        "is_active": true,
+        "is_approved": true,
+        "hashed_password": "$2b$12$DhaxcuUDS5KPHnEepKzIfuOtTsGPTntJKgg.MrbzQwDtxVoY7CX.O",
+        "created_at": "2025-10-14T16:15:23.123000",
+        "last_sync_time": "2026-02-23T21:39:45.956000"
+      },
+      {
+        "_id": "68ee85d5dd094dcda876f3b0",
+        "id": "d3dfa87c-e96f-426e-ae9a-280b8efb05e1",
+        "email": "test123@test.com",
+        "username": "testuser123",
+        "role": "lager",
+        "is_active": true,
+        "is_approved": true,
+        "created_at": "2025-10-14T17:18:13.319000",
+        "hashed_password": "$2b$12$tAnsb3usIZpfNO9ifZ6AJOHdjf8tZXzx748XAufTtknWPJrmx56D6"
+      },
+      {
+        "_id": "68ee9679e5be57f9c9bd97f4",
+        "id": "6fc34ae5-8b97-49f3-aca4-b2aa5b4374e0",
+        "email": "G.joschua112@gmail.com",
+        "username": "Joschuacat",
+        "role": "lager",
+        "is_active": true,
+        "is_approved": true,
+        "created_at": "2025-10-14T18:29:13.966000",
+        "hashed_password": "$2b$12$G.HuVEzcuE1g4OtNwQQCvunGmA/tadqldq1b1kHK3PpQWBRz7pgc6"
+      }
+    ],
+    "bom": [],
+    "storage_zones": [],
+    "maintenance_executions": [
+      {
+        "_id": "68ce55ed6f3728b3f226f113",
+        "id": "8bd610fc-c752-4006-b8a7-8d9de6659d77",
+        "task_id": "0a0b4745-e3db-4fcf-ac3f-cd41492e5473",
+        "checklist_id": "be0b0387-4d1b-4896-8a9e-96089f9b1471",
+        "article_id": "cc32d094-1c5c-44f8-9a93-d65c45a8e2c5",
+        "performed_by": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": true,
+            "notes": "No visible damage found"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": true,
+            "passed": true,
+            "notes": "All connections working properly"
+          },
+          {
+            "item_title": "Sound quality test",
+            "completed": true,
+            "passed": true,
+            "notes": "Audio quality excellent"
+          },
+          {
+            "item_title": "Battery level check",
+            "completed": true,
+            "passed": true,
+            "measurement": "12.5V",
+            "notes": "Battery level good"
+          },
+          {
+            "item_title": "Cleaning status",
+            "completed": true,
+            "passed": true,
+            "notes": "Equipment cleaned thoroughly"
+          }
+        ],
+        "overall_status": "passed",
+        "notes": "All checklist items completed successfully",
+        "created_at": "2025-09-20T07:21:17.694000"
+      },
+      {
+        "_id": "68ce55ee6f3728b3f226f114",
+        "id": "2496d0de-2343-4854-9222-ae47a058ccd5",
+        "task_id": "0a0b4745-e3db-4fcf-ac3f-cd41492e5473",
+        "checklist_id": "be0b0387-4d1b-4896-8a9e-96089f9b1471",
+        "article_id": "cc32d094-1c5c-44f8-9a93-d65c45a8e2c5",
+        "performed_by": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": false,
+            "notes": "Minor scratches found on casing"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": true,
+            "passed": true,
+            "notes": "Connections OK"
+          },
+          {
+            "item_title": "Sound quality test",
+            "completed": true,
+            "passed": false,
+            "notes": "Slight distortion detected"
+          }
+        ],
+        "overall_status": "failed",
+        "notes": "Equipment requires repair before next use",
+        "created_at": "2025-09-20T07:21:18.558000"
+      },
+      {
+        "_id": "68ce55ee6f3728b3f226f115",
+        "id": "48f64f3f-eb39-415a-991e-dcb38702d568",
+        "task_id": "0a0b4745-e3db-4fcf-ac3f-cd41492e5473",
+        "checklist_id": "be0b0387-4d1b-4896-8a9e-96089f9b1471",
+        "article_id": "cc32d094-1c5c-44f8-9a93-d65c45a8e2c5",
+        "performed_by": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": true,
+            "notes": "No damage"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": false,
+            "passed": false,
+            "notes": "Could not complete due to missing equipment"
+          }
+        ],
+        "overall_status": "partial",
+        "notes": "Partial completion - missing test equipment",
+        "created_at": "2025-09-20T07:21:18.570000"
+      },
+      {
+        "_id": "68ee7101403e7e44be9556db",
+        "id": "d472ace8-136c-49b7-835b-c3476193fae1",
+        "task_id": "5a463dc0-5032-4a51-89c9-2e52a2d17a96",
+        "checklist_id": "6f6a6c70-34a8-499b-818e-514ec7229bcb",
+        "article_id": "ea4664f9-b7a1-4458-9d30-0f1ba02c339d",
+        "performed_by": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": true,
+            "notes": "No visible damage found"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": true,
+            "passed": true,
+            "notes": "All connections working properly"
+          },
+          {
+            "item_title": "Sound quality test",
+            "completed": true,
+            "passed": true,
+            "notes": "Audio quality excellent"
+          },
+          {
+            "item_title": "Battery level check",
+            "completed": true,
+            "passed": true,
+            "measurement": "12.5V",
+            "notes": "Battery level good"
+          },
+          {
+            "item_title": "Cleaning status",
+            "completed": true,
+            "passed": true,
+            "notes": "Equipment cleaned thoroughly"
+          }
+        ],
+        "overall_status": "passed",
+        "notes": "All checklist items completed successfully",
+        "created_at": "2025-10-14T15:49:21.373000"
+      },
+      {
+        "_id": "68ee7101403e7e44be9556dc",
+        "id": "e75b6944-5cdf-4e46-aa2a-045f9591298b",
+        "task_id": "5a463dc0-5032-4a51-89c9-2e52a2d17a96",
+        "checklist_id": "6f6a6c70-34a8-499b-818e-514ec7229bcb",
+        "article_id": "ea4664f9-b7a1-4458-9d30-0f1ba02c339d",
+        "performed_by": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": false,
+            "notes": "Minor scratches found on casing"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": true,
+            "passed": true,
+            "notes": "Connections OK"
+          },
+          {
+            "item_title": "Sound quality test",
+            "completed": true,
+            "passed": false,
+            "notes": "Slight distortion detected"
+          }
+        ],
+        "overall_status": "failed",
+        "notes": "Equipment requires repair before next use",
+        "created_at": "2025-10-14T15:49:21.388000"
+      },
+      {
+        "_id": "68ee7101403e7e44be9556dd",
+        "id": "4968c407-b2a5-4463-ab0e-46067128f2ac",
+        "task_id": "5a463dc0-5032-4a51-89c9-2e52a2d17a96",
+        "checklist_id": "6f6a6c70-34a8-499b-818e-514ec7229bcb",
+        "article_id": "ea4664f9-b7a1-4458-9d30-0f1ba02c339d",
+        "performed_by": "130aca65-7420-4fb7-a5c5-17b9f04ce1e7",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": true,
+            "notes": "No damage"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": false,
+            "passed": false,
+            "notes": "Could not complete due to missing equipment"
+          }
+        ],
+        "overall_status": "partial",
+        "notes": "Partial completion - missing test equipment",
+        "created_at": "2025-10-14T15:49:21.438000"
+      },
+      {
+        "_id": "68ee7b09394cbf44bacc915a",
+        "id": "4f47718e-defb-48c8-9092-23aeb7902d5a",
+        "task_id": "4f96956a-7820-4ca7-bc30-2b568fcb6b10",
+        "checklist_id": "4920194f-68b1-46a3-aeca-3c60fc1fd285",
+        "article_id": "b3679ff9-d2ce-4594-831b-ba9e819e46e3",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": true,
+            "notes": "No visible damage found"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": true,
+            "passed": true,
+            "notes": "All connections working properly"
+          },
+          {
+            "item_title": "Sound quality test",
+            "completed": true,
+            "passed": true,
+            "notes": "Audio quality excellent"
+          },
+          {
+            "item_title": "Battery level check",
+            "completed": true,
+            "passed": true,
+            "measurement": "12.5V",
+            "notes": "Battery level good"
+          },
+          {
+            "item_title": "Cleaning status",
+            "completed": true,
+            "passed": true,
+            "notes": "Equipment cleaned thoroughly"
+          }
+        ],
+        "overall_status": "passed",
+        "notes": "All checklist items completed successfully",
+        "created_at": "2025-10-14T16:32:09.727000"
+      },
+      {
+        "_id": "68ee7b09394cbf44bacc915b",
+        "id": "2469e304-d7ad-49e9-abf5-a4e40dc86612",
+        "task_id": "4f96956a-7820-4ca7-bc30-2b568fcb6b10",
+        "checklist_id": "4920194f-68b1-46a3-aeca-3c60fc1fd285",
+        "article_id": "b3679ff9-d2ce-4594-831b-ba9e819e46e3",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": false,
+            "notes": "Minor scratches found on casing"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": true,
+            "passed": true,
+            "notes": "Connections OK"
+          },
+          {
+            "item_title": "Sound quality test",
+            "completed": true,
+            "passed": false,
+            "notes": "Slight distortion detected"
+          }
+        ],
+        "overall_status": "failed",
+        "notes": "Equipment requires repair before next use",
+        "created_at": "2025-10-14T16:32:09.778000"
+      },
+      {
+        "_id": "68ee7b09394cbf44bacc915c",
+        "id": "362d1596-4d0d-441c-b2bc-bfdc0f84aa2e",
+        "task_id": "4f96956a-7820-4ca7-bc30-2b568fcb6b10",
+        "checklist_id": "4920194f-68b1-46a3-aeca-3c60fc1fd285",
+        "article_id": "b3679ff9-d2ce-4594-831b-ba9e819e46e3",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": true,
+            "notes": "No damage"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": false,
+            "passed": false,
+            "notes": "Could not complete due to missing equipment"
+          }
+        ],
+        "overall_status": "partial",
+        "notes": "Partial completion - missing test equipment",
+        "created_at": "2025-10-14T16:32:09.787000"
+      },
+      {
+        "_id": "68ee7b52b04530a36d4cc661",
+        "id": "18728284-acfc-4267-abd7-9902eb1b6787",
+        "task_id": "c3945fea-ec26-47e3-9b8f-242d48ff7678",
+        "checklist_id": "8a3361ec-5fb5-4584-a188-d60c27fa6ecb",
+        "article_id": "9c455b94-8060-456b-b1b7-4e87b13c5d1e",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": true,
+            "notes": "No visible damage found"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": true,
+            "passed": true,
+            "notes": "All connections working properly"
+          },
+          {
+            "item_title": "Sound quality test",
+            "completed": true,
+            "passed": true,
+            "notes": "Audio quality excellent"
+          },
+          {
+            "item_title": "Battery level check",
+            "completed": true,
+            "passed": true,
+            "measurement": "12.5V",
+            "notes": "Battery level good"
+          },
+          {
+            "item_title": "Cleaning status",
+            "completed": true,
+            "passed": true,
+            "notes": "Equipment cleaned thoroughly"
+          }
+        ],
+        "overall_status": "passed",
+        "notes": "All checklist items completed successfully",
+        "created_at": "2025-10-14T16:33:22.339000"
+      },
+      {
+        "_id": "68ee7b52b04530a36d4cc662",
+        "id": "08a0852e-91ba-46fa-b8cd-a70dd0717eb8",
+        "task_id": "c3945fea-ec26-47e3-9b8f-242d48ff7678",
+        "checklist_id": "8a3361ec-5fb5-4584-a188-d60c27fa6ecb",
+        "article_id": "9c455b94-8060-456b-b1b7-4e87b13c5d1e",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": false,
+            "notes": "Minor scratches found on casing"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": true,
+            "passed": true,
+            "notes": "Connections OK"
+          },
+          {
+            "item_title": "Sound quality test",
+            "completed": true,
+            "passed": false,
+            "notes": "Slight distortion detected"
+          }
+        ],
+        "overall_status": "failed",
+        "notes": "Equipment requires repair before next use",
+        "created_at": "2025-10-14T16:33:22.391000"
+      },
+      {
+        "_id": "68ee7b52b04530a36d4cc663",
+        "id": "85d1e612-1c33-4458-877a-212ed648f5c1",
+        "task_id": "c3945fea-ec26-47e3-9b8f-242d48ff7678",
+        "checklist_id": "8a3361ec-5fb5-4584-a188-d60c27fa6ecb",
+        "article_id": "9c455b94-8060-456b-b1b7-4e87b13c5d1e",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": true,
+            "notes": "No damage"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": false,
+            "passed": false,
+            "notes": "Could not complete due to missing equipment"
+          }
+        ],
+        "overall_status": "partial",
+        "notes": "Partial completion - missing test equipment",
+        "created_at": "2025-10-14T16:33:22.402000"
+      },
+      {
+        "_id": "690e20ea973c7798cd0b3590",
+        "id": "ee65449f-6f9b-4227-89f6-38f4d3cd8508",
+        "task_id": "e15337f3-d362-424b-b231-70f124f06f19",
+        "checklist_id": "d1366047-6c79-471f-9ea4-56e12166a042",
+        "article_id": "2df92f26-6e17-4351-9729-84766375237b",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": true,
+            "notes": "No visible damage found"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": true,
+            "passed": true,
+            "notes": "All connections working properly"
+          },
+          {
+            "item_title": "Sound quality test",
+            "completed": true,
+            "passed": true,
+            "notes": "Audio quality excellent"
+          },
+          {
+            "item_title": "Battery level check",
+            "completed": true,
+            "passed": true,
+            "measurement": "12.5V",
+            "notes": "Battery level good"
+          },
+          {
+            "item_title": "Cleaning status",
+            "completed": true,
+            "passed": true,
+            "notes": "Equipment cleaned thoroughly"
+          }
+        ],
+        "overall_status": "passed",
+        "notes": "All checklist items completed successfully",
+        "created_at": "2025-11-07T16:40:10.439000"
+      },
+      {
+        "_id": "690e20ea973c7798cd0b3591",
+        "id": "48e0d12e-cb9a-40b3-9301-52415a6c185d",
+        "task_id": "e15337f3-d362-424b-b231-70f124f06f19",
+        "checklist_id": "d1366047-6c79-471f-9ea4-56e12166a042",
+        "article_id": "2df92f26-6e17-4351-9729-84766375237b",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": false,
+            "notes": "Minor scratches found on casing"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": true,
+            "passed": true,
+            "notes": "Connections OK"
+          },
+          {
+            "item_title": "Sound quality test",
+            "completed": true,
+            "passed": false,
+            "notes": "Slight distortion detected"
+          }
+        ],
+        "overall_status": "failed",
+        "notes": "Equipment requires repair before next use",
+        "created_at": "2025-11-07T16:40:10.456000"
+      },
+      {
+        "_id": "690e20ea973c7798cd0b3592",
+        "id": "f729bca6-5f49-46d5-b701-155e5ff52891",
+        "task_id": "e15337f3-d362-424b-b231-70f124f06f19",
+        "checklist_id": "d1366047-6c79-471f-9ea4-56e12166a042",
+        "article_id": "2df92f26-6e17-4351-9729-84766375237b",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": true,
+            "notes": "No damage"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": false,
+            "passed": false,
+            "notes": "Could not complete due to missing equipment"
+          }
+        ],
+        "overall_status": "partial",
+        "notes": "Partial completion - missing test equipment",
+        "created_at": "2025-11-07T16:40:10.468000"
+      },
+      {
+        "_id": "690e21901d07883a2bc63259",
+        "id": "43c60cbf-3c96-4e2c-90b6-e3b7be9f21c8",
+        "task_id": "e4a3b754-a3bd-41c6-9a93-c8204742b290",
+        "checklist_id": "f130a96a-6925-4d68-ab59-0b49678630fb",
+        "article_id": "b7badc18-7dfc-42ee-b5e9-59aa258f4ddd",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": true,
+            "notes": "No visible damage found"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": true,
+            "passed": true,
+            "notes": "All connections working properly"
+          },
+          {
+            "item_title": "Sound quality test",
+            "completed": true,
+            "passed": true,
+            "notes": "Audio quality excellent"
+          },
+          {
+            "item_title": "Battery level check",
+            "completed": true,
+            "passed": true,
+            "measurement": "12.5V",
+            "notes": "Battery level good"
+          },
+          {
+            "item_title": "Cleaning status",
+            "completed": true,
+            "passed": true,
+            "notes": "Equipment cleaned thoroughly"
+          }
+        ],
+        "overall_status": "passed",
+        "notes": "All checklist items completed successfully",
+        "created_at": "2025-11-07T16:42:56.026000"
+      },
+      {
+        "_id": "690e21901d07883a2bc6325a",
+        "id": "6029d874-afd7-4bf3-9e55-59dcbdc7a4c7",
+        "task_id": "e4a3b754-a3bd-41c6-9a93-c8204742b290",
+        "checklist_id": "f130a96a-6925-4d68-ab59-0b49678630fb",
+        "article_id": "b7badc18-7dfc-42ee-b5e9-59aa258f4ddd",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": false,
+            "notes": "Minor scratches found on casing"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": true,
+            "passed": true,
+            "notes": "Connections OK"
+          },
+          {
+            "item_title": "Sound quality test",
+            "completed": true,
+            "passed": false,
+            "notes": "Slight distortion detected"
+          }
+        ],
+        "overall_status": "failed",
+        "notes": "Equipment requires repair before next use",
+        "created_at": "2025-11-07T16:42:56.036000"
+      },
+      {
+        "_id": "690e21901d07883a2bc6325b",
+        "id": "ad368cd5-edaa-432a-bfbe-07fd766d17a3",
+        "task_id": "e4a3b754-a3bd-41c6-9a93-c8204742b290",
+        "checklist_id": "f130a96a-6925-4d68-ab59-0b49678630fb",
+        "article_id": "b7badc18-7dfc-42ee-b5e9-59aa258f4ddd",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": true,
+            "notes": "No damage"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": false,
+            "passed": false,
+            "notes": "Could not complete due to missing equipment"
+          }
+        ],
+        "overall_status": "partial",
+        "notes": "Partial completion - missing test equipment",
+        "created_at": "2025-11-07T16:42:56.088000"
+      },
+      {
+        "_id": "693342590924b8487a66ab03",
+        "id": "ce4bb81e-b663-4aca-b908-23699969603f",
+        "task_id": "0676a145-27e9-4551-97f4-59dc12830b2d",
+        "checklist_id": "14efe993-7f3c-423d-b3dc-86c272af68ca",
+        "article_id": "8285a55a-db9e-46ca-985b-dc64c7b46efb",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": true,
+            "notes": "No visible damage found"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": true,
+            "passed": true,
+            "notes": "All connections working properly"
+          },
+          {
+            "item_title": "Sound quality test",
+            "completed": true,
+            "passed": true,
+            "notes": "Audio quality excellent"
+          },
+          {
+            "item_title": "Battery level check",
+            "completed": true,
+            "passed": true,
+            "measurement": "12.5V",
+            "notes": "Battery level good"
+          },
+          {
+            "item_title": "Cleaning status",
+            "completed": true,
+            "passed": true,
+            "notes": "Equipment cleaned thoroughly"
+          }
+        ],
+        "overall_status": "passed",
+        "notes": "All checklist items completed successfully",
+        "created_at": "2025-12-05T20:36:41.092000"
+      },
+      {
+        "_id": "693342590924b8487a66ab04",
+        "id": "f371b7dd-b6b2-42aa-a0bc-f494ea695f8b",
+        "task_id": "0676a145-27e9-4551-97f4-59dc12830b2d",
+        "checklist_id": "14efe993-7f3c-423d-b3dc-86c272af68ca",
+        "article_id": "8285a55a-db9e-46ca-985b-dc64c7b46efb",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": false,
+            "notes": "Minor scratches found on casing"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": true,
+            "passed": true,
+            "notes": "Connections OK"
+          },
+          {
+            "item_title": "Sound quality test",
+            "completed": true,
+            "passed": false,
+            "notes": "Slight distortion detected"
+          }
+        ],
+        "overall_status": "failed",
+        "notes": "Equipment requires repair before next use",
+        "created_at": "2025-12-05T20:36:41.145000"
+      },
+      {
+        "_id": "693342590924b8487a66ab05",
+        "id": "1ba02aa1-afa8-449f-96b0-4f2ce11d3b30",
+        "task_id": "0676a145-27e9-4551-97f4-59dc12830b2d",
+        "checklist_id": "14efe993-7f3c-423d-b3dc-86c272af68ca",
+        "article_id": "8285a55a-db9e-46ca-985b-dc64c7b46efb",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": true,
+            "notes": "No damage"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": false,
+            "passed": false,
+            "notes": "Could not complete due to missing equipment"
+          }
+        ],
+        "overall_status": "partial",
+        "notes": "Partial completion - missing test equipment",
+        "created_at": "2025-12-05T20:36:41.153000"
+      },
+      {
+        "_id": "69341d90e31a5e63eb78f647",
+        "id": "98d7c0a3-eeae-424c-b67b-74a045be4d01",
+        "task_id": "5f68045f-7520-4d61-b764-205aeef7a622",
+        "checklist_id": "d3d094e4-bc09-438f-bd56-bd0f2c241488",
+        "article_id": "8d909441-b79c-47fe-a3f2-f1880e47a701",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": true,
+            "notes": "No visible damage found"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": true,
+            "passed": true,
+            "notes": "All connections working properly"
+          },
+          {
+            "item_title": "Sound quality test",
+            "completed": true,
+            "passed": true,
+            "notes": "Audio quality excellent"
+          },
+          {
+            "item_title": "Battery level check",
+            "completed": true,
+            "passed": true,
+            "measurement": "12.5V",
+            "notes": "Battery level good"
+          },
+          {
+            "item_title": "Cleaning status",
+            "completed": true,
+            "passed": true,
+            "notes": "Equipment cleaned thoroughly"
+          }
+        ],
+        "overall_status": "passed",
+        "notes": "All checklist items completed successfully",
+        "created_at": "2025-12-06T12:12:00.806000"
+      },
+      {
+        "_id": "69341d90e31a5e63eb78f648",
+        "id": "f04ab737-c936-4d6d-b81e-f33da62b20eb",
+        "task_id": "5f68045f-7520-4d61-b764-205aeef7a622",
+        "checklist_id": "d3d094e4-bc09-438f-bd56-bd0f2c241488",
+        "article_id": "8d909441-b79c-47fe-a3f2-f1880e47a701",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": false,
+            "notes": "Minor scratches found on casing"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": true,
+            "passed": true,
+            "notes": "Connections OK"
+          },
+          {
+            "item_title": "Sound quality test",
+            "completed": true,
+            "passed": false,
+            "notes": "Slight distortion detected"
+          }
+        ],
+        "overall_status": "failed",
+        "notes": "Equipment requires repair before next use",
+        "created_at": "2025-12-06T12:12:00.927000"
+      },
+      {
+        "_id": "69341d91e31a5e63eb78f649",
+        "id": "b015e97b-1bf7-47b6-9ce6-d858ef257322",
+        "task_id": "5f68045f-7520-4d61-b764-205aeef7a622",
+        "checklist_id": "d3d094e4-bc09-438f-bd56-bd0f2c241488",
+        "article_id": "8d909441-b79c-47fe-a3f2-f1880e47a701",
+        "performed_by": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "checklist_results": [
+          {
+            "item_title": "Visual inspection for damage",
+            "completed": true,
+            "passed": true,
+            "notes": "No damage"
+          },
+          {
+            "item_title": "Cable connection test",
+            "completed": false,
+            "passed": false,
+            "notes": "Could not complete due to missing equipment"
+          }
+        ],
+        "overall_status": "partial",
+        "notes": "Partial completion - missing test equipment",
+        "created_at": "2025-12-06T12:12:01.044000"
+      }
+    ],
+    "push_tokens": [
+      {
+        "_id": "6996039c13eba0b9a9c0b8d9",
+        "id": "854e63c4-9c02-4bfd-9c3f-fe2c74ce288b",
+        "user_id": "b71c6669-9e8d-49aa-adda-305d49769b2c",
+        "token": "ExponentPushToken[test123]",
+        "platform": "ios",
+        "created_at": "2026-02-18T18:23:24.756000",
+        "is_active": true
+      }
+    ],
+    "suppliers": [],
+    "teams": []
+  }
+}

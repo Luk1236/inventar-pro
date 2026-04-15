@@ -1,0 +1,1 @@
+﻿const SecureStore = { store: new Map(), getItemAsync: async (key) => SecureStore.store.get(key) || null, setItemAsync: async (key, value) => { SecureStore.store.set(key, value); }, deleteItemAsync: async (key) => { SecureStore.store.delete(key); } }; module.exports = SecureStore;

@@ -1,0 +1,230 @@
+﻿from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, Response, Query, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+from dotenv import load_dotenv
+from pathlib import Path
+from pydantic import BaseModel, Field, EmailStr, validator
+from typing import List, Optional, Dict, Any
+from datetime import datetime, timedelta
+from passlib.context import CryptContext
+from jose import JWTError, jwt
+import os
+import re
+import shutil
+import logging
+import uuid
+import asyncio
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+import json
+import secrets
+import csv
+import io
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from websocket_handler import manager, websocket_endpoint
+
+# Configure logging (must be early for use throughout file)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+# M5 â€” Rotating file handler: 10 MB per file, keep 5 files â†’ max 50 MB on disk
+_log_dir = os.path.join(os.path.dirname(__file__), "logs")
+os.makedirs(_log_dir, exist_ok=True)
+from logging.handlers import RotatingFileHandler as _RotatingFileHandler
+_file_handler = _RotatingFileHandler(
+    os.path.join(_log_dir, "app.log"),
+    maxBytes=10 * 1024 * 1024,
+    backupCount=5,
+    encoding="utf-8",
+)
+_file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logging.getLogger().addHandler(_file_handler)
+logger = logging.getLogger(__name__)
+
+# Cross-platform sync will be implemented in next version
+# For now, we'll add basic cross-platform support
+
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
+
+# ===========================================
+# SECURITY CONFIGURATION
+# ===========================================
+
+# Rate Limiter - Protects against brute force and DoS
+limiter = Limiter(key_func=get_remote_address)
+
+security = HTTPBearer()
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+SECRET_KEY = os.environ.get("SECRET_KEY")
+_known_weak_keys = {
+    "change_this_to_a_secure_random_string_in_production",
+    "inventory_management_secret_key_2025",
+    "changeme",
+    "",
+}
+if not SECRET_KEY or SECRET_KEY in _known_weak_keys:
+    raise RuntimeError(
+        "â›” CRITICAL: SECRET_KEY ist nicht gesetzt oder verwendet einen unsicheren Standardwert.\n"
+        "Bitte einen sicheren Key in der .env setzen:\n"
+        "  SECRET_KEY=" + secrets.token_hex(32) + "\n"
+        "Server wird nicht gestartet."
+    )
+
+ALGORITHM = "HS256"
+
+# MongoDB connection
+mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+DB_NAME = os.environ.get('DB_NAME', 'inventory_db')
+client = AsyncIOMotorClient(mongo_url)
+db = client[DB_NAME]
+
+# Backup directory
+BACKUP_DIR = Path(os.environ.get("BACKUP_DIR", str(Path(__file__).parent / "backups")))
+BACKUP_DIR.mkdir(exist_ok=True)
+BACKUP_FILE = BACKUP_DIR / "latest_backup.json"
+MAX_EXPORT_ROWS = 5000   # K2: Hard cap for all export endpoints (CSV/PDF/Excel)
+MAX_BACKUP_SIZE_MB = 500  # H2: Backup download size limit
+MAX_IMPORT_ROWS = 1000   # F10: Hard cap for bulk article import
+DASHBOARD_CACHE_TTL = 30  # F9: Dashboard stats cached for 30 seconds
+
+# F9: In-memory dashboard cache â€” avoids 17 count_documents() calls on every page load
+_dashboard_cache: dict = {}
+_dashboard_cache_ts: float = 0.0
+
+# Scheduler for daily backups
+scheduler = AsyncIOScheduler()
+
+# Email configuration
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "")
+SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+NOTIFICATION_EMAIL = os.getenv("NOTIFICATION_EMAIL", "")
+
+# Token Configuration
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+
+app = FastAPI(title="Inventory Management System", version="1.0.0")
+api_router = APIRouter(prefix="/api")
+
+# M4 â€” Health check (used by load balancers, Docker HEALTHCHECK, monitoring)
+@app.get("/health", tags=["health"])
+async def health_check():
+    try:
+        await db.command("ping")
+        return {"status": "ok", "db": "connected", "version": "1.0.0"}
+    except Exception:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            {"status": "degraded", "db": "unreachable", "version": "1.0.0"},
+            status_code=503
+        )
+
+# ===========================================
+# RBAC - Role-Based Access Control
+# ===========================================
+
+class Permission:
+    # Article permissions
+    VIEW_ARTICLES = "view_articles"
+    CREATE_ARTICLE = "create_article"
+    EDIT_ARTICLE = "edit_article"
+    DELETE_ARTICLE = "delete_article"
+    
+    # Stock permissions
+    VIEW_STOCK = "view_stock"
+    EDIT_STOCK = "edit_stock"
+    
+    # Event permissions
+    VIEW_EVENTS = "view_events"
+    CREATE_EVENT = "create_event"
+    EDIT_EVENT = "edit_event"
+    DELETE_EVENT = "delete_event"
+    
+    # Customer permissions
+    VIEW_CUSTOMERS = "view_customers"
+    CREATE_CUSTOMER = "create_customer"
+    EDIT_CUSTOMER = "edit_customer"
+    
+    # Invoice permissions
+    CREATE_INVOICE = "create_invoice"
+    VIEW_INVOICES = "view_invoices"
+
+    # Admin permissions
+    MANAGE_USERS = "manage_users"
+    VIEW_REPORTS = "view_reports"
+    ADMIN_ACCESS = "admin_access"
+    BACKUP_DATABASE = "backup_database"
+
+# Role permission mappings
+ROLE_PERMISSIONS = {
+    "admin": [
+        Permission.VIEW_ARTICLES, Permission.CREATE_ARTICLE, Permission.EDIT_ARTICLE, Permission.DELETE_ARTICLE,
+        Permission.VIEW_STOCK, Permission.EDIT_STOCK,
+        Permission.VIEW_EVENTS, Permission.CREATE_EVENT, Permission.EDIT_EVENT, Permission.DELETE_EVENT,
+        Permission.VIEW_CUSTOMERS, Permission.CREATE_CUSTOMER, Permission.EDIT_CUSTOMER,
+        Permission.MANAGE_USERS, Permission.VIEW_REPORTS, Permission.ADMIN_ACCESS, Permission.BACKUP_DATABASE,
+        Permission.CREATE_INVOICE, Permission.VIEW_INVOICES,
+    ],
+    "lager": [
+        Permission.VIEW_ARTICLES, Permission.CREATE_ARTICLE, Permission.EDIT_ARTICLE,
+        Permission.VIEW_STOCK, Permission.EDIT_STOCK,
+        Permission.VIEW_EVENTS, Permission.CREATE_EVENT, Permission.EDIT_EVENT,
+        Permission.VIEW_CUSTOMERS, Permission.CREATE_CUSTOMER,
+        Permission.VIEW_REPORTS, Permission.CREATE_INVOICE, Permission.VIEW_INVOICES,
+    ],
+    "techniker": [
+        Permission.VIEW_ARTICLES, Permission.EDIT_ARTICLE,
+        Permission.VIEW_STOCK,
+        Permission.VIEW_EVENTS,
+        Permission.VIEW_CUSTOMERS
+    ],
+    # F12: New fine-grained roles
+    "viewer": [
+        # Read-only access across all main entities
+        Permission.VIEW_ARTICLES,
+        Permission.VIEW_STOCK,
+        Permission.VIEW_EVENTS,
+        Permission.VIEW_CUSTOMERS,
+        Permission.VIEW_REPORTS,
+    ],
+    "fahrer": [
+        # Drivers: see events + articles (for loading/unloading), no customer/financial data
+        Permission.VIEW_ARTICLES,
+        Permission.VIEW_STOCK,
+        Permission.VIEW_EVENTS,
+    ],
+}
+
+def has_permission(user_role: str, permission: str) -> bool:
+    """Check if a role has a specific permission"""
+    return permission in ROLE_PERMISSIONS.get(user_role, [])
+
+def require_permission(permission: str):
+    """Dependency to check user permission"""
+    async def permission_checker(current_user: "User" = Depends(get_current_user)):
+        if not has_permission(current_user.role, permission):
+            raise HTTPException(
+                status_code=403, 
+                detail="Keine Berechtigung fÃ¼r diese Aktion"
+            )
+        return current_user
+    return permission_checker
+
+# Models
+class UserRole(str):
+    ADMIN = "admin"
+    LAGER = "lager"
+    TECHNIKER = "techniker"
+    VIEWER = "viewer"   # F12: read-only across all entities
+    FAHRER = "fahrer"   # F12: drivers â€” events + articles only
+
+class User(BaseModel):
