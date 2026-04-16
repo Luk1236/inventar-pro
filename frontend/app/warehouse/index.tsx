@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, ActivityIndicator,
-  TouchableOpacity, StyleSheet, SafeAreaView, TextInput, Platform,
+  TouchableOpacity, StyleSheet, SafeAreaView, TextInput,
   Modal, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +17,8 @@ import {
   getArticlesForLocation,
 } from '../../utils/warehouseUtils';
 import { useTheme } from '../../contexts/ThemeContext';
+
+const zoneColors = ['#1E88E5', '#43A047', '#FB8C00', '#8E24AA', '#E53935'];
 
 export default function WarehouseScreen() {
   const { colors, isDark } = useTheme();
@@ -102,23 +104,36 @@ export default function WarehouseScreen() {
     ? getArticlesForLocation(articles, selectedLocationId)
     : [];
 
-  function getFillRatio(locationId: string): number {
-    const count = articles.filter(a => (a as any).storage_location_id === locationId).length;
-    return Math.min(count / 9, 1);
-  }
+  const fillRatioMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const loc of locations) {
+      const count = articles.filter(a => a.storage_location_id === loc.id).length;
+      map.set(loc.id, Math.min(count / 9, 1));
+    }
+    return map;
+  }, [locations, articles]);
 
-  const filteredLocations = filterMode === 'all' ? locations : locations.filter(loc => {
-    const r = getFillRatio(loc.id);
-    if (filterMode === 'free') return r < 0.7;
-    if (filterMode === 'low')  return r >= 0.7 && r < 0.92;
-    if (filterMode === 'full') return r >= 0.92;
-    return true;
-  });
+  const filteredLocations = useMemo(() => {
+    if (filterMode === 'all') return locations;
+    return locations.filter(loc => {
+      const r = fillRatioMap.get(loc.id) ?? 0;
+      if (filterMode === 'free') return r < 0.7;
+      if (filterMode === 'low')  return r >= 0.7 && r < 0.92;
+      if (filterMode === 'full') return r >= 0.92;
+      return true;
+    });
+  }, [locations, filterMode, fillRatioMap]);
 
-  const totalFill = locations.length > 0
-    ? Math.round((locations.reduce((s, l) => s + getFillRatio(l.id), 0) / locations.length) * 100)
-    : 0;
-  const criticalCount = locations.filter(l => getFillRatio(l.id) >= 0.92).length;
+  const totalFill = useMemo(() => {
+    if (locations.length === 0) return 0;
+    const sum = locations.reduce((s, l) => s + (fillRatioMap.get(l.id) ?? 0), 0);
+    return Math.round((sum / locations.length) * 100);
+  }, [locations, fillRatioMap]);
+
+  const criticalCount = useMemo(() =>
+    locations.filter(l => (fillRatioMap.get(l.id) ?? 0) >= 0.92).length,
+    [locations, fillRatioMap]
+  );
 
   const handlePrint = () => {
     if (typeof window !== 'undefined') {
@@ -292,8 +307,8 @@ export default function WarehouseScreen() {
           { label: 'Kritisch', value: String(criticalCount), color: criticalCount > 0 ? '#ef4444' : '#22c55e' },
           { label: 'Artikel', value: String(articles.length), color: '#60a5fa' },
           { label: 'Zonen', value: String(zones.length), color: '#a78bfa' },
-        ].map((s, i) => (
-          <View key={i} style={{ flex: 1, alignItems: 'center' }}>
+        ].map(s => (
+          <View key={s.label} style={{ flex: 1, alignItems: 'center' }}>
             <Text style={{ color: s.color, fontSize: 16, fontWeight: '700' }}>{s.value}</Text>
             <Text style={{ color: '#475569', fontSize: 10 }}>{s.label}</Text>
           </View>
@@ -316,13 +331,13 @@ export default function WarehouseScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView>
-              {zones.map((zone, zi) => {
+              {(() => {
+                return zones.map((zone, zi) => {
                 const zoneLocs = locations.filter(l => l.zone_id === zone.id);
                 const zoneArts = articles.filter(a =>
-                  zoneLocs.some(l => l.id === (a as any).storage_location_id));
+                  zoneLocs.some(l => l.id === a.storage_location_id));
                 const maxSlots = zoneLocs.length * 9;
                 const fillPct = maxSlots > 0 ? Math.round((zoneArts.length / maxSlots) * 100) : 0;
-                const zoneColors = ['#1E88E5','#43A047','#FB8C00','#8E24AA','#E53935'];
                 const color = zoneColors[zi % zoneColors.length];
                 return (
                   <View key={zone.id} style={{ marginBottom: 14 }}>
@@ -343,7 +358,8 @@ export default function WarehouseScreen() {
                     </View>
                   </View>
                 );
-              })}
+              });
+              })()}
             </ScrollView>
           </View>
         </View>
