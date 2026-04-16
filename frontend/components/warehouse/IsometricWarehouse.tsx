@@ -413,6 +413,11 @@ export default function IsometricWarehouse({ zones, locations, articles, selecte
           const leaderAnchor = isoProject(cx, 0, z0 - 0.1);
           const zoneLocs = getLocationsForZone(locations, zone.id);
           const isCollapsed = collapsedZones.has(zone.id);
+          const zoneArtCount = articles.filter(a =>
+            zoneLocs.some(l => l.id === a.storage_location_id)
+          ).length;
+          const zoneMaxSlots = zoneLocs.length * 9;
+          const zoneFillPct = zoneMaxSlots > 0 ? Math.round((zoneArtCount / zoneMaxSlots) * 100) : 0;
           const lblW = 180, lblH = 22;
           // Maße-String: wenn grid_width/grid_depth gesetzt, echte Meter anzeigen
           const dimStr = (zone.grid_width && zone.grid_depth)
@@ -437,6 +442,9 @@ export default function IsometricWarehouse({ zones, locations, articles, selecte
               </SvgText>
               <SvgText x={lp2.sx} y={lp2.sy} textAnchor="middle" fontSize={10} fill={pal.text} opacity={0.8}>
                 {zone.type} · {zoneLocs.length} Lagerorte{dimStr}{isCollapsed ? ' (ausgeblendet)' : ''}
+              </SvgText>
+              <SvgText x={lp2.sx} y={lp2.sy + 13} textAnchor="middle" fontSize={8} fill={pal.text} opacity={0.6}>
+                {`${zoneLocs.length} Regale · ${zoneFillPct}% belegt`}
               </SvgText>
             </G>
           );
