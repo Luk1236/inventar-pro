@@ -53,6 +53,12 @@ export default function LocationPanel({
   const movingArticle = movingArticleId ? articles.find(a => a.id === movingArticleId) : null;
   const otherLocations = allLocations.filter(l => l.id !== location.id);
 
+  const capacity = 9; // 3 levels × 3 slots standard
+  const fillRatio = Math.min(articles.length / capacity, 1);
+  const fillPct = Math.round(fillRatio * 100);
+  const isFull = fillRatio >= 0.92;
+  const fillColor = fillRatio >= 0.92 ? '#ef4444' : fillRatio >= 0.7 ? '#f59e0b' : '#22c55e';
+
   return (
     <View style={styles.panel}>
       <View style={styles.header}>
@@ -62,9 +68,28 @@ export default function LocationPanel({
           <Text style={styles.locationMeta}>{location.type} · {articles.length} Artikel</Text>
         </View>
         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-          <Ionicons name="close" size={24} color="#333" />
+          <Ionicons name="close" size={24} color="#94a3b8" />
         </TouchableOpacity>
       </View>
+
+      {/* Fill bar */}
+      <View style={styles.fillBar}>
+        <View style={styles.fillBarRow}>
+          <Text style={styles.fillBarLabel}>Füllstand</Text>
+          <Text style={[styles.fillBarValue, { color: fillColor }]}>{fillPct}%</Text>
+        </View>
+        <View style={styles.fillBarTrack}>
+          <View style={[styles.fillBarFill, { width: `${fillPct}%` as any, backgroundColor: fillColor }]} />
+        </View>
+      </View>
+
+      {/* Warning if full */}
+      {isFull && (
+        <View style={styles.warningBox}>
+          <Ionicons name="warning-outline" size={16} color="#ef4444" />
+          <Text style={styles.warningText}>Regal ist voll — Artikel bitte verschieben</Text>
+        </View>
+      )}
 
       {movingArticle && (
         <View style={styles.movePanel}>
@@ -132,77 +157,70 @@ export default function LocationPanel({
 
 const styles = StyleSheet.create({
   panel: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: 300,
-    backgroundColor: '#FFFFFF',
-    borderLeftWidth: 1,
-    borderLeftColor: '#E5E5EA',
-    shadowColor: '#000',
-    shadowOffset: { width: -2, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
+    position: 'absolute', right: 0, top: 0, bottom: 0, width: 300,
+    backgroundColor: '#0f1e35',
+    borderLeftWidth: 1, borderLeftColor: '#1e293b',
+    shadowColor: '#000', shadowOffset: { width: -4, height: 0 },
+    shadowOpacity: 0.4, shadowRadius: 12, elevation: 12,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
-    backgroundColor: '#F2F2F7',
+    flexDirection: 'row', alignItems: 'flex-start',
+    padding: 14, borderBottomWidth: 1, borderBottomColor: '#1e293b',
+    backgroundColor: '#060e1a',
   },
   headerText: { flex: 1 },
-  zoneName: { fontSize: 12, color: '#8E8E93', fontWeight: '600', textTransform: 'uppercase' },
-  locationName: { fontSize: 18, fontWeight: '700', color: '#1C1C1E', marginTop: 2 },
-  locationMeta: { fontSize: 13, color: '#8E8E93', marginTop: 2 },
+  zoneName: { fontSize: 10, color: '#64748b', fontWeight: '700',
+    textTransform: 'uppercase', letterSpacing: 1 },
+  locationName: { fontSize: 17, fontWeight: '700', color: '#e2e8f0', marginTop: 2 },
+  locationMeta: { fontSize: 12, color: '#475569', marginTop: 2 },
   closeButton: { padding: 4 },
-  articleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E5EA',
+  fillBar: {
+    marginHorizontal: 14, marginTop: 12, marginBottom: 4,
   },
-  stockDot: { width: 10, height: 10, borderRadius: 5, marginRight: 10 },
-  articleInfo: { flex: 1 },
-  articleName: { fontSize: 14, fontWeight: '600', color: '#1C1C1E' },
-  articleCode: { fontSize: 12, color: '#8E8E93', marginTop: 1 },
-  articleStock: { fontSize: 12, marginTop: 2, fontWeight: '500' },
-  moveButton: { padding: 8 },
+  fillBarRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  fillBarLabel: { fontSize: 11, color: '#64748b' },
+  fillBarValue: { fontSize: 11, fontWeight: '700' },
+  fillBarTrack: { height: 6, backgroundColor: '#1e293b', borderRadius: 3 },
+  fillBarFill: { height: 6, borderRadius: 3 },
+  warningBox: {
+    margin: 14, marginTop: 8, backgroundColor: '#7f1d1d',
+    borderWidth: 1, borderColor: '#ef4444', borderRadius: 8,
+    padding: 10, flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
+  warningText: { color: '#fca5a5', fontSize: 12, flex: 1 },
   movePanel: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
-    backgroundColor: '#FFF9E6',
+    flex: 1, backgroundColor: '#060e1a',
+    borderTopWidth: 1, borderTopColor: '#1e293b',
   },
-  movePanelTitle: { fontSize: 14, fontWeight: '600', color: '#1C1C1E', marginBottom: 8 },
-  locationList: { maxHeight: 200 },
+  movePanelTitle: {
+    fontSize: 13, color: '#94a3b8', padding: 14,
+    borderBottomWidth: 1, borderBottomColor: '#1e293b',
+  },
+  locationList: { flex: 1 },
   locationOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    gap: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    padding: 12, borderBottomWidth: 1, borderBottomColor: '#1e293b',
   },
-  locationOptionText: { flex: 1, fontSize: 14, color: '#1C1C1E' },
-  locationOptionType: { fontSize: 12, color: '#8E8E93' },
+  locationOptionText: { flex: 1, fontSize: 14, color: '#e2e8f0' },
+  locationOptionType: { fontSize: 11, color: '#475569' },
   cancelButton: {
-    marginTop: 8,
-    paddingVertical: 8,
+    margin: 14, padding: 12, borderRadius: 10, backgroundColor: '#1e293b',
     alignItems: 'center',
-    backgroundColor: '#E5E5EA',
-    borderRadius: 8,
   },
-  cancelButtonText: { fontSize: 14, color: '#FF3B30', fontWeight: '600' },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-    gap: 12,
+  cancelButtonText: { color: '#94a3b8', fontWeight: '600' },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  emptyText: { fontSize: 15, color: '#475569' },
+  articleRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    padding: 12, borderBottomWidth: 1, borderBottomColor: '#1e293b',
   },
-  emptyText: { fontSize: 14, color: '#8E8E93', textAlign: 'center' },
+  stockDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  articleInfo: { flex: 1 },
+  articleName: { fontSize: 13, fontWeight: '600', color: '#e2e8f0' },
+  articleCode: { fontSize: 11, color: '#475569', marginTop: 1 },
+  articleStock: { fontSize: 11, marginTop: 1 },
+  moveButton: {
+    backgroundColor: '#1d4ed820', borderRadius: 8, padding: 8,
+    borderWidth: 1, borderColor: '#1d4ed8',
+  },
 });
