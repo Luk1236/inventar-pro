@@ -2,7 +2,7 @@
   "expo": {
     "name": "Inventar Pro",
     "slug": "inventarpro",
-    "version": "1.0.9",
+    "version": "1.0.10",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "inventarpro",
@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.inventarpro.app",
-      "versionCode": 10009,
+      "versionCode": 10010,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#007AFF"
