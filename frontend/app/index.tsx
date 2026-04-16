@@ -18,10 +18,10 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import apiService from '../services/apiService';
+import apiService, { getToken } from '../services/apiService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GlobalSearch from '../components/GlobalSearch';
 import { useTheme } from '../contexts/ThemeContext';
@@ -108,6 +108,8 @@ export default function Index() {
     app_display_name: 'Inventar Pro',
     app_logo_icon: 'cube' as const,
     app_slogan: 'Professionelle Lagerverwaltung',
+    company_name: '',
+    company_logo: '',
   });
 
   // Widget customization
@@ -340,6 +342,36 @@ export default function Index() {
       width: 36,
       height: 36,
       borderRadius: 18,
+    },
+    profileImagePlaceholder: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    companyLogoSmall: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.background,
+    },
+    companyLogoPlaceholderSmall: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    companyNameSmall: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      letterSpacing: 0.2,
+    },
+    logoutButton: {
+      padding: 8,
+      borderRadius: 20,
     },
     content: {
       flex: 1,
@@ -761,6 +793,8 @@ export default function Index() {
           app_display_name: settings.app_display_name || 'Inventar Pro',
           app_logo_icon: settings.app_logo_icon || 'cube',
           app_slogan: settings.app_slogan || 'Professionelle Lagerverwaltung',
+          company_name: settings.company_name || '',
+          company_logo: settings.company_logo || '',
         });
       }
     } catch (error) {
@@ -929,10 +963,22 @@ export default function Index() {
         <StatusBar style={isDark ? 'light' : 'dark'} />
         <ScrollView contentContainerStyle={styles.loginContainer}>
           <View style={styles.logoContainer}>
-            <View style={styles.logoCircle}>
-              <Ionicons name={branding.app_logo_icon as any} size={48} color={colors.primary} />
-            </View>
-            <Text style={styles.appTitle}>{branding.app_display_name}</Text>
+            {/* Company Logo or Default Icon */}
+            {branding.company_logo ? (
+              <View style={[styles.logoCircle, { overflow: 'hidden', padding: 0 }]}>
+                <Image
+                  source={{ uri: branding.company_logo }}
+                  style={{ width: 96, height: 96, borderRadius: 48 }}
+                  resizeMode="cover"
+                />
+              </View>
+            ) : (
+              <View style={styles.logoCircle}>
+                <Ionicons name={branding.app_logo_icon as any} size={48} color={colors.primary} />
+              </View>
+            )}
+            {/* Company Name or App Name */}
+            <Text style={styles.appTitle}>{branding.company_name || branding.app_display_name}</Text>
             <Text style={styles.appSubtitle}>{branding.app_slogan}</Text>
           </View>
 
@@ -1059,63 +1105,91 @@ export default function Index() {
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <GlobalSearch visible={searchVisible} onClose={() => setSearchVisible(false)} />
 
-      {/* Header */}
+      {/* Header with Company Logo & User Info */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Hallo, {user?.username}! 👋</Text>
-          <Text style={styles.subGreeting}>
-            {todayEvents > 0 ? `Heute stehen ${todayEvents} Events an` : 'Keine Events heute'}
-          </Text>
+        {/* Left: Company Logo + User Greeting */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+          {/* Company Logo */}
+          {branding.company_logo ? (
+            <Image source={{ uri: branding.company_logo }} style={styles.companyLogoSmall} />
+          ) : (
+            <View style={[styles.companyLogoPlaceholderSmall, { backgroundColor: colors.primary + '20' }]}>
+              <Ionicons name="business" size={18} color={colors.primary} />
+            </View>
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.companyNameSmall} numberOfLines={1}>
+              {branding.company_name || branding.app_display_name}
+            </Text>
+            <Text style={styles.greeting}>Hallo, {user?.username}! 👋</Text>
+          </View>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+
+        {/* Right: Action Buttons */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {/* Theme Toggle */}
           <TouchableOpacity
-            style={{ padding: 4 }}
+            style={{ padding: 6 }}
             onPress={toggleTheme}
             accessibilityLabel={isDark ? 'Helles Design aktivieren' : 'Dunkles Design aktivieren'}
-            accessibilityRole="button"
           >
-            <Ionicons name={isDark ? 'sunny-outline' : 'moon-outline'} size={24} color={colors.primary} />
+            <Ionicons name={isDark ? 'sunny-outline' : 'moon-outline'} size={22} color={colors.primary} />
           </TouchableOpacity>
+
+          {/* Notifications */}
           <TouchableOpacity
-            style={{ padding: 4, position: 'relative' }}
+            style={{ padding: 6, position: 'relative' }}
             onPress={() => setNotifModalVisible(true)}
-            accessibilityLabel={`Benachrichtigungen${notifications.length > 0 ? `, ${notifications.length} neu` : ''}`}
-            accessibilityRole="button"
           >
-            <Ionicons name="notifications-outline" size={28} color={colors.primary} />
+            <Ionicons name="notifications-outline" size={24} color={colors.primary} />
             {notifications.length > 0 && (
               <View style={{
-                position: 'absolute', top: 0, right: 0,
+                position: 'absolute', top: 2, right: 2,
                 backgroundColor: '#FF3B30', borderRadius: 10,
-                minWidth: 18, height: 18,
+                minWidth: 16, height: 16,
                 justifyContent: 'center', alignItems: 'center',
-                paddingHorizontal: 3,
+                paddingHorizontal: 2,
               }}>
-                <Text style={{ color: 'white', fontSize: 11, fontWeight: 'bold' }}>
+                <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>
                   {notifications.length > 99 ? '99+' : notifications.length}
                 </Text>
               </View>
             )}
           </TouchableOpacity>
+
+          {/* Settings Button */}
+          <TouchableOpacity
+            style={{ padding: 6 }}
+            onPress={() => router.push('/settings')}
+            accessibilityLabel="Einstellungen öffnen"
+          >
+            <Ionicons name="settings-outline" size={24} color={colors.textSecondary} />
+          </TouchableOpacity>
+
+          {/* User Avatar */}
           <TouchableOpacity
             style={styles.profileButton}
             onPress={() => router.push('/profile')}
             accessibilityLabel="Profil öffnen"
-            accessibilityRole="button"
           >
             {user?.profile_image ? (
               <Image source={{ uri: user.profile_image }} style={styles.profileImage} />
             ) : (
-              <Ionicons name="person-circle-outline" size={36} color={colors.primary} />
+              <View style={[styles.profileImagePlaceholder, { backgroundColor: colors.primary }]}>
+                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>
+                  {(user?.username || 'U')[0].toUpperCase()}
+                </Text>
+              </View>
             )}
           </TouchableOpacity>
+
+          {/* Logout */}
           <TouchableOpacity
-            style={styles.profileButton}
+            style={[styles.logoutButton, { backgroundColor: isDark ? '#3a2723' : '#fee2e2' }]}
             onPress={handleLogout}
             accessibilityLabel="Abmelden"
-            accessibilityRole="button"
           >
-            <Ionicons name="log-out-outline" size={28} color={colors.danger} />
+            <Ionicons name="log-out-outline" size={20} color={isDark ? '#f87171' : '#dc2626'} />
           </TouchableOpacity>
         </View>
       </View>
@@ -1278,12 +1352,6 @@ export default function Index() {
             </View>
             <Text style={styles.quickLabel}>Rechnungen</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.quickCard} onPress={() => router.push('/settings')}>
-            <View style={[styles.quickIcon, { backgroundColor: '#8E8E9315' }]}>
-              <Ionicons name="settings-outline" size={26} color="#8E8E93" />
-            </View>
-            <Text style={styles.quickLabel}>Einstellungen</Text>
-          </TouchableOpacity>
         </View>
 
         {/* ===== DASHBOARD STATS WIDGETS ===== */}
@@ -1346,6 +1414,7 @@ export default function Index() {
               {renderSubItem('folder-outline', 'Kategorien', '/categories')}
               {renderSubItem('location-outline', 'Lagerorte', '/storage/locations')}
               {renderSubItem('business-outline', 'Lager 3D', '/warehouse')}
+              {renderSubItem('cube-outline', 'Lager Visualizer', '/warehouse-3d')}
               {renderSubItem('git-merge-outline', 'Kombinationen', '/bundles')}
               {renderSubItem('swap-horizontal-outline', 'Cross-Docking', '/cross-docking')}
               {renderSubItem('list-circle-outline', 'Lager-Tracking-Log', '/tracking-log')}
@@ -1477,11 +1546,6 @@ export default function Index() {
           )}
         </View>
 
-        {/* Konfiguration */}
-        <View style={styles.accordionContainer}>
-          {renderSubItem('settings-outline', 'Einstellungen', '/settings')}
-        </View>
-
       </ScrollView>
 
       {/* Widget Customization Modal */}
@@ -1571,7 +1635,7 @@ export default function Index() {
                 setSessionWarningVisible(false);
                 // Token erneuern
                 try {
-                  const token = await AsyncStorage.getItem('auth_token');
+                  const token = await getToken();
                   if (token) startSessionTimer();
                   else handleLogout(); // Token gone — force logout
                 } catch (error) {

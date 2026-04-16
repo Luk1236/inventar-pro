@@ -59,6 +59,7 @@ export default function RootLayout() {
               <Stack.Screen name="time-tracking/index" />
               <Stack.Screen name="time-tracking/create" />
               <Stack.Screen name="warehouse/index" options={{ headerShown: true, title: 'Lager 3D' }} />
+              <Stack.Screen name="warehouse-3d/index" options={{ headerShown: false }} />
               <Stack.Screen name="vehicles/index" />
               <Stack.Screen name="tasks/index" />
               <Stack.Screen name="tasks/create" />
