@@ -90,6 +90,23 @@ export default function WarehouseScreen() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // Inject print CSS on web so only the SVG canvas is printed
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const style = document.createElement('style');
+    style.id = 'warehouse-print-css';
+    style.textContent = `
+      @media print {
+        body > * { display: none !important; }
+        #warehouse-print-root { display: block !important; }
+        .warehouse-toolbar, .warehouse-stats-bar { display: none !important; }
+        svg { max-width: 100%; height: auto; }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => { document.getElementById('warehouse-print-css')?.remove(); };
+  }, []);
+
   const handleArticleMoved = useCallback((articleId: string, newLocationId: string) => {
     setArticles(prev =>
       prev.map(a => a.id === articleId ? { ...a, storage_location_id: newLocationId } : a)
