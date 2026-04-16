@@ -179,6 +179,13 @@ function ZoneBlock({ zone, locs, arts, y, zi, selectedId, rotations, searchMatch
 }) {
   const color = ZCOLORS[zi % ZCOLORS.length];
 
+  // Zone-level stats for the header label
+  const locIds = new Set(locs.map(l => l.id));
+  const usedArticles = arts.filter(a => a.storage_location_id != null && locIds.has(a.storage_location_id)).length;
+  const maxSlots = locs.length * 9;
+  const fillPct = maxSlots > 0 ? Math.round((usedArticles / maxSlots) * 100) : 0;
+  const statsText = `${locs.length} Regale · ${fillPct}% belegt`;
+
   // Rotation-aware shelf dimensions
   const sw = (loc: StorageLocation) => (rotations[loc.id] ?? 0) % 2 === 1 ? SW * 0.38 : SW;
   const sh = (loc: StorageLocation) => (rotations[loc.id] ?? 0) % 2 === 1 ? SH * 1.6  : SH;
@@ -215,6 +222,10 @@ function ZoneBlock({ zone, locs, arts, y, zi, selectedId, rotations, searchMatch
       <T x={totalW / 2} y={y + ZTOP - 14} textAnchor="middle"
         fontSize={9} fill={color} opacity={0.65}>
         {zone.type} · {locs.length} Lagerorte
+      </T>
+      <T x={totalW / 2} y={y + ZTOP - 2} textAnchor="middle"
+        fontSize={8} fill={color + '99'}>
+        {statsText}
       </T>
 
       {/* Collapse / Expand toggle button */}
