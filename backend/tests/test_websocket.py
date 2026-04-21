@@ -18,41 +18,46 @@ def _make_token(sub: str, token_type: str = "access") -> str:
 
 # ─── _validate_ws_token ───────────────────────────────────────────────────────
 
-def test_ws_token_valid():
+@pytest.mark.asyncio
+async def test_ws_token_valid():
     """Valid access token passes validation."""
-    import sys, os as _os
+    import os as _os
     _os.environ.setdefault("SECRET_KEY", "test-secret-key-for-ws-tests")
     from websocket_handler import _validate_ws_token
     token = _make_token("user123")
-    assert _validate_ws_token(token) is True
+    assert await _validate_ws_token(token) is not None
 
 
-def test_ws_token_empty_rejected():
+@pytest.mark.asyncio
+async def test_ws_token_empty_rejected():
     """Empty token string is rejected."""
     from websocket_handler import _validate_ws_token
-    assert _validate_ws_token("") is False
+    assert await _validate_ws_token("") is None
 
 
-def test_ws_token_refresh_rejected():
+@pytest.mark.asyncio
+async def test_ws_token_refresh_rejected():
     """Refresh token (type=refresh) is rejected."""
     from websocket_handler import _validate_ws_token
     token = _make_token("user123", token_type="refresh")
-    assert _validate_ws_token(token) is False
+    assert await _validate_ws_token(token) is None
 
 
-def test_ws_token_invalid_signature_rejected():
+@pytest.mark.asyncio
+async def test_ws_token_invalid_signature_rejected():
     """Token with wrong secret is rejected."""
     token = jwt.encode({"sub": "user", "type": "access"}, "wrong-secret", algorithm="HS256")
     from websocket_handler import _validate_ws_token
-    assert _validate_ws_token(token) is False
+    assert await _validate_ws_token(token) is None
 
 
-def test_ws_token_no_sub_rejected():
+@pytest.mark.asyncio
+async def test_ws_token_no_sub_rejected():
     """Token without 'sub' claim is rejected."""
     secret = os.environ.get("SECRET_KEY", "test-secret-key-for-ws-tests")
     token = jwt.encode({"type": "access"}, secret, algorithm="HS256")
     from websocket_handler import _validate_ws_token
-    assert _validate_ws_token(token) is False
+    assert await _validate_ws_token(token) is None
 
 
 # ─── ConnectionManager ────────────────────────────────────────────────────────

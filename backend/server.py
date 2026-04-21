@@ -3490,7 +3490,7 @@ async def create_customer(customer_data: CustomerCreate, current_user: User = De
     customer_number = await generate_customer_number()
     customer = Customer(**customer_data.dict(), customer_number=customer_number)
     await db.customers.insert_one(customer.dict())
-    await create_audit_log("CREATE", "customer", customer.id, customer.company_name or customer.contact_name, current_user, {"new": customer.dict()})
+    await create_audit_log("CREATE", "customer", current_user, customer.id, customer.company_name or customer.contact_name, {"new": customer.dict()})
     return customer
 
 @api_router.get("/customers", response_model=List[Customer])
@@ -3538,7 +3538,7 @@ async def update_customer(
         raise HTTPException(status_code=404, detail="Customer not found")
 
     updated_customer = await db.customers.find_one({"id": customer_id})
-    await create_audit_log("UPDATE", "customer", customer_id, updated_customer.get("company_name") or updated_customer.get("contact_name"), current_user, {"old": old_customer, "new": customer_dict})
+    await create_audit_log("UPDATE", "customer", current_user, customer_id, updated_customer.get("company_name") or updated_customer.get("contact_name"), {"old": old_customer, "new": customer_dict})
     return Customer(**updated_customer)
 
 @api_router.delete("/customers/{customer_id}")
@@ -3559,7 +3559,7 @@ async def delete_customer(customer_id: str, current_user: User = Depends(require
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Customer not found")
-    await create_audit_log("DELETE", "customer", customer_id, customer_name, current_user, {"deleted": True})
+    await create_audit_log("DELETE", "customer", current_user, customer_id, customer_name, {"deleted": True})
     return {"message": "Customer deleted successfully"}
 
 # Event Management  
@@ -3871,7 +3871,7 @@ async def create_booking(booking_data: BookingCreate, current_user: User = Depen
         )
 
     await manager.broadcast(json.dumps({"type": "booking_created", "id": str(booking.id)}))
-    await create_audit_log("CREATE", "booking", booking.id, f"{article.get('name', 'Unknown')} x{booking.quantity}", current_user, {"event_id": booking_data.event_id, "article_id": booking_data.article_id, "quantity": booking_data.quantity})
+    await create_audit_log("CREATE", "booking", current_user, booking.id, f"{article.get('name', 'Unknown')} x{booking.quantity}", {"event_id": booking_data.event_id, "article_id": booking_data.article_id, "quantity": booking_data.quantity})
 
     return booking
 
@@ -4147,7 +4147,7 @@ async def create_quote(quote_data: QuoteCreate, current_user: User = Depends(req
         created_by=getattr(current_user, "id", str(current_user)),
     )
     await db.quotes.insert_one(quote.dict())
-    await create_audit_log("CREATE", "quote", quote.id, quote_number, current_user, {"customer_id": quote_data.customer_id, "total_net": round(total_net, 2)})
+    await create_audit_log("CREATE", "quote", current_user, quote.id, quote_number, {"customer_id": quote_data.customer_id, "total_net": round(total_net, 2)})
     return quote.dict()
 
 @api_router.get("/quotes")
@@ -4317,7 +4317,7 @@ async def create_invoice(invoice_data: InvoiceCreate, current_user: User = Depen
     )
 
     await db.invoices.insert_one(invoice.dict())
-    await create_audit_log("CREATE", "invoice", invoice.id, invoice.invoice_number, current_user, {"customer_id": customer_id, "total_amount": total_amount, "event_id": invoice_data.event_id})
+    await create_audit_log("CREATE", "invoice", current_user, invoice.id, invoice.invoice_number, {"customer_id": customer_id, "total_amount": total_amount, "event_id": invoice_data.event_id})
     return invoice
 
 @api_router.get("/invoices", response_model=List[Invoice])
