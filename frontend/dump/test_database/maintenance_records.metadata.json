@@ -1,1 +1,0 @@
-{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"6bdcb5559a1d4024a9d9b4fd00e4bbe7","collectionName":"maintenance_records","type":"collection"}

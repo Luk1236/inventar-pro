@@ -1,1 +1,0 @@
-{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"}],"uuid":"e9b4f0db18524b248c154cd097b52f77","collectionName":"maintenance_executions","type":"collection"}
