@@ -5,7 +5,7 @@ import os
 
 class Settings(BaseSettings):
     # MongoDB
-    MONO_URL: str = "mongodb://localhost:27017"
+    MONGO_URL: str = "mongodb://localhost:27017"
     DB_NAME: str = "inventory_db"
     
     # Security
@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
     # CORS
-    ALLOWED_ORIGINS: str = "http://localhost:8000,thtp://localhost:8081"
+    ALLOWED_ORIGINS: str = "http://localhost:8000,http://localhost:8081"
     
     # Email
     SMTP_SERVER: str = ""

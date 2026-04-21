@@ -1,14 +1,14 @@
 # app/database.py
-from motor.motor_asyncion import AsyncIOMoterClient
+from motor.motor_asyncio import AsyncIOMotorClient
 from .config import settings
 
-client: AsyncIOMoterClient = None
-db: = None
+client: AsyncIOMotorClient = None
+db = None
 
 async def connect_to_database():
-    """Connect to MongODB and initialize database reference."""
+    """Connect to MongoDB and initialize database reference."""
     global client, db
-    client = AsyncIMOtorClient(settings.MONGO_URL)
+    client = AsyncIOMotorClient(settings.MONGO_URL)
     db = client[settings.DB_NAME]
     return db
 

@@ -60,3 +60,18 @@ async def auth_headers(client, test_db):
     })
     token = resp.json().get("access_token", "")
     return {"Authorization": f"Bearer {token}"}
+
+
+# Collections that should be cleaned between tests.
+# Users are excluded — the admin user created by auth_headers is session-scoped.
+_TEST_COLLECTIONS = [
+    "articles", "bookings", "events", "categories", "suppliers",
+    "customers", "invoices", "maintenance_tasks", "counters",
+]
+
+@pytest_asyncio.fixture(autouse=True)
+async def clean_collections(test_db):
+    """Clear mutable collections after each test to prevent state leakage."""
+    yield
+    for coll_name in _TEST_COLLECTIONS:
+        await test_db[coll_name].delete_many({})

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, Response, Query, Request
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -10,12 +11,14 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
 from jose import JWTError, jwt
+from uuid import UUID
 import os
 import re
 import shutil
 import logging
 import uuid
 import asyncio
+import time
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import json
 import secrets
@@ -92,6 +95,7 @@ MAX_EXPORT_ROWS = 5000   # K2: Hard cap for all export endpoints (CSV/PDF/Excel)
 MAX_BACKUP_SIZE_MB = 500  # H2: Backup download size limit
 MAX_IMPORT_ROWS = 1000   # F10: Hard cap for bulk article import
 DASHBOARD_CACHE_TTL = 30  # F9: Dashboard stats cached for 30 seconds
+_ISO_DT_RE = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}')  # Strict ISO-8601 prefix
 
 # F9: In-memory dashboard cache — avoids 17 count_documents() calls on every page load
 _dashboard_cache: dict = {}
@@ -158,6 +162,16 @@ class Permission:
     CREATE_INVOICE = "create_invoice"
     VIEW_INVOICES = "view_invoices"
 
+    # Booking permissions
+    CREATE_BOOKING = "create_booking"
+    EDIT_BOOKING = "edit_booking"
+    VIEW_BOOKINGS = "view_bookings"
+
+    # Quote permissions
+    CREATE_QUOTE = "create_quote"
+    VIEW_QUOTES = "view_quotes"
+    EDIT_QUOTE = "edit_quote"
+
     # Admin permissions
     MANAGE_USERS = "manage_users"
     VIEW_REPORTS = "view_reports"
@@ -173,6 +187,8 @@ ROLE_PERMISSIONS = {
         Permission.VIEW_CUSTOMERS, Permission.CREATE_CUSTOMER, Permission.EDIT_CUSTOMER,
         Permission.MANAGE_USERS, Permission.VIEW_REPORTS, Permission.ADMIN_ACCESS, Permission.BACKUP_DATABASE,
         Permission.CREATE_INVOICE, Permission.VIEW_INVOICES,
+        Permission.CREATE_BOOKING, Permission.EDIT_BOOKING, Permission.VIEW_BOOKINGS,
+        Permission.CREATE_QUOTE, Permission.VIEW_QUOTES, Permission.EDIT_QUOTE,
     ],
     "lager": [
         Permission.VIEW_ARTICLES, Permission.CREATE_ARTICLE, Permission.EDIT_ARTICLE,
@@ -180,12 +196,15 @@ ROLE_PERMISSIONS = {
         Permission.VIEW_EVENTS, Permission.CREATE_EVENT, Permission.EDIT_EVENT,
         Permission.VIEW_CUSTOMERS, Permission.CREATE_CUSTOMER,
         Permission.VIEW_REPORTS, Permission.CREATE_INVOICE, Permission.VIEW_INVOICES,
+        Permission.CREATE_BOOKING, Permission.EDIT_BOOKING, Permission.VIEW_BOOKINGS,
+        Permission.CREATE_QUOTE, Permission.VIEW_QUOTES,
     ],
     "techniker": [
         Permission.VIEW_ARTICLES, Permission.EDIT_ARTICLE,
         Permission.VIEW_STOCK,
         Permission.VIEW_EVENTS,
-        Permission.VIEW_CUSTOMERS
+        Permission.VIEW_CUSTOMERS,
+        Permission.VIEW_BOOKINGS,
     ],
     # F12: New fine-grained roles
     "viewer": [
@@ -867,6 +886,7 @@ class AppSettings(BaseModel):
     settings_version: int = Field(1, ge=1)
     # Firmendaten
     company_name: str = Field("", max_length=255)
+    company_logo: str = Field("", max_length=2000)  # Base64 or URL for company logo
     company_address: str = Field("", max_length=500)
     company_phone: str = Field("", max_length=50)
     company_email: str = Field("", max_length=255)
@@ -1287,19 +1307,26 @@ async def ensure_admin_user():
             logging.info(f"Ensured admin user is approved: {admin_username}")
 
 async def generate_customer_number():
-    """Generate unique customer number"""
-    # Get count of customers
-    count = await db.customers.count_documents({})
-    return f"CUST-{datetime.now(timezone.utc).year}-{str(count + 1).zfill(4)}"
+    """Generate unique customer number using atomic counter to prevent race conditions."""
+    year = datetime.now(timezone.utc).year
+    result = await db.counters.find_one_and_update(
+        {"_id": f"customer_{year}"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True,
+    )
+    return f"CUST-{year}-{str(result['seq']).zfill(4)}"
 
 async def generate_event_number():
-    """Generate unique event number: EVT-YYYY-NNN"""
+    """Generate unique event number: EVT-YYYY-NNN using atomic counter."""
     year = datetime.now(timezone.utc).year
-    # Count events in current year
-    count = await db.events.count_documents({
-        "event_number": {"$regex": f"^EVT-{year}"}
-    })
-    return f"EVT-{year}-{str(count + 1).zfill(3)}"
+    result = await db.counters.find_one_and_update(
+        {"_id": f"event_{year}"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True,
+    )
+    return f"EVT-{year}-{str(result['seq']).zfill(3)}"
 
 async def check_booking_conflict(article_id: str, start_date: datetime, end_date: datetime, exclude_booking_id: Optional[str] = None):
     """Check if article is already booked for the given date range"""
@@ -1323,12 +1350,15 @@ async def check_booking_conflict(article_id: str, start_date: datetime, end_date
     return conflicts
 
 async def generate_invoice_number():
-    """Generate unique invoice number: INV-YYYY-NNNN"""
+    """Generate unique invoice number: INV-YYYY-NNNN using atomic counter."""
     year = datetime.now(timezone.utc).year
-    count = await db.invoices.count_documents({
-        "invoice_number": {"$regex": f"^INV-{year}"}
-    })
-    return f"INV-{year}-{str(count + 1).zfill(4)}"
+    result = await db.counters.find_one_and_update(
+        {"_id": f"invoice_{year}"},
+        {"$inc": {"seq": 1}},
+        upsert=True,
+        return_document=True,
+    )
+    return f"INV-{year}-{str(result['seq']).zfill(4)}"
 
 async def send_booking_notification_email(customer_email: str, event_name: str, action: str):
     """Send booking notification to customer"""
@@ -1495,6 +1525,28 @@ async def logout(current_user: User = Depends(get_current_user)):
     )
     return {"message": "Erfolgreich abgemeldet"}
 
+@api_router.get("/ws-token")
+@limiter.limit("30/minute")
+async def get_ws_token(request: Request, current_user: User = Depends(get_current_user)):
+    """Generate a short-lived one-time token for WebSocket authentication.
+    This token is single-use and expires after 5 minutes.
+    More secure than passing the access token in URL query parameter.
+    """
+    # Generate one-time WebSocket token
+    ws_token = secrets.token_urlsafe(32)
+
+    # Store in database with 5-minute expiry
+    await db.ws_tokens.insert_one({
+        "token": ws_token,
+        "user_id": current_user.id,
+        "username": current_user.username,
+        "created_at": datetime.now(timezone.utc),
+        "expires_at": datetime.now(timezone.utc) + timedelta(minutes=5),
+        "used": False
+    })
+
+    return {"ws_token": ws_token, "expires_in": 300}  # 5 minutes
+
 @api_router.get("/me", response_model=User)
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
@@ -1532,7 +1584,8 @@ async def update_profile(
     if update_data.new_password:
         if not update_data.current_password:
             raise HTTPException(status_code=400, detail="Aktuelles Passwort erforderlich")
-        if not verify_password(update_data.current_password, current_user.hashed_password):
+        user_doc = await db.users.find_one({"id": current_user.id})
+        if not verify_password(update_data.current_password, user_doc.get("hashed_password", "")):
             raise HTTPException(status_code=400, detail="Aktuelles Passwort ist falsch")
         update_fields["hashed_password"] = get_password_hash(update_data.new_password)
 
@@ -1620,6 +1673,8 @@ async def reset_password(body: ResetPasswordRequest):
 # Categories
 @api_router.post("/categories", response_model=Category)
 async def create_category(category: Category, current_user: User = Depends(get_current_user)):
+    if current_user.role not in ("admin", "manager"):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung zum Erstellen von Kategorien")
     await db.categories.insert_one(category.dict())
     return category
 
@@ -1656,6 +1711,8 @@ async def update_category(
 
 @api_router.delete("/categories/{category_id}")
 async def delete_category(category_id: str, current_user: User = Depends(get_current_user)):
+    if current_user.role not in ("admin", "manager"):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung zum Löschen von Kategorien")
     # Check if category is used by articles
     articles_using_category = await db.articles.count_documents({"category_id": category_id})
     if articles_using_category > 0:
@@ -1672,6 +1729,8 @@ async def delete_category(category_id: str, current_user: User = Depends(get_cur
 # Suppliers
 @api_router.post("/suppliers", response_model=Supplier)
 async def create_supplier(supplier_data: SupplierCreate, current_user: User = Depends(get_current_user)):
+    if current_user.role not in ("admin", "manager"):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung zum Erstellen von Lieferanten")
     supplier = Supplier(**supplier_data.dict())
     await db.suppliers.insert_one(supplier.dict())
     return supplier
@@ -1708,6 +1767,8 @@ async def update_supplier(
 
 @api_router.delete("/suppliers/{supplier_id}")
 async def delete_supplier(supplier_id: str, current_user: User = Depends(get_current_user)):
+    if current_user.role not in ("admin", "manager"):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung zum Löschen von Lieferanten")
     result = await db.suppliers.delete_one({"id": supplier_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Supplier not found")
@@ -2136,8 +2197,10 @@ class Inspection(InspectionCreate):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 @api_router.post("/articles/import")
+@limiter.limit("5/minute")
 async def import_articles(
-    request: ArticleImportRequest,
+    request: Request,
+    import_request: ArticleImportRequest,
     current_user: User = Depends(get_current_user)
 ):
     """Import articles from CSV or Excel. Returns { imported: int, errors: List[str] }"""
@@ -2150,11 +2213,11 @@ async def import_articles(
 
     # F10: Build rows list from CSV or Excel
     rows: list[dict] = []
-    if request.file_type == "excel":
+    if import_request.file_type == "excel":
         try:
             import base64
             import openpyxl
-            raw_bytes = base64.b64decode(request.file_content)
+            raw_bytes = base64.b64decode(import_request.file_content)
             wb = openpyxl.load_workbook(io.BytesIO(raw_bytes), read_only=True, data_only=True)
             ws = wb.active
             header = [str(c.value or "").strip() for c in next(ws.iter_rows(min_row=1, max_row=1))]
@@ -2165,7 +2228,7 @@ async def import_articles(
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Excel-Datei konnte nicht gelesen werden: {e}")
     else:
-        rows = list(csv.DictReader(io.StringIO(request.csv_content)))
+        rows = list(csv.DictReader(io.StringIO(import_request.csv_content)))
 
     if len(rows) > MAX_IMPORT_ROWS:
         raise HTTPException(status_code=400, detail=f"Zu viele Zeilen — maximal {MAX_IMPORT_ROWS} erlaubt")
@@ -2251,37 +2314,37 @@ async def get_archived_articles_v2(current_user: User = Depends(get_current_user
     return [Article(**{k: v for k, v in a.items() if k != "_id"}) for a in articles]
 
 @api_router.get("/articles/{article_id}", response_model=Article)
-async def get_article(article_id: str, current_user: User = Depends(get_current_user)):
-    article = await db.articles.find_one({"id": article_id})
+async def get_article(article_id: UUID, current_user: User = Depends(get_current_user)):
+    article = await db.articles.find_one({"id": str(article_id)})
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
     return Article(**article)
 
 @api_router.put("/articles/{article_id}", response_model=Article)
 async def update_article(
-    article_id: str,
+    article_id: UUID,
     article_data: ArticleCreate,
     current_user: User = Depends(require_permission(Permission.EDIT_ARTICLE))
 ):
     article_dict = article_data.dict()
     article_dict["updated_at"] = datetime.now(timezone.utc)
-    
+
     result = await db.articles.update_one(
-        {"id": article_id}, 
+        {"id": str(article_id)},
         {"$set": article_dict}
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Article not found")
-    
-    updated_article = await db.articles.find_one({"id": article_id})
-    await manager.broadcast(json.dumps({"type": "article_updated", "id": article_id}))
+
+    updated_article = await db.articles.find_one({"id": str(article_id)})
+    await manager.broadcast(json.dumps({"type": "article_updated", "id": str(article_id)}))
     return Article(**updated_article)
 
 @api_router.delete("/articles/{article_id}")
-async def delete_article(article_id: str, current_user: User = Depends(require_permission(Permission.DELETE_ARTICLE))):
+async def delete_article(article_id: UUID, current_user: User = Depends(require_permission(Permission.DELETE_ARTICLE))):
     # V7: Soft-delete — preserves history and allows recovery
     result = await db.articles.update_one(
-        {"id": article_id, "deleted": {"$ne": True}},
+        {"id": str(article_id), "deleted": {"$ne": True}},
         {"$set": {
             "deleted": True,
             "deleted_at": datetime.now(timezone.utc).isoformat(),
@@ -2290,12 +2353,12 @@ async def delete_article(article_id: str, current_user: User = Depends(require_p
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Article not found")
-    await manager.broadcast(json.dumps({"type": "article_deleted", "id": article_id}))
+    await manager.broadcast(json.dumps({"type": "article_deleted", "id": str(article_id)}))
     return {"message": "Article deleted successfully"}
 
 @api_router.post("/articles/{article_id}/images")
 async def add_article_image(
-    article_id: str,
+    article_id: UUID,
     payload: dict,  # { "image": "base64string" }
     current_user: User = Depends(require_permission(Permission.EDIT_ARTICLE))
 ):
@@ -2304,7 +2367,7 @@ async def add_article_image(
     if not image_data:
         raise HTTPException(status_code=400, detail="No image provided")
     result = await db.articles.update_one(
-        {"id": article_id},
+        {"id": str(article_id)},
         {"$push": {"images": image_data}}
     )
     if result.matched_count == 0:
@@ -2313,12 +2376,12 @@ async def add_article_image(
 
 @api_router.delete("/articles/{article_id}/images/{image_index}")
 async def delete_article_image(
-    article_id: str,
+    article_id: UUID,
     image_index: int,
     current_user: User = Depends(get_current_user)
 ):
     """Remove image at given index from article.images list."""
-    article = await db.articles.find_one({"id": article_id})
+    article = await db.articles.find_one({"id": str(article_id)})
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
     images = article.get("images", [])
@@ -2326,7 +2389,7 @@ async def delete_article_image(
         raise HTTPException(status_code=400, detail="Invalid image index")
     images.pop(image_index)
     await db.articles.update_one(
-        {"id": article_id},
+        {"id": str(article_id)},
         {"$set": {"images": images}}
     )
     return {"message": "Image deleted"}
@@ -2855,32 +2918,32 @@ async def get_dguv_due_inspections(
 
 @api_router.post("/articles/{article_id}/operating-hours")
 async def update_operating_hours(
-    article_id: str,
+    article_id: UUID,
     hours_update: OperatingHoursUpdate,
     current_user: User = Depends(get_current_user)
 ):
     """Update operating hours for an article and check for maintenance threshold"""
     try:
-        article = await db.articles.find_one({"id": article_id})
+        article = await db.articles.find_one({"id": str(article_id)})
         if not article:
             raise HTTPException(status_code=404, detail="Artikel nicht gefunden")
-        
+
         current_hours = article.get("operating_hours", 0) or 0
         new_hours = current_hours + hours_update.hours_to_add
         max_hours = article.get("max_operating_hours")
-        
+
         update_data = {
             "operating_hours": new_hours,
             "updated_at": datetime.now(timezone.utc)
         }
-        
+
         # Check if maintenance is needed
         maintenance_needed = False
         if max_hours and new_hours >= max_hours:
             maintenance_needed = True
             # Create automatic maintenance task
             task = MaintenanceTask(
-                article_id=article_id,
+                article_id=str(article_id),
                 title=f"Wartung nach {int(new_hours)} Betriebsstunden",
                 description=f"Artikel hat {int(new_hours)} von {int(max_hours)} max. Betriebsstunden erreicht. Wartung erforderlich!",
                 task_type="routine",
@@ -2889,13 +2952,13 @@ async def update_operating_hours(
                 created_by=current_user.id
             )
             await db.maintenance_tasks.insert_one(task.dict())
-        
-        await db.articles.update_one({"id": article_id}, {"$set": update_data})
-        
+
+        await db.articles.update_one({"id": str(article_id)}, {"$set": update_data})
+
         # Log the update
         log_entry = {
             "id": str(uuid.uuid4()),
-            "article_id": article_id,
+            "article_id": str(article_id),
             "previous_hours": current_hours,
             "added_hours": hours_update.hours_to_add,
             "new_hours": new_hours,
@@ -2904,9 +2967,9 @@ async def update_operating_hours(
             "timestamp": datetime.now(timezone.utc)
         }
         await db.operating_hours_log.insert_one(log_entry)
-        
+
         return {
-            "article_id": article_id,
+            "article_id": str(article_id),
             "previous_hours": current_hours,
             "added_hours": hours_update.hours_to_add,
             "new_hours": new_hours,
@@ -2914,7 +2977,7 @@ async def update_operating_hours(
             "maintenance_needed": maintenance_needed,
             "percentage_used": round((new_hours / max_hours) * 100, 1) if max_hours else None
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -3154,13 +3217,12 @@ async def create_maintenance_execution(
 # Dashboard stats (updated with maintenance)
 @api_router.get("/dashboard/stats")
 async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
-    import time
     global _dashboard_cache, _dashboard_cache_ts
     # F9: Return cached result if still fresh (30 s TTL)
     if _dashboard_cache and (time.monotonic() - _dashboard_cache_ts) < DASHBOARD_CACHE_TTL:
         return _dashboard_cache
 
-    total_articles = await db.articles.count_documents({})
+    total_articles = await db.articles.count_documents({"deleted": {"$ne": True}})
     low_stock_articles = await db.articles.count_documents({
         "$expr": {
             "$and": [
@@ -3201,7 +3263,7 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
     now = datetime.now(timezone.utc)
     start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     events_this_month = await db.events.count_documents({
-        "start_date": {"$gte": start_of_month.isoformat()}
+        "start_date": {"$gte": start_of_month}
     })
     
     # Total inventory value — computed server-side via aggregation, no full collection load
@@ -3226,16 +3288,24 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
         {"$group": {"_id": "$article_id", "booking_count": {"$sum": 1}}},
         {"$sort": {"booking_count": -1}},
         {"$limit": 10},
+        {"$lookup": {
+            "from": "articles",
+            "localField": "_id",
+            "foreignField": "id",
+            "as": "article_info"
+        }},
+        {"$unwind": {"path": "$article_info", "preserveNullAndEmptyArrays": True}},
+        {"$project": {
+            "id": "$_id",
+            "name": {"$ifNull": ["$article_info.name", "Unbekannt"]},
+            "booking_count": 1
+        }}
     ]
     _top_results = await db.bookings.aggregate(_top_pipeline).to_list(10)
-    top_rented = []
-    for entry in _top_results:
-        _art = await db.articles.find_one({"id": entry["_id"]}, {"name": 1})
-        top_rented.append({
-            "id": entry["_id"],
-            "name": _art["name"] if _art else "Unbekannt",
-            "booking_count": entry["booking_count"],
-        })
+    top_rented = [
+        {"id": r["id"], "name": r["name"], "booking_count": r["booking_count"]}
+        for r in _top_results
+    ]
 
     # Pending invoices
     _inv_pipeline = [
@@ -3416,10 +3486,11 @@ async def get_all_users(current_user: User = Depends(get_current_user)):
 
 # Customer Management
 @api_router.post("/customers", response_model=Customer)
-async def create_customer(customer_data: CustomerCreate, current_user: User = Depends(get_current_user)):
+async def create_customer(customer_data: CustomerCreate, current_user: User = Depends(require_permission(Permission.CREATE_CUSTOMER))):
     customer_number = await generate_customer_number()
     customer = Customer(**customer_data.dict(), customer_number=customer_number)
     await db.customers.insert_one(customer.dict())
+    await create_audit_log("CREATE", "customer", customer.id, customer.company_name or customer.contact_name, current_user, {"new": customer.dict()})
     return customer
 
 @api_router.get("/customers", response_model=List[Customer])
@@ -3451,23 +3522,31 @@ async def get_customer(customer_id: str, current_user: User = Depends(get_curren
 async def update_customer(
     customer_id: str,
     customer_data: CustomerCreate,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission(Permission.EDIT_CUSTOMER))
 ):
+    # Get old customer for audit log
+    old_customer = await db.customers.find_one({"id": customer_id})
+
     customer_dict = customer_data.dict()
     customer_dict["updated_at"] = datetime.now(timezone.utc)
-    
+
     result = await db.customers.update_one(
         {"id": customer_id},
         {"$set": customer_dict}
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Customer not found")
-    
+
     updated_customer = await db.customers.find_one({"id": customer_id})
+    await create_audit_log("UPDATE", "customer", customer_id, updated_customer.get("company_name") or updated_customer.get("contact_name"), current_user, {"old": old_customer, "new": customer_dict})
     return Customer(**updated_customer)
 
 @api_router.delete("/customers/{customer_id}")
-async def delete_customer(customer_id: str, current_user: User = Depends(get_current_user)):
+async def delete_customer(customer_id: str, current_user: User = Depends(require_permission(Permission.EDIT_CUSTOMER))):
+    # Get customer before deletion for audit log
+    customer = await db.customers.find_one({"id": customer_id})
+    customer_name = customer.get("company_name") or customer.get("contact_name") if customer else customer_id
+
     # V7: Soft-delete with audit trail
     result = await db.customers.update_one(
         {"id": customer_id, "is_active": {"$ne": False}},
@@ -3480,6 +3559,7 @@ async def delete_customer(customer_id: str, current_user: User = Depends(get_cur
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Customer not found")
+    await create_audit_log("DELETE", "customer", customer_id, customer_name, current_user, {"deleted": True})
     return {"message": "Customer deleted successfully"}
 
 # Event Management  
@@ -3713,7 +3793,7 @@ async def clone_event(
 
 # Booking Management
 @api_router.post("/bookings", response_model=Booking)
-async def create_booking(booking_data: BookingCreate, current_user: User = Depends(get_current_user)):
+async def create_booking(booking_data: BookingCreate, current_user: User = Depends(require_permission(Permission.CREATE_BOOKING))):
     # Validate event exists
     event = await db.events.find_one({"id": booking_data.event_id})
     if not event:
@@ -3791,6 +3871,7 @@ async def create_booking(booking_data: BookingCreate, current_user: User = Depen
         )
 
     await manager.broadcast(json.dumps({"type": "booking_created", "id": str(booking.id)}))
+    await create_audit_log("CREATE", "booking", booking.id, f"{article.get('name', 'Unknown')} x{booking.quantity}", current_user, {"event_id": booking_data.event_id, "article_id": booking_data.article_id, "quantity": booking_data.quantity})
 
     return booking
 
@@ -3823,7 +3904,7 @@ async def get_booking(booking_id: str, current_user: User = Depends(get_current_
     return Booking(**booking)
 
 @api_router.put("/bookings/{booking_id}/return")
-async def return_booking(booking_id: str, current_user: User = Depends(get_current_user)):
+async def return_booking(booking_id: str, current_user: User = Depends(require_permission(Permission.EDIT_BOOKING))):
     booking = await db.bookings.find_one({"id": booking_id})
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -3856,7 +3937,7 @@ async def return_booking(booking_id: str, current_user: User = Depends(get_curre
     return {"message": "Booking returned successfully"}
 
 @api_router.delete("/bookings/{booking_id}")
-async def cancel_booking(booking_id: str, current_user: User = Depends(get_current_user)):
+async def cancel_booking(booking_id: str, current_user: User = Depends(require_permission(Permission.EDIT_BOOKING))):
     booking = await db.bookings.find_one({"id": booking_id})
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -3901,7 +3982,7 @@ class AssignSerialsRequest(BaseModel):
 async def assign_serials_to_booking(
     booking_id: str,
     body: AssignSerialsRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission(Permission.EDIT_BOOKING))
 ):
     booking = await db.bookings.find_one({"id": booking_id})
     if not booking:
@@ -4053,7 +4134,7 @@ async def get_time_entries_summary(
 
 # Quote Management
 @api_router.post("/quotes")
-async def create_quote(quote_data: QuoteCreate, current_user: User = Depends(get_current_user)):
+async def create_quote(quote_data: QuoteCreate, current_user: User = Depends(require_permission(Permission.CREATE_QUOTE))):
     count = await db.quotes.count_documents({})
     quote_number = f"QUO-{datetime.now(timezone.utc).year}-{count + 1:04d}"
     total_net = sum(item.unit_price * item.quantity * item.days for item in quote_data.items)
@@ -4066,6 +4147,7 @@ async def create_quote(quote_data: QuoteCreate, current_user: User = Depends(get
         created_by=getattr(current_user, "id", str(current_user)),
     )
     await db.quotes.insert_one(quote.dict())
+    await create_audit_log("CREATE", "quote", quote.id, quote_number, current_user, {"customer_id": quote_data.customer_id, "total_net": round(total_net, 2)})
     return quote.dict()
 
 @api_router.get("/quotes")
@@ -4093,7 +4175,7 @@ async def get_quote(quote_id: str, current_user: User = Depends(get_current_user
     return quote
 
 @api_router.put("/quotes/{quote_id}")
-async def update_quote(quote_id: str, update_data: QuoteCreate, current_user: User = Depends(get_current_user)):
+async def update_quote(quote_id: str, update_data: QuoteCreate, current_user: User = Depends(require_permission(Permission.EDIT_QUOTE))):
     total_net = sum(item.unit_price * item.quantity * item.days for item in update_data.items)
     if update_data.discount_percent > 0:
         total_net = total_net * (1 - update_data.discount_percent / 100)
@@ -4106,7 +4188,7 @@ async def update_quote(quote_id: str, update_data: QuoteCreate, current_user: Us
     return {"message": "Angebot aktualisiert"}
 
 @api_router.put("/quotes/{quote_id}/status")
-async def update_quote_status(quote_id: str, update: dict, current_user: User = Depends(get_current_user)):
+async def update_quote_status(quote_id: str, update: dict, current_user: User = Depends(require_permission(Permission.EDIT_QUOTE))):
     valid = ["entwurf", "gesendet", "akzeptiert", "abgelehnt"]
     new_status = update.get("status")
     if new_status not in valid:
@@ -4120,7 +4202,7 @@ async def update_quote_status(quote_id: str, update: dict, current_user: User = 
     return {"message": "Status aktualisiert"}
 
 @api_router.put("/quotes/{quote_id}/sign")
-async def sign_quote(quote_id: str, body: dict, current_user: User = Depends(get_current_user)):
+async def sign_quote(quote_id: str, body: dict, current_user: User = Depends(require_permission(Permission.EDIT_QUOTE))):
     """Save customer signature and accept quote"""
     result = await db.quotes.update_one(
         {"id": quote_id},
@@ -4149,13 +4231,13 @@ async def share_quote(quote_id: str, current_user: User = Depends(get_current_us
     return {"public_token": token}
 
 @api_router.delete("/quotes/{quote_id}/share")
-async def revoke_quote_share(quote_id: str, current_user: User = Depends(get_current_user)):
+async def revoke_quote_share(quote_id: str, current_user: User = Depends(require_permission(Permission.EDIT_QUOTE))):
     """Revoke public share token"""
     await db.quotes.update_one({"id": quote_id}, {"$set": {"public_token": None, "public_token_created_at": None}})
     return {"message": "Link widerrufen"}
 
 @api_router.delete("/quotes/{quote_id}")
-async def delete_quote(quote_id: str, current_user: User = Depends(get_current_user)):
+async def delete_quote(quote_id: str, current_user: User = Depends(require_permission(Permission.EDIT_QUOTE))):
     result = await db.quotes.delete_one({"id": quote_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Angebot nicht gefunden")
@@ -4163,7 +4245,7 @@ async def delete_quote(quote_id: str, current_user: User = Depends(get_current_u
 
 # Invoice Management
 @api_router.post("/invoices", response_model=Invoice)
-async def create_invoice(invoice_data: InvoiceCreate, current_user: User = Depends(get_current_user)):
+async def create_invoice(invoice_data: InvoiceCreate, current_user: User = Depends(require_permission(Permission.CREATE_INVOICE))):
     # Determine customer_id
     customer_id = invoice_data.customer_id
 
@@ -4235,6 +4317,7 @@ async def create_invoice(invoice_data: InvoiceCreate, current_user: User = Depen
     )
 
     await db.invoices.insert_one(invoice.dict())
+    await create_audit_log("CREATE", "invoice", invoice.id, invoice.invoice_number, current_user, {"customer_id": customer_id, "total_amount": total_amount, "event_id": invoice_data.event_id})
     return invoice
 
 @api_router.get("/invoices", response_model=List[Invoice])
@@ -4263,7 +4346,7 @@ async def get_invoice(invoice_id: str, current_user: User = Depends(get_current_
 async def update_invoice_status(
     invoice_id: str,
     status: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission(Permission.CREATE_INVOICE))
 ):
     valid_statuses = ["draft", "sent", "paid", "cancelled"]
     if status not in valid_statuses:
@@ -4284,7 +4367,7 @@ async def update_invoice_status(
     return {"message": f"Invoice status updated to {status}"}
 
 @api_router.put("/invoices/{invoice_id}/payment-status")
-async def update_invoice_payment_status(invoice_id: str, update: dict, current_user: User = Depends(get_current_user)):
+async def update_invoice_payment_status(invoice_id: str, update: dict, current_user: User = Depends(require_permission(Permission.CREATE_INVOICE))):
     valid_statuses = ["offen", "teilweise", "bezahlt", "überfällig"]
     new_status = update.get("payment_status")
     if new_status not in valid_statuses:
@@ -4543,7 +4626,8 @@ async def reject_user(user_id: str, current_user: User = Depends(require_permiss
 
 # Backup & Restore Endpoints (Admin only)
 @api_router.post("/admin/backup/create")
-async def create_backup(current_user: User = Depends(require_permission(Permission.BACKUP_DATABASE))):
+@limiter.limit("3/hour")
+async def create_backup(request: Request, current_user: User = Depends(require_permission(Permission.BACKUP_DATABASE))):
     
     success = await create_database_backup()
     
@@ -4560,7 +4644,8 @@ async def create_backup(current_user: User = Depends(require_permission(Permissi
         raise HTTPException(status_code=500, detail="Backup failed")
 
 @api_router.post("/admin/backup/restore")
-async def restore_backup(current_user: User = Depends(require_permission(Permission.BACKUP_DATABASE))):
+@limiter.limit("1/hour")
+async def restore_backup(request: Request, current_user: User = Depends(require_permission(Permission.BACKUP_DATABASE))):
     
     success, message = await restore_database_from_backup()
     
@@ -4574,7 +4659,8 @@ async def restore_backup(current_user: User = Depends(require_permission(Permiss
         raise HTTPException(status_code=500, detail=f"Restore failed: {message}")
 
 @api_router.get("/admin/backup/download")
-async def download_backup(current_user: User = Depends(require_permission(Permission.BACKUP_DATABASE))):
+@limiter.limit("10/hour")
+async def download_backup(request: Request, current_user: User = Depends(require_permission(Permission.BACKUP_DATABASE))):
     """Download backup as ZIP file"""
     import tempfile
     import zipfile
@@ -4588,7 +4674,7 @@ async def download_backup(current_user: User = Depends(require_permission(Permis
         tmp.close()
 
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            backup_dir = Path("/app/backups")
+            backup_dir = BACKUP_DIR
             if backup_dir.exists():
                 for file in backup_dir.rglob('*'):
                     if file.is_file():
@@ -5316,36 +5402,36 @@ async def calculate_rental_price(
 
 @api_router.put("/articles/{article_id}/operating-hours")
 async def update_operating_hours(
-    article_id: str,
+    article_id: UUID,
     hours_to_add: float,
     current_user: User = Depends(get_current_user)
 ):
     """Aktualisiert die Betriebsstunden eines Artikels"""
-    article = await db.articles.find_one({"id": article_id})
+    article = await db.articles.find_one({"id": str(article_id)})
     if not article:
         raise HTTPException(status_code=404, detail="Artikel nicht gefunden")
-    
+
     current_hours = article.get("operating_hours", 0) or 0
     new_hours = current_hours + hours_to_add
     max_hours = article.get("max_operating_hours")
-    
+
     update_data = {
         "operating_hours": new_hours,
         "updated_at": datetime.now(timezone.utc)
     }
-    
+
     warnings = []
     if max_hours and new_hours >= max_hours:
         warnings.append(f"⚠️ Maximale Betriebsstunden ({max_hours}h) erreicht - Wartung erforderlich!")
         update_data["status"] = "wartung_erforderlich"
-    
+
     await db.articles.update_one(
-        {"id": article_id},
+        {"id": str(article_id)},
         {"$set": update_data}
     )
-    
+
     return {
-        "article_id": article_id,
+        "article_id": str(article_id),
         "previous_hours": current_hours,
         "hours_added": hours_to_add,
         "new_total_hours": new_hours,
@@ -5555,6 +5641,9 @@ async def checkout_items(checkout: PackingListCheckout, current_user: User = Dep
         if result.modified_count > 0:
             updated_count += 1
     
+    if updated_count > 0:
+        from websocket_handler import manager
+        await manager.broadcast('{"type": "packing_list_updated"}')
     return {"success": True, "updated": updated_count}
 
 @api_router.post("/packing-list/checkout-all/{event_id}")
@@ -5572,6 +5661,9 @@ async def checkout_all_items(event_id: str, current_user: User = Depends(get_cur
         }}
     )
     
+    if result.modified_count > 0:
+        from websocket_handler import manager
+        await manager.broadcast('{"type": "packing_list_updated"}')
     return {"success": True, "updated": result.modified_count}
 
 @api_router.post("/packing-list/checkin")
@@ -5623,6 +5715,8 @@ async def checkin_item(checkin: PackingListCheckin, current_user: User = Depends
         )
         await db.maintenance_tasks.insert_one(maintenance_task.model_dump())
 
+    from websocket_handler import manager
+    await manager.broadcast('{"type": "packing_list_updated"}')
     return {"success": True, "condition": checkin.condition}
 
 @api_router.post("/packing-list/checkin-all/{event_id}")
@@ -5640,6 +5734,10 @@ async def checkin_all_items(event_id: str, condition: str = "OK", current_user: 
         }}
     )
     
+    if result.modified_count > 0:
+        from websocket_handler import manager
+        await manager.broadcast('{"type": "packing_list_updated"}')
+        
     return {"success": True, "updated": result.modified_count}
 
 @api_router.get("/packing-list/missing/{event_id}")
@@ -5689,32 +5787,52 @@ async def reset_packing_list(event_id: str, current_user: User = Depends(require
     return {"success": True, "deleted": result.deleted_count}
 
 @api_router.post("/events/{event_id}/packing-list/sign")
-async def sign_packing_list(event_id: str, body: dict, current_user: User = Depends(get_current_user)):
+class PackingListSign(BaseModel):
+    signature: str = Field(..., max_length=500_000)
+    signed_by: str = Field(..., max_length=255)
+
+async def sign_packing_list(event_id: str, body: PackingListSign, current_user: User = Depends(get_current_user)):
     """Save sign-off signature for a packing list"""
     await db.events.update_one(
         {"id": event_id},
         {"$set": {
-            "packing_list_signature": body.get("signature", ""),
-            "packing_list_signed_by": body.get("signed_by", ""),
+            "packing_list_signature": body.signature,
+            "packing_list_signed_by": body.signed_by,
             "packing_list_signed_at": datetime.now(timezone.utc),
         }}
     )
     return {"message": "Packliste abgezeichnet"}
 
+def _export_csv_safe(value) -> str:
+    """Prevent CSV injection: prefix formula-triggering chars with a single quote."""
+    s = str(value) if value is not None else ""
+    if s and s[0] in ('=', '+', '-', '@', '\t', '\r', '|', '%'):
+        s = "'" + s
+    return s
+
 @api_router.get("/reports/inventory-csv")
 async def export_inventory_csv(current_user: User = Depends(get_current_user)):
     """Export inventory as CSV"""
     articles = await db.articles.find({"deleted": {"$ne": True}}).to_list(MAX_EXPORT_ROWS)
-    
+
+    # Pre-load all categories to avoid N+1 queries
+    all_categories = {c["id"]: c["name"] for c in await db.categories.find().to_list(1000)}
+
     csv_lines = ["Name,Inventory Code,Category,Stock,Min Stock,Price,Rental Price"]
-    
+
     for article in articles:
-        category = await db.categories.find_one({"id": article.get("category_id", "")})
-        category_name = category["name"] if category else "N/A"
-        
-        line = f'"{article["name"]}","{article["inventory_code"]}","{category_name}",{article.get("current_stock", 0)},{article.get("min_stock_level", 0)},{article.get("price_per_unit", 0)},{article.get("rental_price", 0) or 0}'
+        category_name = all_categories.get(article.get("category_id", ""), "N/A")
+        line = (
+            f'"{_export_csv_safe(article.get("name", ""))}",'
+            f'"{_export_csv_safe(article.get("inventory_code", ""))}",'
+            f'"{_export_csv_safe(category_name)}",'
+            f'{article.get("current_stock", 0)},'
+            f'{article.get("min_stock_level", 0)},'
+            f'{article.get("price_per_unit", 0)},'
+            f'{article.get("rental_price", 0) or 0}'
+        )
         csv_lines.append(line)
-    
+
     csv_data = "\n".join(csv_lines)
     return Response(content=csv_data, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=inventory.csv"})
 
@@ -5722,13 +5840,20 @@ async def export_inventory_csv(current_user: User = Depends(get_current_user)):
 async def export_customers_csv(current_user: User = Depends(get_current_user)):
     """Export customers as CSV"""
     customers = await db.customers.find({"is_active": True}).to_list(MAX_EXPORT_ROWS)
-    
+
     csv_lines = ["Customer Number,Company,Contact,Email,Phone,City"]
-    
+
     for customer in customers:
-        line = f'"{customer.get("customer_number", "")}","{customer.get("company_name", "")}","{customer.get("contact_person", "")}","{customer.get("email", "")}","{customer.get("phone", "")}","{customer.get("address_city", "")}"'
+        line = (
+            f'"{_export_csv_safe(customer.get("customer_number", ""))}",'
+            f'"{_export_csv_safe(customer.get("company_name", ""))}",'
+            f'"{_export_csv_safe(customer.get("contact_person", ""))}",'
+            f'"{_export_csv_safe(customer.get("email", ""))}",'
+            f'"{_export_csv_safe(customer.get("phone", ""))}",'
+            f'"{_export_csv_safe(customer.get("address_city", ""))}"'
+        )
         csv_lines.append(line)
-    
+
     csv_data = "\n".join(csv_lines)
     return Response(content=csv_data, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=customers.csv"})
 
@@ -5762,12 +5887,19 @@ async def generate_monthly_report(
         "created_at": {"$gte": start, "$lt": end}
     }).to_list(1000)
     
-    # Calculate revenue (simplified)
+    # Calculate revenue — pre-load all relevant articles to avoid N+1 queries
     total_revenue = 0.0
+    article_ids = list({b.get("article_id", "") for b in bookings if b.get("article_id")})
+    articles_map: dict = {}
+    if article_ids:
+        articles_map = {
+            a["id"]: a
+            for a in await db.articles.find({"id": {"$in": article_ids}}).to_list(len(article_ids))
+        }
     for booking in bookings:
-        article = await db.articles.find_one({"id": booking["article_id"]})
+        article = articles_map.get(booking.get("article_id", ""))
         if article and article.get("rental_price"):
-            total_revenue += article["rental_price"] * booking["quantity"]
+            total_revenue += article["rental_price"] * booking.get("quantity", 1)
     
     return {
         "period": period,
@@ -6175,7 +6307,7 @@ async def get_delivery_status(
 
 @api_router.get("/articles/{article_id}/availability-check")
 async def check_article_availability(
-    article_id: str,
+    article_id: UUID,
     start_date: str,
     end_date: str,
     quantity: int = 1,
@@ -6183,27 +6315,27 @@ async def check_article_availability(
 ):
     """Check if article is available and warn about conflicts"""
     try:
-        article = await db.articles.find_one({"id": article_id})
+        article = await db.articles.find_one({"id": str(article_id)})
         if not article:
             raise HTTPException(status_code=404, detail="Artikel nicht gefunden")
-        
+
         # Parse dates — raises 400 on invalid format
         start_dt = parse_iso_date(start_date, "start_date")
         end_dt = parse_iso_date(end_date, "end_date")
-        
+
         # Find conflicting bookings
         conflicts = await db.bookings.find({
-            "article_id": article_id,
+            "article_id": str(article_id),
             "status": {"$in": ["booked", "confirmed", "delivered"]},
             "$or": [
                 {"start_date": {"$lte": end_dt}, "end_date": {"$gte": start_dt}},
             ]
         }).to_list(100)
-        
+
         # Calculate booked quantity in period
         booked_quantity = sum(b.get("quantity", 1) for b in conflicts)
         available_quantity = article.get("current_stock", 0) - booked_quantity
-        
+
         # Get conflict details
         conflict_details = []
         for conflict in conflicts:
@@ -6215,13 +6347,13 @@ async def check_article_availability(
                 "start_date": conflict.get("start_date"),
                 "end_date": conflict.get("end_date")
             })
-        
+
         # Check for shortage
         is_available = available_quantity >= quantity
         shortage = max(0, quantity - available_quantity)
-        
+
         return {
-            "article_id": article_id,
+            "article_id": str(article_id),
             "article_name": article.get("name"),
             "requested_quantity": quantity,
             "current_stock": article.get("current_stock", 0),
@@ -6232,7 +6364,7 @@ async def check_article_availability(
             "conflicts": conflict_details,
             "suggestion": f"Zumieten: {shortage} Stück" if shortage > 0 else None
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -6870,7 +7002,9 @@ class DatabaseResetRequest(BaseModel):
     confirmation_phrase: str  # H1: Must equal "DATENBANK LÖSCHEN" to confirm wipe
 
 @api_router.post("/admin/reset-database")
+@limiter.limit("1/day")
 async def reset_database(
+    request: Request,
     body: DatabaseResetRequest,
     current_user: User = Depends(require_permission(Permission.BACKUP_DATABASE))
 ):
@@ -7488,8 +7622,8 @@ def _calculate_rental_price(article: dict, days: int) -> float:
 
 # F6 — Return all pricing tiers for a single article
 @api_router.get("/articles/{article_id}/rental-tiers")
-async def get_rental_tiers(article_id: str, current_user: User = Depends(get_current_user)):
-    article = await db.articles.find_one({"id": article_id, "deleted": {"$ne": True}})
+async def get_rental_tiers(article_id: UUID, current_user: User = Depends(get_current_user)):
+    article = await db.articles.find_one({"id": str(article_id), "deleted": {"$ne": True}})
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
     base = float(article.get("rental_price") or 0.0)
@@ -7991,6 +8125,119 @@ def generate_rental_contract_html(contract: dict, event: dict, customer: dict, s
     </html>
     """
 
+# PDF Template für Rechnung HTML
+def generate_invoice_html(invoice: dict, event: dict, customer: dict, items: list, settings: dict = None) -> str:
+    """Generate HTML for invoice PDF"""
+    items_html = ""
+    for item in items:
+        items_html += f"""
+        <tr>
+            <td>{item.get('article_name', '')}<br><small>{item.get('inventory_code', '')}</small></td>
+            <td>{item.get('quantity', 1)}</td>
+            <td>€{item.get('unit_price', 0):.2f}</td>
+            <td>€{item.get('total', 0):.2f}</td>
+        </tr>
+        """
+    
+    s = settings or {}
+    color = s.get("letterhead_primary_color", "#007AFF")
+    lh_header = get_letterhead_header_html(s)
+    lh_footer = get_letterhead_footer_html(s)
+    lh_styles = get_letterhead_styles(s)
+
+    issue_date = invoice.get("issue_date")
+    due_date = invoice.get("due_date")
+    if isinstance(issue_date, str):
+        issue_date = datetime.fromisoformat(issue_date.replace('Z', '+00:00'))
+    if isinstance(due_date, str):
+        due_date = datetime.fromisoformat(due_date.replace('Z', '+00:00'))
+
+    event_start = event.get('start_date')
+    if isinstance(event_start, str):
+        event_start = datetime.fromisoformat(event_start.replace('Z', '+00:00'))
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body {{ font-family: 'Helvetica', sans-serif; padding: 40px; color: #333; }}
+            .invoice-header {{ display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }}
+            .invoice-title {{ font-size: 28px; font-weight: bold; color: {color}; }}
+            .section {{ margin: 25px 0; }}
+            .section-title {{ color: {color}; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid #eee; padding-bottom: 5px; }}
+            table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+            th {{ background: #f8f9fa; color: #333; padding: 12px; text-align: left; border-bottom: 2px solid {color}; }}
+            td {{ padding: 12px; border-bottom: 1px solid #eee; }}
+            .totals {{ text-align: right; margin-top: 20px; }}
+            .total-row {{ padding: 5px 0; }}
+            .total-final {{ font-size: 20px; font-weight: bold; color: {color}; border-top: 2px solid {color}; padding-top: 10px; margin-top: 10px; }}
+            .footer-info {{ margin-top: 50px; font-size: 12px; color: #666; line-height: 1.6; }}
+            {lh_styles}
+        </style>
+    </head>
+    <body>
+        {lh_header}
+        
+        <div class="invoice-header">
+            <div>
+                <div class="invoice-title">RECHNUNG</div>
+                <div style="margin-top: 5px; font-weight: bold;">Nr. {invoice.get('invoice_number', '')}</div>
+            </div>
+            <div style="text-align: right;">
+                <div>Datum: {issue_date.strftime('%d.%m.%Y') if issue_date else ''}</div>
+                <div>Fällig am: {due_date.strftime('%d.%m.%Y') if due_date else ''}</div>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between;">
+            <div style="width: 45%;">
+                <div class="section-title">Rechnungsempfänger</div>
+                <div><strong>{customer.get('company_name', customer.get('name', 'N/A'))}</strong></div>
+                <div>{customer.get('address', '')}</div>
+                <div>{customer.get('email', '')}</div>
+            </div>
+            <div style="width: 45%;">
+                <div class="section-title">Leistungsempfänger</div>
+                <div><strong>Event: {event.get('event_name', '')}</strong></div>
+                <div>Ort: {event.get('location', '')}</div>
+                <div>Zeitraum: {event_start.strftime('%d.%m.%Y') if event_start else ''}</div>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Beschreibung</th>
+                    <th>Menge</th>
+                    <th>Einzelpreis</th>
+                    <th>Gesamt</th>
+                </tr>
+            </thead>
+            <tbody>
+                {items_html}
+            </tbody>
+        </table>
+
+        <div class="totals">
+            <div class="total-row">Netto-Betrag: €{invoice.get('subtotal', 0):.2f}</div>
+            <div class="total-row">MwSt ({invoice.get('tax_rate', 19)}%): €{invoice.get('tax_amount', 0):.2f}</div>
+            <div class="total-row total-final">Gesamtbetrag: €{invoice.get('total_amount', 0):.2f}</div>
+        </div>
+
+        <div class="footer-info">
+            <strong>Zahlungshinweise:</strong><br>
+            Bitte überweisen Sie den Rechnungsbetrag innerhalb von 14 Tagen auf unser unten genanntes Bankkonto.<br>
+            Als Verwendungszweck geben Sie bitte die Rechnungsnummer an.<br>
+            {f'<br>Anmerkungen: {invoice.get("notes")}' if invoice.get("notes") else ""}
+        </div>
+
+        {lh_footer}
+    </body>
+    </html>
+    """
+
 # PDF-Daten für Mietvertrag generieren
 @api_router.get("/rental-contracts/{contract_id}/pdf-data")
 async def get_contract_pdf_data(
@@ -8063,11 +8310,24 @@ async def get_invoice_pdf_data(
                     "total": booking.get("total_price", 0)
                 })
         
+        # Load settings for letterhead
+        app_settings = await db.app_settings.find_one({"_id": "main"}) or {}
+        
+        # Generate HTML
+        html = generate_invoice_html(
+            invoice,
+            event or {},
+            customer or {},
+            items,
+            app_settings
+        )
+        
         return {
             "invoice": invoice,
             "event": event,
             "customer": customer,
-            "items": items
+            "items": items,
+            "html": html
         }
         
     except HTTPException:
@@ -8677,7 +8937,6 @@ app.add_middleware(SecurityHeadersMiddleware)
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """V5: Log every request with method, path, status, duration, and client IP."""
     async def dispatch(self, request, call_next):
-        import time
         start = time.perf_counter()
         # Resolve real IP behind reverse proxies
         forwarded_for = request.headers.get("X-Forwarded-For")
@@ -8726,14 +8985,11 @@ async def create_database_backup():
         # Get all collection names
         collection_names = await db.list_collection_names()
         
-        # Backup each collection
+        # Backup each collection — cursor-based to avoid loading entire collection into RAM
         for collection_name in collection_names:
             collection = db[collection_name]
-            documents = await collection.find().to_list(None)
-            
-            # Convert ObjectId and datetime to string
             serializable_docs = []
-            for doc in documents:
+            async for doc in collection.find():
                 if '_id' in doc:
                     doc['_id'] = str(doc['_id'])
                 # Convert datetime fields to ISO format
@@ -8773,7 +9029,12 @@ async def restore_database_from_backup():
         if not BACKUP_FILE.exists():
             logging.error("No backup file found")
             return False, "No backup file found"
-        
+
+        # Safety backup before wiping collections
+        pre_restore_ok = await create_database_backup()
+        if not pre_restore_ok:
+            logging.warning("Pre-restore safety backup failed — proceeding with restore anyway")
+
         # Read backup file
         with open(BACKUP_FILE, 'r') as f:
             backup_data = json.load(f)
@@ -8793,7 +9054,7 @@ async def restore_database_from_backup():
             # Convert datetime strings back to datetime objects
             for doc in documents:
                 for key, value in doc.items():
-                    if isinstance(value, str) and 'T' in value:
+                    if isinstance(value, str) and _ISO_DT_RE.match(value):
                         try:
                             doc[key] = datetime.fromisoformat(value.replace('Z', '+00:00'))
                         except (ValueError, AttributeError):
@@ -8834,26 +9095,12 @@ def scheduled_backup_job():
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# ===========================================
-# GLOBALER EXCEPTION HANDLER
-# Verhindert, dass interne Fehlermeldungen an den Client gelangen
-# ===========================================
-from fastapi.responses import JSONResponse
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    logging.error(f"Unbehandelter Fehler bei {request.method} {request.url.path}: {exc}", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Interner Serverfehler. Details wurden protokolliert."}
-    )
-
 # ===========================
 # APP SETTINGS
 # ===========================
 
 @app.get("/api/settings/app")
-async def get_app_settings():
+async def get_app_settings(current_user: User = Depends(get_current_user)):
     doc = await db.app_settings.find_one({"_id": "main"})
     if not doc:
         defaults = AppSettings()
@@ -8863,7 +9110,9 @@ async def get_app_settings():
     return doc
 
 @app.put("/api/settings/app")
-async def update_app_settings(settings: AppSettings, current_user: dict = Depends(get_current_user)):
+async def update_app_settings(settings: AppSettings, current_user: User = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Nur Admins können Einstellungen ändern")
     # Get current settings to compare changes
     old_doc = await db.app_settings.find_one({"_id": "main"}) or {}
     old_settings = AppSettings(**{k: v for k, v in old_doc.items() if k != "_id"}) if old_doc else AppSettings()
@@ -8886,7 +9135,7 @@ async def update_app_settings(settings: AppSettings, current_user: dict = Depend
         version_entry = {
             "version": new_version,
             "changed_at": datetime.utcnow(),
-            "changed_by": current_user.get("username", "unknown"),
+            "changed_by": current_user.username,
             "changes": changes
         }
 
@@ -8901,7 +9150,7 @@ async def update_app_settings(settings: AppSettings, current_user: dict = Depend
     return settings.dict()
 
 @app.get("/api/settings/versions")
-async def get_settings_versions(current_user: dict = Depends(get_current_user)):
+async def get_settings_versions(current_user: User = Depends(get_current_user)):
     """Get settings version history"""
     versions = await db.settings_versions.find().sort("version", -1).to_list(50)
     for v in versions:
@@ -8909,9 +9158,9 @@ async def get_settings_versions(current_user: dict = Depends(get_current_user)):
     return versions
 
 @app.post("/api/settings/restore/{version}")
-async def restore_settings_version(version: int, current_user: dict = Depends(get_current_user)):
+async def restore_settings_version(version: int, current_user: User = Depends(get_current_user)):
     """Restore settings to a specific version"""
-    if current_user.get("role") != "admin":
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Nur Admins können Einstellungen wiederherstellen")
 
     version_entry = await db.settings_versions.find_one({"version": version})
@@ -9690,15 +9939,15 @@ async def delete_communication_log(log_id: str, current_user: User = Depends(get
 # ===========================
 
 @app.post("/api/articles/{article_id}/archive")
-async def archive_article(article_id: str, current_user: User = Depends(get_current_user)):
-    result = await db.articles.update_one({"id": article_id}, {"$set": {"archived": True, "deleted": True}})
+async def archive_article(article_id: UUID, current_user: User = Depends(get_current_user)):
+    result = await db.articles.update_one({"id": str(article_id)}, {"$set": {"archived": True, "deleted": True}})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Artikel nicht gefunden")
     return {"message": "Artikel archiviert"}
 
 @app.post("/api/articles/{article_id}/unarchive")
-async def unarchive_article(article_id: str, current_user: User = Depends(get_current_user)):
-    result = await db.articles.update_one({"id": article_id}, {"$set": {"archived": False, "deleted": False}})
+async def unarchive_article(article_id: UUID, current_user: User = Depends(get_current_user)):
+    result = await db.articles.update_one({"id": str(article_id)}, {"$set": {"archived": False, "deleted": False}})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Artikel nicht gefunden")
     return {"message": "Artikel aus Archiv entfernt"}
@@ -9993,9 +10242,13 @@ for _route in api_router.routes:
                 _rel,
                 _route.endpoint,
                 methods=list(_route.methods) if _route.methods else None,
-                response_model=_route.response_model,
-                tags=_route.tags,
-                dependencies=_route.dependencies,
+                response_model=getattr(_route, "response_model", None),
+                status_code=getattr(_route, "status_code", 200),
+                tags=getattr(_route, "tags", None),
+                dependencies=getattr(_route, "dependencies", None),
+                summary=getattr(_route, "summary", None),
+                description=getattr(_route, "description", None),
+                response_class=getattr(_route, "response_class", None),
             )
 
 # 2) Also copy all direct @app routes starting with /api/ (but not /api/v1/ already)
@@ -10013,9 +10266,13 @@ for _route in list(app.routes):
                 _rel,
                 _route.endpoint,
                 methods=list(_route.methods) if _route.methods else None,
-                response_model=_route.response_model,
-                tags=_route.tags,
-                dependencies=_route.dependencies,
+                response_model=getattr(_route, "response_model", None),
+                status_code=getattr(_route, "status_code", 200),
+                tags=getattr(_route, "tags", None),
+                dependencies=getattr(_route, "dependencies", None),
+                summary=getattr(_route, "summary", None),
+                description=getattr(_route, "description", None),
+                response_class=getattr(_route, "response_class", None),
             )
 
 app.include_router(_api_router_v1)
