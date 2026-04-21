@@ -44,6 +44,27 @@ PYTHON=$(which python3)
 $PYTHON --version
 
 # ────────────────────────────────────────────
+# 2b. Avahi (mDNS) installieren
+# ────────────────────────────────────────────
+info "Avahi (mDNS) installieren..."
+apt-get install -y avahi-daemon avahi-utils
+systemctl enable avahi-daemon
+systemctl start avahi-daemon
+
+# ────────────────────────────────────────────
+# 2c. Hostname auf 'inventarpro' setzen
+# ────────────────────────────────────────────
+info "Hostname auf 'inventarpro' setzen..."
+hostnamectl set-hostname inventarpro
+echo "inventarpro" > /etc/hostname
+# /etc/hosts anpassen (127.0.1.1 Zeile aktualisieren)
+if grep -q "127.0.1.1" /etc/hosts; then
+    sed -i "s/127\.0\.1\.1.*/127.0.1.1\tinventarpro/" /etc/hosts
+else
+    echo "127.0.1.1\tinventarpro" >> /etc/hosts
+fi
+
+# ────────────────────────────────────────────
 # 3. MongoDB installieren (ARM64)
 # ────────────────────────────────────────────
 if ! command -v mongod &>/dev/null; then
@@ -233,7 +254,11 @@ echo "  Inventar Pro erfolgreich eingerichtet!"
 echo "════════════════════════════════════════════"
 echo ""
 echo "  Backend-URL:  http://${PI_IP}:${BACKEND_PORT}"
+echo "  Backend-URL (mDNS):  http://inventarpro.local:${BACKEND_PORT}"
 echo "  API-Docs:     http://${PI_IP}:${BACKEND_PORT}/docs"
+echo ""
+echo "  Tipp: Die mDNS-URL funktioniert auch nach einem Router-Neustart,"
+echo "        unabhaengig von der IP-Adresse. (Benoetigt mDNS-Unterstuetzung)"
 echo ""
 echo "  Logs:         journalctl -u inventarpro -f"
 echo "  Neustart:     systemctl restart inventarpro"
