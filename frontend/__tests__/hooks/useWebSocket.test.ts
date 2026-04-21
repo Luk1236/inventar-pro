@@ -21,6 +21,9 @@ class MockWebSocket {
 
 (global as any).WebSocket = MockWebSocket;
 
+// Mock global fetch so getWsToken() fails fast and falls back to getToken()
+(global as any).fetch = jest.fn().mockRejectedValue(new Error('Network error'));
+
 // Mock expo-constants
 jest.mock("expo-constants", () => ({
   expoConfig: { extra: { EXPO_PUBLIC_BACKEND_URL: "http://localhost:8000" } }
@@ -33,12 +36,14 @@ jest.mock("expo-secure-store", () => ({
   deleteItemAsync: jest.fn().mockResolvedValue(undefined),
 }));
 
-// Mock apiService
+// Mock apiService — provide both named exports that useWebSocket.ts imports directly
 jest.mock("../../services/apiService", () => ({
   __esModule: true,
   default: {
     getToken: jest.fn().mockResolvedValue("test-token"),
   },
+  getToken: jest.fn().mockResolvedValue("test-token"),
+  getBackendUrl: jest.fn().mockReturnValue("http://localhost:8000"),
 }));
 
 import { renderHook, act, waitFor } from "@testing-library/react-native";
