@@ -11,3 +11,8 @@ contextBridge.exposeInMainWorld('__electronBridge', {
   // Is this running in Electron?
   isElectron: true,
 });
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  saveUrl: (url) => ipcRenderer.send('save-url', url),
+  onUrlError: (cb) => ipcRenderer.on('url-error', (_event, msg) => cb(msg)),
+});

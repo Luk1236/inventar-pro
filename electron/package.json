@@ -2,10 +2,12 @@
   "name": "inventarpro-desktop",
   "version": "1.0.0",
   "description": "Inventar Pro — Desktop App für Windows",
+  "author": "Inventar Pro",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win --x64"
+    "build": "electron-builder --win --x64",
+    "build:dir": "electron-builder --win --x64 --dir"
   },
   "build": {
     "appId": "com.inventarpro.desktop",
@@ -19,18 +21,21 @@
       "web-dist/**/*"
     ],
     "win": {
-      "target": "nsis"
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
     },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Inventar Pro"
+    "portable": {
+      "artifactName": "InventarPro.exe"
     }
   },
   "devDependencies": {
-    "electron": "^28.0.0",
+    "electron": "^28.3.3",
     "electron-builder": "^24.0.0"
   }
 }
