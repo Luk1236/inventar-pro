@@ -75,7 +75,7 @@ pip install -r requirements.txt
 
 # Backend starten
 python server.py
-# Server läuft auf http://localhost:8000
+# Server läuft auf http://localhost:8002
 ```
 
 **⚠️ Wichtig:** Wenn Sie Fehler wie `Microsoft Visual C++ 14.0 required` bekommen:
@@ -101,9 +101,14 @@ npm start
 
 ### 3️⃣ Login & Test
 
-**Standard Admin-Credentials:**
+**Admin-Account:**
 - Username: `Admin`
-- Password: `YNwJT56G`
+- Password: wird beim ersten Serverstart aus `ADMIN_PASSWORD` in [`backend/.env`](backend/.env) gelesen (mindestens 12 Zeichen, keine Trivial-Defaults).
+- Beispiel in `backend/.env` setzen:
+  ```
+  ADMIN_PASSWORD=<dein-sicheres-passwort>
+  ```
+- Fehlt die Variable oder ist sie zu schwach, startet der Server nicht.
 
 ---
 
@@ -131,13 +136,13 @@ eas build --platform android --type apk
 
 ## 🐛 Troubleshooting
 
-### ❌ „Backend nicht erreichbar. Läuft der Server auf Port 8000?"
+### ❌ „Backend nicht erreichbar. Läuft der Server auf Port 8002?"
 **Lösung:**
 1. Überprüfen Sie, ob der Backend läuft: `python backend/server.py`
 2. Überprüfen Sie `frontend/app.json` - die `EXPO_PUBLIC_BACKEND_URL` muss gesetzt sein:
 ```json
 "extra": {
-  "EXPO_PUBLIC_BACKEND_URL": "http://localhost:8000"
+  "EXPO_PUBLIC_BACKEND_URL": "http://localhost:8002"
 }
 ```
 
@@ -180,9 +185,9 @@ npm install
 
 ## 📚 API Dokumentation
 
-Wenn der Backend läuft (`http://localhost:8000`):
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+Wenn der Backend läuft (`http://localhost:8002`):
+- **Swagger UI**: http://localhost:8002/docs
+- **ReDoc**: http://localhost:8002/redoc
 
 Die API ist vollständig dokumentiert mit allen 39 Endpoints.
 
