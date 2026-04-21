@@ -83,6 +83,21 @@ android-sdk/
 *.env
 *.env.*
 !*.env.example
+
+# Runtime artifacts (logs, backups, server stdout dumps)
+logs/
+*.log
+backend/backups/
+backend/server_out.txt
+backend/server*.txt
+backend/diagnosis/report.html
+
+# Claude Code / Superpowers state
+.superpowers/
+.claude/
+
+# Emergent platform config (legacy, no longer in use)
+.emergent/
 -e 
 # Environment files
 *.env
