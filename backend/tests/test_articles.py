@@ -160,3 +160,38 @@ async def test_article_list_excludes_deleted(client, auth_headers):
     assert list_resp.status_code == 200
     ids = [a["id"] for a in list_resp.json()]
     assert article_id not in ids, "Deleted article must not appear in active list"
+
+
+# ── UUID Constraint Tests (Bug 4) ──────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_articles_archived_returns_200(client, auth_headers):
+    """/articles/archived darf NICHT als article_id interpretiert werden."""
+    resp = await client.get("/api/articles/archived", headers=auth_headers)
+    assert resp.status_code == 200, (
+        f"Erwartet 200, bekommen {resp.status_code}. "
+        "Fehler: 'archived' wird als article_id interpretiert."
+    )
+    assert isinstance(resp.json(), list)
+
+
+@pytest.mark.asyncio
+async def test_article_invalid_uuid_returns_422(client, auth_headers):
+    """Nicht-UUID article_id muss 422 zurückgeben (FastAPI-Validierung)."""
+    resp = await client.get("/api/articles/not-a-valid-uuid", headers=auth_headers)
+    assert resp.status_code == 422, (
+        f"Erwartet 422 Unprocessable Entity, bekommen {resp.status_code}. "
+        "Fehler: UUID-Constraint fehlt oder ist falsch konfiguriert."
+    )
+
+
+@pytest.mark.asyncio
+async def test_article_valid_uuid_returns_200_or_404(client, auth_headers):
+    """Gültige UUID als article_id muss 200 oder 404 zurückgeben (nie 422)."""
+    import uuid
+    valid_uuid = str(uuid.uuid4())
+    resp = await client.get(f"/api/articles/{valid_uuid}", headers=auth_headers)
+    assert resp.status_code in (200, 404), (
+        f"Erwartet 200 oder 404, bekommen {resp.status_code}. "
+        "Fehler: Gültige UUID wird abgelehnt."
+    )
