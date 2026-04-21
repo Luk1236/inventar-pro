@@ -194,6 +194,45 @@ export default function BookingsPage() {
                   </Text>
                 )}
 
+                {/* Mietfaktoren-Rechner */}
+                {booking.pickup_date && booking.return_date && (() => {
+                  const days = Math.max(1, Math.ceil(
+                    (new Date(booking.return_date).getTime() - new Date(booking.pickup_date).getTime()) / (1000 * 60 * 60 * 24)
+                  ));
+                  const art = articles[booking.article_id];
+                  if (!art) return null;
+                  const basePrice = art.rental_price_day || art.rental_price || 0;
+                  const weekPrice = art.rental_price_week || (basePrice * 5);
+                  let price = 0, tier = '', discount = 0;
+                  if (days <= 3) {
+                    price = basePrice * days * booking.quantity;
+                    tier = `${days}T × ${basePrice.toFixed(2)}€`;
+                  } else if (days <= 7) {
+                    price = weekPrice * booking.quantity;
+                    tier = `Woche × ${weekPrice.toFixed(2)}€`;
+                    discount = Math.round((1 - weekPrice / (basePrice * days)) * 100);
+                  } else {
+                    const weeks = Math.ceil(days / 7);
+                    price = weekPrice * weeks * booking.quantity;
+                    tier = `${weeks} Wo. × ${weekPrice.toFixed(2)}€`;
+                    discount = Math.round((1 - (weekPrice * weeks) / (basePrice * days)) * 100);
+                  }
+                  if (price <= 0) return null;
+                  return (
+                    <View style={[styles.priceBox, { backgroundColor: colors.background }]}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={[styles.dateLabel, { color: colors.textSecondary }]}>⏱ {days} Tag{days !== 1 ? 'e' : ''} · {tier}</Text>
+                        {discount > 0 && (
+                          <Text style={{ fontSize: 11, color: '#34C759', fontWeight: '700' }}>-{discount}%</Text>
+                        )}
+                      </View>
+                      <Text style={[styles.dateValue, { color: colors.primary, fontSize: 16 }]}>
+                        {price.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}
+                      </Text>
+                    </View>
+                  );
+                })()}
+
                 {booking.notes && (
                   <Text style={[styles.notes, { color: colors.textSecondary }]}>📝 {booking.notes}</Text>
                 )}
@@ -338,5 +377,11 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
+  },
+  priceBox: {
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 10,
+    gap: 4,
   },
 });

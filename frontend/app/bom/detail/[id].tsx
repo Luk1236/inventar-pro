@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import Constants from 'expo-constants';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -266,7 +266,7 @@ export default function BOMDetailPage() {
 
   const loadBOMDetails = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
       const response = await fetch(`${BACKEND_URL}/api/bom/${id}/details`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -286,7 +286,7 @@ export default function BOMDetailPage() {
 
   const loadEvents = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
       const response = await fetch(`${BACKEND_URL}/api/events`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -309,7 +309,7 @@ export default function BOMDetailPage() {
 
   const bookToEvent = async (eventId: string) => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
       const response = await fetch(`${BACKEND_URL}/api/bom/${id}/book-to-event?event_id=${eventId}`, {
         method: 'POST',
         headers: {

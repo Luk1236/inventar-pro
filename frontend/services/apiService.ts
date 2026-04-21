@@ -6,11 +6,12 @@ import { Alert } from 'react-native';
 
 // Default URL from env/config
 const DEFAULT_BACKEND_URL: string =
-  Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL ??
   process.env.EXPO_PUBLIC_BACKEND_URL ??
+  Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL ??
   'http://localhost:8002';
 
 // Runtime override (set by settings screen or Electron bridge)
+// Always start with the configured default so stale mocks or cached values are ignored
 let _runtimeBackendUrl: string | null = null;
 
 export function setBackendUrl(url: string): void {
@@ -21,10 +22,8 @@ export function getBackendUrl(): string {
   return _runtimeBackendUrl ?? DEFAULT_BACKEND_URL;
 }
 
-// On startup: load persisted server URL from AsyncStorage
-AsyncStorage.getItem('server_url').then((url) => {
-  if (url) _runtimeBackendUrl = url;
-}).catch(() => {});
+// On startup: reset any stored server URL so the default (localhost:8002) is always used
+AsyncStorage.removeItem('server_url').catch(() => {});
 
 // Electron bridge: load from Electron settings if running in desktop
 if (typeof window !== 'undefined' && (window as any).__electronBridge) {
@@ -117,6 +116,9 @@ const DEFAULT_CONFIG: RequestConfig = {
 
 class ApiService {
   private isRefreshing = false;
+  // Queues callers that arrive while a token refresh is already in flight.
+  // When the refresh resolves, every queued caller is unblocked with the new token.
+  // An empty-string token signals refresh failure so callers can reject cleanly.
   private refreshSubscribers: ((token: string) => void)[] = [];
   // H3 — Deduplication: prevent double-tap from sending identical concurrent requests
   private pendingRequests = new Map<string, Promise<any>>();
@@ -243,7 +245,9 @@ class ApiService {
 
       clearTimeout(timeoutId);
 
-      // Handle 401 - Token expired
+      // 401 with isRefreshing=false: this request kicks off the refresh.
+      // 401 with isRefreshing=true: a refresh is already happening — queue this
+      // request as a subscriber so it retries automatically when the new token arrives.
       if (response.status === 401 && !skipAuth) {
         if (!this.isRefreshing) {
           this.isRefreshing = true;
@@ -391,3 +395,9 @@ class ApiService {
 
 const apiService = new ApiService();
 export default apiService;
+
+// Export getToken for use in components that need direct token access
+// Always use this instead of AsyncStorage.getItem('auth_token') for secure storage
+export const getToken = async (): Promise<string | null> => {
+  return secureGet('auth_token');
+};

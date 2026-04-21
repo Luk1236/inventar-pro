@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,14 +12,16 @@ import {
   RefreshControl,
   Dimensions,
 } from 'react-native';
-import ShelfVisualizer3D from '../../components/warehouse/ShelfVisualizer3D';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
-import apiService from '../../services/apiService';
+import apiService, { getToken } from '../../services/apiService';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Import improved 3D warehouse visualizer
+import WarehouseVisualizer3D, { Shelf3DConfig, Shelf3DData } from '../../components/warehouse/WarehouseVisualizer3D';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -91,7 +93,7 @@ export default function ShelvesManagementPage() {
 
   const loadData = async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
       if (!token) {
         router.replace('/');
         return;
@@ -277,7 +279,7 @@ export default function ShelvesManagementPage() {
   };
 
   const createShelfLocations = async (shelf: Shelf) => {
-    const token = await AsyncStorage.getItem('auth_token');
+    const token = await getToken();
     
     if (!token) {
       console.error('No auth token found');
@@ -373,180 +375,6 @@ export default function ShelvesManagementPage() {
   const handlePositionPress = (shelf: Shelf, row: number, level: number, position: number) => {
     setSelectedPosition({ row, level, position });
     setShowPositionDetail(true);
-  };
-
-  const getOccupancyColor = (occupied: boolean, stock: number) => {
-    if (!occupied || stock === 0) return { bg: '#E8F5E9', border: '#4CAF50', text: '#2E7D32' }; // Frei - Grün
-    if (stock === 1) return { bg: '#FFF3E0', border: '#FF9800', text: '#E65100' }; // Belegt - Orange
-    return { bg: '#FFEBEE', border: '#F44336', text: '#C62828' }; // Voll - Rot
-  };
-
-  // Render 3D Shelf Visual
-  const render3DShelfVisual = (shelf: Shelf) => {
-    const cellWidth = Math.min(70, (screenWidth - 120) / shelf.positions_per_level);
-    
-    return (
-      <View style={styles.shelf3DContainer}>
-        {/* Shelf Header */}
-        <View style={styles.shelfHeaderBar}>
-          <Text style={styles.shelfHeaderText}>{shelf.name}</Text>
-          <Text style={styles.shelfSubHeader}>{getZoneName(shelf.zone_id)}</Text>
-        </View>
-
-        {/* Legend */}
-        <View style={styles.legendContainer}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendBox, { backgroundColor: '#E8F5E9', borderColor: '#4CAF50' }]} />
-            <Text style={styles.legendText}>Frei</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendBox, { backgroundColor: '#FFF3E0', borderColor: '#FF9800' }]} />
-            <Text style={styles.legendText}>Belegt</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendBox, { backgroundColor: '#FFEBEE', borderColor: '#F44336' }]} />
-            <Text style={styles.legendText}>Voll</Text>
-          </View>
-        </View>
-
-        {/* Stats */}
-        <View style={styles.shelfStats}>
-          {(() => {
-            let total = 0, occupied = 0;
-            for (let r = 1; r <= shelf.rows; r++) {
-              for (let l = 1; l <= shelf.levels; l++) {
-                for (let p = 1; p <= shelf.positions_per_level; p++) {
-                  total++;
-                  const info = getLocationInfo(shelf, r, l, p);
-                  if (info.occupied) occupied++;
-                }
-              }
-            }
-            const percentage = Math.round((occupied / total) * 100);
-            return (
-              <>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{total}</Text>
-                  <Text style={styles.statLabel}>Plätze</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={[styles.statValue, { color: '#4CAF50' }]}>{total - occupied}</Text>
-                  <Text style={styles.statLabel}>Frei</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={[styles.statValue, { color: '#FF9800' }]}>{occupied}</Text>
-                  <Text style={styles.statLabel}>Belegt</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={[styles.statValue, { color: percentage > 80 ? '#F44336' : '#007AFF' }]}>{percentage}%</Text>
-                  <Text style={styles.statLabel}>Auslastung</Text>
-                </View>
-              </>
-            );
-          })()}
-        </View>
-
-        {/* 3D Shelf Rows */}
-        {[...Array(shelf.rows)].map((_, rowIndex) => {
-          const row = rowIndex + 1;
-          
-          return (
-            <View key={row} style={styles.shelfRowContainer}>
-              {/* Row Label */}
-              <View style={styles.rowLabelSide}>
-                <Text style={styles.rowLabelText}>R{String(row).padStart(2, '0')}</Text>
-              </View>
-
-              <View style={styles.shelf3DWrapper}>
-                {/* Side Panel Left - 3D Effect */}
-                <View style={styles.sidePanelLeft} />
-                
-                {/* Main Shelf Content */}
-                <View style={styles.shelfMainContent}>
-                  {/* Render levels from top to bottom */}
-                  {[...Array(shelf.levels)].map((_, levelIndex) => {
-                    const level = shelf.levels - levelIndex;
-                    
-                    return (
-                      <View key={level} style={styles.level3DContainer}>
-                        {/* Level Label */}
-                        <View style={styles.levelLabelBox}>
-                          <Text style={styles.levelLabelText}>E{level}</Text>
-                        </View>
-                        
-                        {/* Positions */}
-                        <View style={styles.positions3DRow}>
-                          {[...Array(shelf.positions_per_level)].map((_, posIndex) => {
-                            const position = posIndex + 1;
-                            const info = getLocationInfo(shelf, row, level, position);
-                            const colorScheme = getOccupancyColor(info.occupied, info.stock);
-                            
-                            return (
-                              <TouchableOpacity
-                                key={position}
-                                style={[
-                                  styles.position3DBox,
-                                  { 
-                                    width: cellWidth,
-                                    backgroundColor: colorScheme.bg,
-                                    borderColor: colorScheme.border,
-                                  }
-                                ]}
-                                onPress={() => handlePositionPress(shelf, row, level, position)}
-                                activeOpacity={0.7}
-                              >
-                                {/* 3D Top Effect */}
-                                <View style={[styles.position3DTop, { backgroundColor: colorScheme.border }]} />
-                                
-                                {/* Position Content */}
-                                <View style={styles.positionContent}>
-                                  <Text style={[styles.positionNumber, { color: colorScheme.text }]}>
-                                    {String(position).padStart(2, '0')}
-                                  </Text>
-                                  
-                                  {info.occupied && (
-                                    <View style={styles.articleIndicator}>
-                                      <Ionicons name="cube" size={16} color={colorScheme.text} />
-                                      {info.stock > 1 && (
-                                        <Text style={[styles.stockCount, { color: colorScheme.text }]}>
-                                          {info.stock}
-                                        </Text>
-                                      )}
-                                    </View>
-                                  )}
-                                </View>
-                                
-                                {/* 3D Shadow Effect */}
-                                <View style={styles.position3DShadow} />
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                        
-                        {/* Shelf Beam with 3D effect */}
-                        <View style={styles.shelfBeam3D}>
-                          <View style={styles.beamTop} />
-                          <View style={styles.beamFront} />
-                        </View>
-                      </View>
-                    );
-                  })}
-                  
-                  {/* Base */}
-                  <View style={styles.shelfBase3D}>
-                    <View style={styles.baseTop} />
-                    <View style={styles.baseFront} />
-                  </View>
-                </View>
-                
-                {/* Side Panel Right - 3D Effect */}
-                <View style={styles.sidePanelRight} />
-              </View>
-            </View>
-          );
-        })}
-      </View>
-    );
   };
 
   // Render Position Detail Modal
@@ -1025,26 +853,49 @@ export default function ShelvesManagementPage() {
           {/* 3D Visualizer */}
           {selectedShelf && (() => {
             const pad = (n: number) => String(n).padStart(2, '0');
-            const fillData: Record<string, number> = {};
+
+            // Build config for new component
+            const shelfConfig: Shelf3DConfig = {
+              blocks: selectedShelf.rows,
+              levels: selectedShelf.levels,
+              spotsPerLevel: selectedShelf.positions_per_level,
+              name: selectedShelf.name,
+            };
+
+            // Build data for new component
+            const shelfData: Record<string, Shelf3DData> = {};
             for (let r = 1; r <= selectedShelf.rows; r++) {
               for (let l = 1; l <= selectedShelf.levels; l++) {
                 for (let p = 1; p <= selectedShelf.positions_per_level; p++) {
                   const info = getLocationInfo(selectedShelf, r, l, p);
                   const key = `${pad(r)}-${pad(l)}-${pad(p)}`;
-                  fillData[key] = info.occupied ? (info.stock > 1 ? 85 : 65) : 0;
+                  const article = info.articles.length > 0 ? info.articles[0] : undefined;
+
+                  shelfData[key] = {
+                    code: key,
+                    fillPercent: info.occupied ? (info.stock > 1 ? 85 : 65) : 0,
+                    articleName: article?.name,
+                    articleId: article?.id,
+                    stock: info.stock,
+                  };
                 }
               }
             }
+
             return (
-              <ShelfVisualizer3D
-                blocks={selectedShelf.rows}
-                levels={selectedShelf.levels}
-                spots={selectedShelf.positions_per_level}
-                fillData={fillData}
-                onSpotPress={(block, level, spot) => {
+              <WarehouseVisualizer3D
+                config={shelfConfig}
+                data={shelfData}
+                onSpotSelect={(block, level, spot, code, data) => {
                   setSelectedPosition({ row: block, level, position: spot });
                   setShowPositionDetail(true);
                 }}
+                selectedSpot={selectedPosition ? `${pad(selectedPosition.row)}-${pad(selectedPosition.level)}-${pad(selectedPosition.position)}` : null}
+                theme="auto"
+                showLabels={true}
+                showSearch={true}
+                showFilters={true}
+                enableAnimation={true}
               />
             );
           })()}
@@ -1229,204 +1080,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FF3B30',
   },
-  
-  // 3D Shelf Styles
-  shelf3DContainer: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-  },
-  shelfHeaderBar: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-    alignItems: 'center',
-  },
-  shelfHeaderText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  shelfSubHeader: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 4,
-  },
-  legendContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 24,
-    marginBottom: 16,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  legendBox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 2,
-  },
-  legendText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  shelfStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  statLabel: {
-    fontSize: 11,
-    color: '#999',
-    marginTop: 4,
-  },
-  shelfRowContainer: {
-    flexDirection: 'row',
-    marginBottom: 24,
-  },
-  rowLabelSide: {
-    width: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  rowLabelText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#007AFF',
-    transform: [{ rotate: '-90deg' }],
-  },
-  shelf3DWrapper: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  sidePanelLeft: {
-    width: 8,
-    backgroundColor: '#5D4037',
-    borderTopLeftRadius: 4,
-    borderBottomLeftRadius: 4,
-  },
-  sidePanelRight: {
-    width: 8,
-    backgroundColor: '#4E342E',
-    borderTopRightRadius: 4,
-    borderBottomRightRadius: 4,
-  },
-  shelfMainContent: {
-    flex: 1,
-    backgroundColor: '#8D6E63',
-    padding: 8,
-  },
-  level3DContainer: {
-    marginBottom: 4,
-  },
-  levelLabelBox: {
-    backgroundColor: '#5D4037',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-    marginBottom: 4,
-  },
-  levelLabelText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  positions3DRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 4,
-  },
-  position3DBox: {
-    height: 60,
-    borderRadius: 6,
-    borderWidth: 2,
-    marginHorizontal: 2,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  position3DTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 4,
-    opacity: 0.5,
-  },
-  positionContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  positionNumber: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  articleIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  stockCount: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginLeft: 2,
-  },
-  position3DShadow: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 4,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-  },
-  shelfBeam3D: {
-    marginTop: 4,
-  },
-  beamTop: {
-    height: 4,
-    backgroundColor: '#6D4C41',
-    borderTopLeftRadius: 2,
-    borderTopRightRadius: 2,
-  },
-  beamFront: {
-    height: 8,
-    backgroundColor: '#5D4037',
-    borderBottomLeftRadius: 2,
-    borderBottomRightRadius: 2,
-  },
-  shelfBase3D: {
-    marginTop: 8,
-  },
-  baseTop: {
-    height: 6,
-    backgroundColor: '#4E342E',
-    borderTopLeftRadius: 2,
-    borderTopRightRadius: 2,
-  },
-  baseFront: {
-    height: 12,
-    backgroundColor: '#3E2723',
-    borderBottomLeftRadius: 4,
-    borderBottomRightRadius: 4,
-  },
-  
+
   // Position Detail Modal
   detailOverlay: {
     flex: 1,

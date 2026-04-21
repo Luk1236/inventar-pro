@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -176,7 +176,7 @@ export default function ScannerPageWeb() {
     setLoading(true);
 
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
       if (!token) {
         router.replace('/');
         return;

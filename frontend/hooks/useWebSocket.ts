@@ -1,10 +1,34 @@
 // frontend/hooks/useWebSocket.ts
 import { useEffect, useRef, useCallback } from 'react';
-import apiService, { getBackendUrl } from '../services/apiService';
+import { getBackendUrl, getToken } from '../services/apiService';
+
+/**
+ * Get a one-time WebSocket token from the server.
+ * This is more secure than passing the JWT access token in the URL.
+ */
+async function getWsToken(): Promise<string | null> {
+  try {
+    const accessToken = await getToken();
+    if (!accessToken) return null;
+    const response = await fetch(`${getBackendUrl()}/api/ws-token`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return data.ws_token ?? accessToken;
+    }
+    // Fallback: use access token directly (backward compatible)
+    return accessToken;
+  } catch {
+    // Last resort fallback
+    return await getToken();
+  }
+}
 
 async function getWsUrl(): Promise<string> {
-  // F8: Append JWT access token as ?token= so server can authenticate the connection
-  const token = await apiService.getToken();
+  // Try to get a one-time ws_token first (more secure)
+  // Falls back to JWT access token if ws-token endpoint fails
+  const token = await getWsToken();
   const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
 
   const backendUrl = getBackendUrl();

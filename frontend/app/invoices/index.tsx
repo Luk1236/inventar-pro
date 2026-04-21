@@ -11,11 +11,11 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { router } from 'expo-router';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import apiService from '../../services/apiService';
+import apiService, { getToken } from '../../services/apiService';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -44,7 +44,7 @@ export default function InvoicesPage() {
 
   const loadInvoices = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
       if (!token) {
         router.replace('/');
         return;
@@ -130,194 +130,12 @@ export default function InvoicesPage() {
 
   const generateInvoicePDF = async (invoice: Invoice) => {
     try {
-      const event = events[invoice.event_id];
-      const customer = customers[invoice.customer_id];
+      const pdfData = await apiService.get<{ html: string }>(
+        `/api/invoices/${invoice.id}/pdf-data`,
+        { showErrorAlert: false }
+      );
       
-      const html = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body {
-              font-family: 'Helvetica', 'Arial', sans-serif;
-              padding: 40px;
-              color: #333;
-            }
-            .header {
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 40px;
-              border-bottom: 3px solid #007AFF;
-              padding-bottom: 20px;
-            }
-            .company {
-              font-size: 24px;
-              font-weight: bold;
-              color: #007AFF;
-            }
-            .invoice-number {
-              font-size: 20px;
-              color: #666;
-            }
-            .customer-info {
-              margin-bottom: 30px;
-            }
-            .customer-info h3 {
-              color: #007AFF;
-              margin-bottom: 10px;
-            }
-            .invoice-details {
-              margin-bottom: 30px;
-              background: #f8f9fa;
-              padding: 15px;
-              border-radius: 8px;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-bottom: 30px;
-            }
-            th {
-              background: #007AFF;
-              color: white;
-              padding: 12px;
-              text-align: left;
-            }
-            td {
-              padding: 12px;
-              border-bottom: 1px solid #e9ecef;
-            }
-            .totals {
-              text-align: right;
-              margin-top: 20px;
-            }
-            .totals-row {
-              display: flex;
-              justify-content: flex-end;
-              padding: 8px 0;
-            }
-            .totals-label {
-              width: 150px;
-              font-weight: bold;
-            }
-            .totals-value {
-              width: 120px;
-              text-align: right;
-            }
-            .total-final {
-              font-size: 18px;
-              color: #007AFF;
-              border-top: 2px solid #007AFF;
-              padding-top: 10px;
-              margin-top: 10px;
-            }
-            .footer {
-              margin-top: 50px;
-              padding-top: 20px;
-              border-top: 1px solid #e9ecef;
-              font-size: 12px;
-              color: #666;
-              text-align: center;
-            }
-            .status {
-              display: inline-block;
-              padding: 6px 12px;
-              border-radius: 4px;
-              font-weight: bold;
-              font-size: 12px;
-            }
-            .status-paid { background: #d4edda; color: #155724; }
-            .status-pending { background: #fff3cd; color: #856404; }
-            .status-overdue { background: #f8d7da; color: #721c24; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div>
-              <div class="company">Ihr Firmenname</div>
-              <div>Ihre Adresse</div>
-              <div>Ihre Stadt, PLZ</div>
-              <div>Tel: Ihre Telefonnummer</div>
-            </div>
-            <div>
-              <div class="invoice-number">Rechnung ${invoice.invoice_number}</div>
-              <div>Datum: ${new Date(invoice.issue_date).toLocaleDateString('de-DE')}</div>
-              <div>Fällig: ${new Date(invoice.due_date).toLocaleDateString('de-DE')}</div>
-              <div>
-                <span class="status status-${invoice.status === 'paid' ? 'paid' : invoice.status === 'pending' ? 'pending' : 'overdue'}">
-                  ${invoice.status === 'paid' ? 'Bezahlt' : invoice.status === 'pending' ? 'Ausstehend' : 'Überfällig'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div class="customer-info">
-            <h3>Rechnungsempfänger</h3>
-            <div><strong>${customer?.name || 'Kunde nicht gefunden'}</strong></div>
-            ${customer?.company ? `<div>${customer.company}</div>` : ''}
-            ${customer?.address ? `<div>${customer.address}</div>` : ''}
-            ${customer?.email ? `<div>E-Mail: ${customer.email}</div>` : ''}
-            ${customer?.phone ? `<div>Tel: ${customer.phone}</div>` : ''}
-          </div>
-
-          <div class="invoice-details">
-            <strong>Event:</strong> ${event?.title || 'Event nicht gefunden'}<br>
-            ${event?.start_date ? `<strong>Datum:</strong> ${new Date(event.start_date).toLocaleDateString('de-DE')}` : ''}
-            ${event?.location ? ` | <strong>Ort:</strong> ${event.location}` : ''}
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th>Beschreibung</th>
-                <th>Menge</th>
-                <th>Einzelpreis</th>
-                <th>Gesamt</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Verleih Equipment für Event</td>
-                <td>1</td>
-                <td>€${invoice.subtotal.toFixed(2)}</td>
-                <td>€${invoice.subtotal.toFixed(2)}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div class="totals">
-            <div class="totals-row">
-              <div class="totals-label">Zwischensumme:</div>
-              <div class="totals-value">€${invoice.subtotal.toFixed(2)}</div>
-            </div>
-            <div class="totals-row">
-              <div class="totals-label">MwSt (${invoice.tax_rate}%):</div>
-              <div class="totals-value">€${invoice.tax_amount.toFixed(2)}</div>
-            </div>
-            <div class="totals-row total-final">
-              <div class="totals-label">Gesamtbetrag:</div>
-              <div class="totals-value">€${invoice.total_amount.toFixed(2)}</div>
-            </div>
-          </div>
-
-          ${invoice.notes ? `
-            <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-              <strong>Anmerkungen:</strong><br>
-              ${invoice.notes}
-            </div>
-          ` : ''}
-
-          <div class="footer">
-            <p>Vielen Dank für Ihr Vertrauen!</p>
-            <p>Zahlungsziel: ${new Date(invoice.due_date).toLocaleDateString('de-DE')}</p>
-            <p>Bei Fragen kontaktieren Sie uns bitte unter: info@beispiel.de</p>
-          </div>
-        </body>
-        </html>
-      `;
-
-      const { uri } = await Print.printToFileAsync({ html });
+      const { uri } = await Print.printToFileAsync({ html: pdfData.html });
       
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, {
@@ -359,7 +177,7 @@ export default function InvoicesPage() {
           text: labels[i],
           onPress: async () => {
             try {
-              const token = await AsyncStorage.getItem('auth_token');
+              const token = await getToken();
               await apiService.put(`/api/invoices/${invoice.id}/payment-status`, { payment_status: opt });
               setInvoices(prev => prev.map(inv => inv.id === invoice.id ? { ...inv, payment_status: opt } : inv));
             } catch (e) {

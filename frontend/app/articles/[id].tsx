@@ -13,13 +13,10 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
-
-const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || process.env.EXPO_PUBLIC_BACKEND_URL;
+import apiService from '../../services/apiService';
 
 interface Article {
   id: string;
@@ -40,6 +37,11 @@ interface Article {
   image_base64?: string;
   images?: string[];
   qr_code?: string;
+  weight_kg?: number;
+  power_watt?: number;
+  is_sub_rental?: boolean;
+  sub_rental_supplier_id?: string;
+  sub_rental_cost?: number;
   created_at: string;
   updated_at: string;
 }
@@ -74,6 +76,7 @@ export default function ArticleDetailPage() {
   const [article, setArticle] = useState<Article | null>(null);
   const [category, setCategory] = useState<Category | null>(null);
   const [supplier, setSupplier] = useState<Supplier | null>(null);
+  const [subRentalSupplier, setSubRentalSupplier] = useState<Supplier | null>(null);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [loading, setLoading] = useState(true);
   const [showImageModal, setShowImageModal] = useState(false);
@@ -336,50 +339,38 @@ export default function ArticleDetailPage() {
 
   const loadArticleData = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
-      if (!token) {
-        router.replace('/');
-        return;
-      }
-
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      };
-
-      // Load article details
-      const articleResponse = await fetch(`${BACKEND_URL}/api/articles/${id}`, { headers });
-
-      if (!articleResponse.ok) {
+      // Load article details using apiService
+      const articleData = await apiService.get<Article>(`/api/articles/${id}`);
+      if (!articleData) {
         Alert.alert('Fehler', 'Artikel nicht gefunden');
         router.back();
         return;
       }
-
-      const articleData = await articleResponse.json();
       setArticle(articleData);
 
-      // Load category and supplier info
-      const [categoriesRes, suppliersRes, movementsRes] = await Promise.all([
-        fetch(`${BACKEND_URL}/api/categories`, { headers }),
-        fetch(`${BACKEND_URL}/api/suppliers`, { headers }),
-        fetch(`${BACKEND_URL}/api/movements?article_id=${id}`, { headers }),
+      // Load category and supplier info in parallel
+      const [categories, suppliers, movementsData] = await Promise.all([
+        apiService.get<Category[]>('/api/categories'),
+        apiService.get<Supplier[]>('/api/suppliers'),
+        apiService.get<any[]>(`/api/movements?article_id=${id}`),
       ]);
 
-      if (categoriesRes.ok) {
-        const categories = await categoriesRes.json();
-        const articleCategory = categories.find((c: Category) => c.id === articleData.category_id);
+      if (categories) {
+        const articleCategory = categories.find((c) => c.id === articleData.category_id);
         setCategory(articleCategory || null);
       }
 
-      if (suppliersRes.ok && articleData.supplier_id) {
-        const suppliers = await suppliersRes.json();
-        const articleSupplier = suppliers.find((s: Supplier) => s.id === articleData.supplier_id);
+      if (suppliers && articleData.supplier_id) {
+        const articleSupplier = suppliers.find((s) => s.id === articleData.supplier_id);
         setSupplier(articleSupplier || null);
       }
 
-      if (movementsRes.ok) {
-        const movementsData = await movementsRes.json();
+      if (suppliers && articleData.sub_rental_supplier_id) {
+        const srSupplier = suppliers.find((s) => s.id === articleData.sub_rental_supplier_id);
+        setSubRentalSupplier(srSupplier || null);
+      }
+
+      if (movementsData) {
         setMovements(movementsData.slice(0, 10)); // Show last 10 movements
       }
 
@@ -408,23 +399,12 @@ export default function ArticleDetailPage() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const token = await AsyncStorage.getItem('auth_token');
-              const response = await fetch(`${BACKEND_URL}/api/articles/${id}`, {
-                method: 'DELETE',
-                headers: {
-                  'Authorization': `Bearer ${token}`,
-                },
-              });
-
-              if (response.ok) {
-                Alert.alert('Erfolg', 'Artikel wurde gelöscht', [
-                  { text: 'OK', onPress: () => router.back() }
-                ]);
-              } else {
-                Alert.alert('Fehler', 'Artikel konnte nicht gelöscht werden');
-              }
+              await apiService.delete(`/api/articles/${id}`);
+              Alert.alert('Erfolg', 'Artikel wurde gelöscht', [
+                { text: 'OK', onPress: () => router.back() }
+              ]);
             } catch (error) {
-              Alert.alert('Fehler', 'Netzwerkfehler beim Löschen');
+              Alert.alert('Fehler', 'Artikel konnte nicht gelöscht werden');
             }
           },
         },
@@ -615,6 +595,57 @@ export default function ArticleDetailPage() {
             </View>
           </View>
         </View>
+
+        {/* Sub-Rental Card */}
+        {article.is_sub_rental && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Zumietung (Sub-Rental)</Text>
+
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Status</Text>
+              <View style={[styles.statusBadge, { backgroundColor: colors.primary }]}>
+                <Text style={styles.statusText}>Zumietartikel</Text>
+              </View>
+            </View>
+
+            {subRentalSupplier && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Vermieter</Text>
+                <Text style={styles.infoValue}>{subRentalSupplier.name}</Text>
+              </View>
+            )}
+
+            {article.sub_rental_cost !== undefined && article.sub_rental_cost !== null && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Mietkosten</Text>
+                <Text style={[styles.infoValue, { color: '#FF3B30' }]}>
+                  €{article.sub_rental_cost}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Technical Data Card */}
+        {(article.weight_kg !== undefined || article.power_watt !== undefined) && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Technische Daten</Text>
+
+            {article.weight_kg !== undefined && article.weight_kg !== null && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Gewicht</Text>
+                <Text style={styles.infoValue}>{article.weight_kg} kg</Text>
+              </View>
+            )}
+
+            {article.power_watt !== undefined && article.power_watt !== null && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Leistung</Text>
+                <Text style={styles.infoValue}>{article.power_watt} Watt</Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Stock Info Card */}
         <View style={styles.card}>

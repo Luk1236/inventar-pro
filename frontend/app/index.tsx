@@ -631,6 +631,51 @@ export default function Index() {
       fontSize: 13,
       flex: 1,
     },
+    // ===== KPI Widget Styles =====
+    widgetRow: {
+      flexDirection: 'row' as const,
+      gap: 12,
+      marginBottom: 12,
+    },
+    widget: {
+      flex: 1,
+      borderRadius: 18,
+      padding: 18,
+      position: 'relative' as const,
+      overflow: 'hidden' as const,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: isDark ? 0.15 : 0.06,
+      shadowRadius: 10,
+      elevation: 3,
+      backgroundColor: colors.card,
+    },
+    widgetBlue: { backgroundColor: isDark ? '#1a2744' : '#EFF6FF' },
+    widgetRed: { backgroundColor: isDark ? '#3d1515' : '#FFF1F0' },
+    widgetGreen: { backgroundColor: isDark ? '#14321a' : '#F0FFF4' },
+    widgetOrange: { backgroundColor: isDark ? '#3d2800' : '#FFFBEB' },
+    widgetNumber: {
+      fontSize: 36,
+      fontWeight: '800' as const,
+      color: colors.text,
+      letterSpacing: -1,
+    },
+    widgetLabel: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      fontWeight: '500' as const,
+      marginTop: 2,
+    },
+    widgetIcon: {
+      position: 'absolute' as const,
+      top: 14,
+      right: 14,
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      justifyContent: 'center' as const,
+      alignItems: 'center' as const,
+    },
     subGroupLabel: {
       paddingHorizontal: 16,
       paddingVertical: 6,
@@ -1208,8 +1253,8 @@ export default function Index() {
           </TouchableOpacity>
         </TouchableOpacity>
 
-        {/* Financial Widgets */}
-        {visibleWidgets.financial && financialStats && (
+        {/* Financial Widgets - Only for Admin/Manager */}
+        {visibleWidgets.financial && financialStats && (user?.role === 'admin' || user?.role === 'manager') && (
           <>
             {/* Offenstehende Rechnungen */}
             <TouchableOpacity
@@ -1346,18 +1391,69 @@ export default function Index() {
             </View>
             <Text style={styles.quickLabel}>Lager</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.quickCard} onPress={() => router.push('/invoices')}>
-            <View style={[styles.quickIcon, { backgroundColor: '#AF52DE15' }]}>
-              <Ionicons name="receipt-outline" size={26} color="#AF52DE" />
+          {(user?.role === 'admin' || user?.role === 'manager') && (
+            <TouchableOpacity style={styles.quickCard} onPress={() => router.push('/invoices')}>
+              <View style={[styles.quickIcon, { backgroundColor: '#AF52DE15' }]}>
+                <Ionicons name="receipt-outline" size={26} color="#AF52DE" />
+              </View>
+              <Text style={styles.quickLabel}>Rechnungen</Text>
+            </TouchableOpacity>
+          )}
+          {(user?.role === 'admin' || user?.role === 'manager') && (
+            <TouchableOpacity style={styles.quickCard} onPress={() => router.push('/sub-rentals')}>
+              <View style={[styles.quickIcon, { backgroundColor: '#FF6B0015' }]}>
+                <Ionicons name="git-compare-outline" size={26} color="#FF6B00" />
+              </View>
+              <Text style={styles.quickLabel}>Zumietung</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.quickCard} onPress={() => router.push('/packing-list')}>
+            <View style={[styles.quickIcon, { backgroundColor: '#00897B15' }]}>
+              <Ionicons name="list-outline" size={26} color="#00897B" />
             </View>
-            <Text style={styles.quickLabel}>Rechnungen</Text>
+            <Text style={styles.quickLabel}>Packliste</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ===== WAREHOUSE METRICS (Available for all) ===== */}
+        <View style={styles.widgetRow}>
+          <TouchableOpacity style={[styles.widget, styles.widgetBlue]} onPress={() => router.push('/events')}>
+            <Text style={styles.widgetNumber}>{todayEvents}</Text>
+            <Text style={styles.widgetLabel}>Aktive Events</Text>
+            <View style={[styles.widgetIcon, { backgroundColor: colors.primary + '15' }]}>
+              <Ionicons name="calendar" size={24} color={colors.primary} />
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.widget, styles.widgetRed]} onPress={() => router.push('/maintenance')}>
+            <Text style={styles.widgetNumber}>{openRepairs}</Text>
+            <Text style={styles.widgetLabel}>Defekte Artikel</Text>
+            <View style={[styles.widgetIcon, { backgroundColor: '#FF3B3015' }]}>
+              <Ionicons name="warning" size={24} color="#FF3B30" />
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.widgetRow}>
+          <TouchableOpacity style={[styles.widget, styles.widgetGreen]} onPress={() => router.push('/packing-list')}>
+            <Text style={styles.widgetNumber}>{readyPacklists}</Text>
+            <Text style={styles.widgetLabel}>Packlisten</Text>
+            <View style={[styles.widgetIcon, { backgroundColor: '#34C75915' }]}>
+              <Ionicons name="list" size={24} color="#34C759" />
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.widget, styles.widgetOrange]} onPress={() => router.push('/storage')}>
+            <Text style={styles.widgetNumber}>{overdueReturns}</Text>
+            <Text style={styles.widgetLabel}>Rückläufer</Text>
+            <View style={[styles.widgetIcon, { backgroundColor: '#FF950015' }]}>
+              <Ionicons name="return-down-back" size={24} color="#FF9500" />
+            </View>
           </TouchableOpacity>
         </View>
 
         {/* ===== DASHBOARD STATS WIDGETS ===== */}
 
-        {/* Inventory Value */}
-        {stats?.total_inventory_value !== undefined && (
+        {/* Inventory Value - Only Admin/Manager */}
+        {(user?.role === 'admin' || user?.role === 'manager') && stats?.total_inventory_value !== undefined && (
           <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 16, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: isDark ? 0.12 : 0.04, shadowRadius: 8, elevation: 2 }]}>
             <Text style={{ fontSize: 22, fontWeight: '700', color: colors.text }}>
               {`€ ${(stats.total_inventory_value ?? 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
@@ -1366,8 +1462,8 @@ export default function Index() {
           </View>
         )}
 
-        {/* Pending Invoices */}
-        {stats?.pending_invoices_count !== undefined && (
+        {/* Pending Invoices - Only Admin/Manager */}
+        {(user?.role === 'admin' || user?.role === 'manager') && stats?.pending_invoices_count !== undefined && (
           <View style={[{ backgroundColor: colors.card, borderRadius: 16, padding: 16, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: isDark ? 0.12 : 0.04, shadowRadius: 8, elevation: 2 }]}>
             <Text style={{ fontSize: 22, fontWeight: '700', color: colors.text }}>
               {stats.pending_invoices_count ?? 0}

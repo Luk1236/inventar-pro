@@ -15,10 +15,10 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { router } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
-import apiService from '../../services/apiService';
+import apiService, { getToken } from '../../services/apiService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ShelfVisualizer3D from '../../components/warehouse/ShelfVisualizer3D';
 
@@ -75,7 +75,7 @@ export default function StorageLocationsPage() {
 
   const loadData = async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
       if (!token) {
         router.replace('/');
         return;

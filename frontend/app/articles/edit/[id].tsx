@@ -18,7 +18,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import * as ImagePicker from 'expo-image-picker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import Constants from 'expo-constants';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -59,6 +59,9 @@ interface ArticleFormData {
   operating_hours: string;
   max_operating_hours: string;
   is_consumable: boolean;
+  is_sub_rental: boolean;
+  sub_rental_supplier_id: string;
+  sub_rental_cost: string;
 }
 
 export default function EditArticlePage() {
@@ -72,6 +75,7 @@ export default function EditArticlePage() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showUnitModal, setShowUnitModal] = useState(false);
+  const [showSubRentalSupplierModal, setShowSubRentalSupplierModal] = useState(false);
   const [images, setImages] = useState<string[]>([]);
 
   const [formData, setFormData] = useState<ArticleFormData>({
@@ -94,6 +98,9 @@ export default function EditArticlePage() {
     operating_hours: '0',
     max_operating_hours: '',
     is_consumable: false,
+    is_sub_rental: false,
+    sub_rental_supplier_id: '',
+    sub_rental_cost: '',
   });
 
   const units = ['Stück', 'kg', 'Liter', 'Meter', 'Rolle', 'Karton', 'Paar'];
@@ -343,7 +350,7 @@ export default function EditArticlePage() {
 
   const loadData = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
       if (!token) {
         router.replace('/');
         return;
@@ -390,6 +397,9 @@ export default function EditArticlePage() {
         operating_hours: articleData.operating_hours?.toString() || '0',
         max_operating_hours: articleData.max_operating_hours?.toString() || '',
         is_consumable: articleData.is_consumable ?? false,
+        is_sub_rental: articleData.is_sub_rental ?? false,
+        sub_rental_supplier_id: articleData.sub_rental_supplier_id || '',
+        sub_rental_cost: articleData.sub_rental_cost?.toString() || '',
       });
       setImages(Array.isArray(articleData.images) ? articleData.images : []);
 
@@ -522,7 +532,7 @@ export default function EditArticlePage() {
 
     setSaving(true);
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
 
       const toFloat = (v: string) => (v?.toString().trim() !== '' ? Number(v) : null);
       const toInt = (v: string) => (v?.toString().trim() !== '' ? parseInt(String(v), 10) : null);
@@ -541,6 +551,9 @@ export default function EditArticlePage() {
         power_type: formData.power_type || null,
         operating_hours: toFloat(formData.operating_hours) ?? 0,
         max_operating_hours: toFloat(formData.max_operating_hours),
+        is_sub_rental: formData.is_sub_rental,
+        sub_rental_supplier_id: formData.sub_rental_supplier_id || null,
+        sub_rental_cost: toFloat(formData.sub_rental_cost),
         images,
       };
 
@@ -760,6 +773,50 @@ export default function EditArticlePage() {
               thumbColor="white"
             />
           </View>
+        </View>
+
+        {/* Sub-Rental Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Zumietung (Sub-Rental)</Text>
+
+          <View style={styles.switchRow}>
+            <Text style={styles.label}>Ist Zumietartikel</Text>
+            <Switch
+              value={formData.is_sub_rental}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, is_sub_rental: value }))}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor="white"
+            />
+          </View>
+
+          {formData.is_sub_rental && (
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Vermieter / Lieferant</Text>
+                <TouchableOpacity
+                  style={styles.selector}
+                  onPress={() => setShowSubRentalSupplierModal(true)}
+                >
+                  <Text style={[styles.selectorText, !formData.sub_rental_supplier_id && styles.placeholderText]}>
+                    {getSupplierName(formData.sub_rental_supplier_id)}
+                  </Text>
+                  <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Mietkosten pro Einheit (€)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.sub_rental_cost}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, sub_rental_cost: text }))}
+                  placeholder="0.00"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+            </>
+          )}
         </View>
 
         {/* Price Section */}
@@ -984,6 +1041,51 @@ export default function EditArticlePage() {
                   onPress={() => {
                     setFormData(prev => ({ ...prev, supplier_id: supplier.id }));
                     setShowSupplierModal(false);
+                  }}
+                >
+                  <Text style={styles.modalItemText}>{supplier.name}</Text>
+                  {supplier.contact_email && (
+                    <Text style={styles.modalItemSubtext}>{supplier.contact_email}</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Sub-Rental Supplier Modal */}
+      <Modal
+        visible={showSubRentalSupplierModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowSubRentalSupplierModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Vermieter auswählen</Text>
+              <TouchableOpacity onPress={() => setShowSubRentalSupplierModal(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              <TouchableOpacity
+                style={styles.modalItem}
+                onPress={() => {
+                  setFormData(prev => ({ ...prev, sub_rental_supplier_id: '' }));
+                  setShowSubRentalSupplierModal(false);
+                }}
+              >
+                <Text style={styles.modalItemText}>Kein Vermieter</Text>
+              </TouchableOpacity>
+              {suppliers.map(supplier => (
+                <TouchableOpacity
+                  key={supplier.id}
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setFormData(prev => ({ ...prev, sub_rental_supplier_id: supplier.id }));
+                    setShowSubRentalSupplierModal(false);
                   }}
                 >
                   <Text style={styles.modalItemText}>{supplier.name}</Text>

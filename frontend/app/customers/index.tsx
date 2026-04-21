@@ -12,10 +12,10 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import apiService from '../../services/apiService';
+import apiService, { getToken } from '../../services/apiService';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -59,7 +59,7 @@ export default function CustomersPage() {
 
   const loadCustomers = async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
       if (!token) {
         router.replace('/');
         return;

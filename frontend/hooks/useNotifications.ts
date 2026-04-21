@@ -13,7 +13,7 @@ export function useNotifications() {
 
     // Listen for incoming notifications
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-      console.log('Notification received:', notification);
+      if (__DEV__) console.log('Notification received:', notification);
     });
 
     // Handle notification interactions

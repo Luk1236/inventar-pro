@@ -17,7 +17,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import * as ImagePicker from 'expo-image-picker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -79,6 +79,7 @@ export default function AddArticlePage() {
   const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const [showSubRentalSupplierModal, setShowSubRentalSupplierModal] = useState(false);
   const [showStorageModal, setShowStorageModal] = useState(false);
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [formData, setFormData] = useState<ArticleFormData>({
@@ -304,7 +305,7 @@ export default function AddArticlePage() {
 
   const loadData = async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
       if (!token) {
         router.replace('/');
         return;
@@ -431,7 +432,7 @@ export default function AddArticlePage() {
 
     setSaving(true);
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
 
       const toFloat = (v: string) => (v.trim() !== '' ? Number(v) : null);
       const toInt = (v: string) => (v.trim() !== '' ? parseInt(v, 10) : null);
@@ -677,6 +678,35 @@ export default function AddArticlePage() {
           </View>
         </View>
 
+        {/* Technical Specifications */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Technische Daten</Text>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Gewicht (kg)</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.weight_kg}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, weight_kg: text }))}
+              placeholder="z.B. 12.5"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="decimal-pad"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Leistung (Watt)</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.power_watt}
+              onChangeText={(text) => setFormData(prev => ({ ...prev, power_watt: text }))}
+              placeholder="z.B. 2000"
+              placeholderTextColor={colors.textSecondary}
+              keyboardType="numeric"
+            />
+          </View>
+        </View>
+
         {/* Price Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Preise</Text>
@@ -704,6 +734,50 @@ export default function AddArticlePage() {
               keyboardType="decimal-pad"
             />
           </View>
+        </View>
+
+        {/* Sub-Rental Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Zumietung (Sub-Rental)</Text>
+
+          <View style={styles.switchRow}>
+            <Text style={styles.label}>Ist Zumietartikel</Text>
+            <Switch
+              value={formData.is_sub_rental}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, is_sub_rental: value }))}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor="white"
+            />
+          </View>
+
+          {formData.is_sub_rental && (
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Vermieter / Lieferant</Text>
+                <TouchableOpacity
+                  style={styles.selector}
+                  onPress={() => setShowSubRentalSupplierModal(true)}
+                >
+                  <Text style={[styles.selectorText, !formData.sub_rental_supplier_id && styles.placeholderText]}>
+                    {getSupplierName(formData.sub_rental_supplier_id)}
+                  </Text>
+                  <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Mietkosten pro Einheit (€)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.sub_rental_cost}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, sub_rental_cost: text }))}
+                  placeholder="0.00"
+                  placeholderTextColor={colors.textSecondary}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+            </>
+          )}
         </View>
       </KeyboardAwareScrollView>
 
@@ -775,6 +849,51 @@ export default function AddArticlePage() {
                   onPress={() => {
                     setFormData(prev => ({ ...prev, supplier_id: supplier.id }));
                     setShowSupplierModal(false);
+                  }}
+                >
+                  <Text style={styles.modalItemText}>{supplier.name}</Text>
+                  {supplier.contact_email && (
+                    <Text style={styles.modalItemSubtext}>{supplier.contact_email}</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Sub-Rental Supplier Modal */}
+      <Modal
+        visible={showSubRentalSupplierModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowSubRentalSupplierModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Vermieter auswählen</Text>
+              <TouchableOpacity onPress={() => setShowSubRentalSupplierModal(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              <TouchableOpacity
+                style={styles.modalItem}
+                onPress={() => {
+                  setFormData(prev => ({ ...prev, sub_rental_supplier_id: '' }));
+                  setShowSubRentalSupplierModal(false);
+                }}
+              >
+                <Text style={styles.modalItemText}>Kein Vermieter</Text>
+              </TouchableOpacity>
+              {suppliers.map(supplier => (
+                <TouchableOpacity
+                  key={supplier.id}
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setFormData(prev => ({ ...prev, sub_rental_supplier_id: supplier.id }));
+                    setShowSubRentalSupplierModal(false);
                   }}
                 >
                   <Text style={styles.modalItemText}>{supplier.name}</Text>

@@ -11,10 +11,12 @@ export const useNetworkStatus = () => {
       setIsConnected(state.isConnected);
       setIsInternetReachable(state.isInternetReachable);
       
-      if (state.isConnected) {
-        console.log('✅ Netzwerk verbunden');
-      } else {
-        console.log('❌ Netzwerk getrennt');
+      if (__DEV__) {
+        if (state.isConnected) {
+          console.log('✅ Netzwerk verbunden');
+        } else {
+          console.log('❌ Netzwerk getrennt');
+        }
       }
     });
 

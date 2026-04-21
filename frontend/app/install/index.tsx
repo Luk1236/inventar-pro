@@ -21,7 +21,7 @@ const APP_URL = 'https://bundle-export-pro.preview.emergentagent.com';
 export default function AppInstallationPage() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
-  const [selectedTab, setSelectedTab] = useState<'android' | 'ios' | 'web'>('android');
+  const [selectedTab, setSelectedTab] = useState<'android' | 'ios' | 'web' | 'windows'>('android');
 
   const handleOpenURL = (url: string) => {
     Linking.openURL(url).catch(() => {
@@ -37,7 +37,7 @@ export default function AppInstallationPage() {
       </View>
 
       <View style={[styles.card, { backgroundColor: colors.card }]}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>Option 1: Expo Go (Empfohlen)</Text>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>Expo Go (Empfohlen)</Text>
         <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
           Schnellste Methode - keine APK nötig
         </Text>
@@ -80,72 +80,6 @@ export default function AppInstallationPage() {
           </TouchableOpacity>
         </View>
       </View>
-
-      <View style={[styles.card, { backgroundColor: colors.card }]}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>Option 2: Web-App (PWA)</Text>
-        <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-          Als App auf dem Homescreen installieren
-        </Text>
-
-        <View style={styles.stepsContainer}>
-          <View style={styles.step}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>1</Text>
-            </View>
-            <Text style={[styles.stepText, { color: colors.text }]}>
-              Chrome Browser öffnen
-            </Text>
-          </View>
-
-          <View style={styles.step}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>2</Text>
-            </View>
-            <Text style={[styles.stepText, { color: colors.text }]}>
-              URL eingeben: {APP_URL}
-            </Text>
-          </View>
-
-          <View style={styles.step}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>3</Text>
-            </View>
-            <Text style={[styles.stepText, { color: colors.text }]}>
-              {`Menü (⋮) → "Zum Startbildschirm hinzufügen"`}
-            </Text>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: colors.primary }]}
-          onPress={() => handleOpenURL(APP_URL)}
-        >
-          <Ionicons name="globe-outline" size={20} color="white" />
-          <Text style={styles.buttonText}>Web-App öffnen</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={[styles.card, { backgroundColor: colors.card }]}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>Option 3: APK Download</Text>
-        <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-          Native Installation (in Vorbereitung)
-        </Text>
-
-        <View style={styles.infoBox}>
-          <Ionicons name="information-circle" size={20} color={colors.primary} />
-          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-            APK-Build wird über Emergent Platform erstellt. Nach dem Build steht hier ein Download-Link zur Verfügung.
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.button, styles.buttonDisabled]}
-          disabled
-        >
-          <Ionicons name="download-outline" size={20} color="#999" />
-          <Text style={[styles.buttonText, { color: '#999' }]}>APK Download (bald verfügbar)</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 
@@ -157,7 +91,7 @@ export default function AppInstallationPage() {
       </View>
 
       <View style={[styles.card, { backgroundColor: colors.card }]}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>Option 1: Expo Go (Empfohlen)</Text>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>Expo Go (Empfohlen)</Text>
         <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
           Schnellste Methode - keine IPA nötig
         </Text>
@@ -200,72 +134,6 @@ export default function AppInstallationPage() {
           </TouchableOpacity>
         </View>
       </View>
-
-      <View style={[styles.card, { backgroundColor: colors.card }]}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>Option 2: Web-App (PWA)</Text>
-        <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-          Als App auf dem Homescreen installieren
-        </Text>
-
-        <View style={styles.stepsContainer}>
-          <View style={styles.step}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>1</Text>
-            </View>
-            <Text style={[styles.stepText, { color: colors.text }]}>
-              Safari Browser öffnen
-            </Text>
-          </View>
-
-          <View style={styles.step}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>2</Text>
-            </View>
-            <Text style={[styles.stepText, { color: colors.text }]}>
-              URL eingeben: {APP_URL}
-            </Text>
-          </View>
-
-          <View style={styles.step}>
-            <View style={styles.stepNumber}>
-              <Text style={styles.stepNumberText}>3</Text>
-            </View>
-            <Text style={[styles.stepText, { color: colors.text }]}>
-              {`Teilen-Button → "Zum Home-Bildschirm"`}
-            </Text>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: colors.primary }]}
-          onPress={() => handleOpenURL(APP_URL)}
-        >
-          <Ionicons name="globe-outline" size={20} color="white" />
-          <Text style={styles.buttonText}>Web-App öffnen</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={[styles.card, { backgroundColor: colors.card }]}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>Option 3: TestFlight</Text>
-        <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-          Beta-Installation über TestFlight (in Vorbereitung)
-        </Text>
-
-        <View style={styles.infoBox}>
-          <Ionicons name="information-circle" size={20} color={colors.primary} />
-          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-            iOS-Build wird über TestFlight bereitgestellt. Link wird hier verfügbar gemacht sobald der Build fertig ist.
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.button, styles.buttonDisabled]}
-          disabled
-        >
-          <Ionicons name="download-outline" size={20} color="#999" />
-          <Text style={[styles.buttonText, { color: '#999' }]}>TestFlight (bald verfügbar)</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 
@@ -284,13 +152,13 @@ export default function AppInstallationPage() {
 
         <View style={styles.urlBox}>
           <Text style={[styles.urlText, { color: colors.primary }]} selectable>
-            {APP_URL}
+            http://localhost:8081
           </Text>
         </View>
 
         <TouchableOpacity
           style={[styles.button, { backgroundColor: colors.primary }]}
-          onPress={() => handleOpenURL(APP_URL)}
+          onPress={() => handleOpenURL('http://localhost:8081')}
         >
           <Ionicons name="open-outline" size={20} color="white" />
           <Text style={styles.buttonText}>Jetzt öffnen</Text>
@@ -298,53 +166,99 @@ export default function AppInstallationPage() {
       </View>
 
       <View style={[styles.card, { backgroundColor: colors.card }]}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>Als Desktop-App installieren</Text>
+        <Text style={[styles.cardTitle, { color: colors.text }]}>Als Desktop-App installieren (PWA)</Text>
+        <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+          Im Browser als App installieren
+        </Text>
 
         <View style={styles.stepsContainer}>
           <View style={styles.step}>
+            <View style={styles.stepNumber}>
+              <Text style={styles.stepNumberText}>1</Text>
+            </View>
             <Text style={[styles.stepText, { color: colors.text }]}>
-              <Text style={{ fontWeight: 'bold' }}>Chrome/Edge:</Text> Adressleiste → Install-Symbol (+)
+              http://localhost:8081 im Browser öffnen
             </Text>
           </View>
 
           <View style={styles.step}>
+            <View style={styles.stepNumber}>
+              <Text style={styles.stepNumberText}>2</Text>
+            </View>
             <Text style={[styles.stepText, { color: colors.text }]}>
-              <Text style={{ fontWeight: 'bold' }}>Firefox:</Text>{` Menü → "App installieren"`}
+              <Text style={{ fontWeight: 'bold' }}>Chrome/Edge:</Text> Adressleiste → Install-Symbol (⊕)
             </Text>
           </View>
 
           <View style={styles.step}>
+            <View style={styles.stepNumber}>
+              <Text style={styles.stepNumberText}>3</Text>
+            </View>
             <Text style={[styles.stepText, { color: colors.text }]}>
-              <Text style={{ fontWeight: 'bold' }}>Safari:</Text>{` Teilen → "Zum Dock hinzufügen"`}
+              "App installieren" bestätigen
             </Text>
           </View>
         </View>
       </View>
+    </View>
+  );
+
+  const renderWindowsSection = () => (
+    <View style={styles.section}>
+      <View style={[styles.platformHeader, { backgroundColor: '#00A4EF' }]}>
+        <Ionicons name="logo-windows" size={32} color="white" />
+        <Text style={styles.platformTitle}>Windows Desktop</Text>
+      </View>
 
       <View style={[styles.card, { backgroundColor: colors.card }]}>
-        <Text style={[styles.cardTitle, { color: colors.text }]}>System-Anforderungen</Text>
-        
-        <View style={styles.requirementsList}>
-          <View style={styles.requirementItem}>
-            <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-            <Text style={[styles.requirementText, { color: colors.text }]}>
-              Moderne Browser (Chrome, Firefox, Safari, Edge)
+        <Text style={[styles.cardTitle, { color: colors.text }]}>Windows App erstellen</Text>
+        <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+          Noch zu erledigende Schritte:
+        </Text>
+
+        <View style={styles.stepsContainer}>
+          <View style={styles.step}>
+            <View style={[styles.stepNumber, { backgroundColor: '#FF9500' }]}>
+              <Text style={styles.stepNumberText}>1</Text>
+            </View>
+            <Text style={[styles.stepText, { color: colors.text }]}>
+              Windows-Entwicklermodus aktivieren
             </Text>
           </View>
 
-          <View style={styles.requirementItem}>
-            <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-            <Text style={[styles.requirementText, { color: colors.text }]}>
-              Internetverbindung erforderlich
+          <View style={styles.step}>
+            <View style={[styles.stepNumber, { backgroundColor: '#FF9500' }]}>
+              <Text style={styles.stepNumberText}>2</Text>
+            </View>
+            <Text style={[styles.stepText, { color: colors.text }]}>
+              Terminal als Administrator öffnen
             </Text>
           </View>
 
-          <View style={styles.requirementItem}>
-            <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-            <Text style={[styles.requirementText, { color: colors.text }]}>
-              Responsive Design für alle Bildschirmgrößen
+          <View style={styles.step}>
+            <View style={[styles.stepNumber, { backgroundColor: '#FF9500' }]}>
+              <Text style={styles.stepNumberText}>3</Text>
+            </View>
+            <Text style={[styles.stepText, { color: colors.text }]}>
+              <Text style={{ fontWeight: 'bold' }}>cd electron</Text> ausführen
             </Text>
           </View>
+
+          <View style={styles.step}>
+            <View style={[styles.stepNumber, { backgroundColor: '#FF9500' }]}>
+              <Text style={styles.stepNumberText}>4</Text>
+            </View>
+            <Text style={[styles.stepText, { color: colors.text }]}>
+              <Text style={{ fontWeight: 'bold' }}>npm run build</Text> ausführen
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.infoBox}>
+          <Ionicons name="information-circle" size={20} color={colors.primary} />
+          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+            Nach dem Build liegt die .exe-Datei im Ordner electron/dist/
+          </Text>
         </View>
       </View>
     </View>
@@ -403,16 +317,33 @@ export default function AppInstallationPage() {
           style={[styles.tab, selectedTab === 'web' && styles.tabActive]}
           onPress={() => setSelectedTab('web')}
         >
-          <Ionicons 
-            name="globe" 
-            size={24} 
-            color={selectedTab === 'web' ? colors.primary : colors.textSecondary} 
+          <Ionicons
+            name="globe"
+            size={24}
+            color={selectedTab === 'web' ? colors.primary : colors.textSecondary}
           />
           <Text style={[
-            styles.tabText, 
+            styles.tabText,
             { color: selectedTab === 'web' ? colors.primary : colors.textSecondary }
           ]}>
             Web
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, selectedTab === 'windows' && styles.tabActive]}
+          onPress={() => setSelectedTab('windows')}
+        >
+          <Ionicons
+            name="logo-windows"
+            size={24}
+            color={selectedTab === 'windows' ? '#00A4EF' : colors.textSecondary}
+          />
+          <Text style={[
+            styles.tabText,
+            { color: selectedTab === 'windows' ? '#00A4EF' : colors.textSecondary }
+          ]}>
+            Windows
           </Text>
         </TouchableOpacity>
       </View>
@@ -422,6 +353,7 @@ export default function AppInstallationPage() {
         {selectedTab === 'android' && renderAndroidSection()}
         {selectedTab === 'ios' && renderIOSSection()}
         {selectedTab === 'web' && renderWebSection()}
+        {selectedTab === 'windows' && renderWindowsSection()}
       </ScrollView>
     </SafeAreaView>
   );
@@ -585,5 +517,17 @@ const styles = StyleSheet.create({
   requirementText: {
     flex: 1,
     fontSize: 14,
+  },
+  codeBox: {
+    backgroundColor: '#1e1e1e',
+    padding: 16,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  codeText: {
+    color: '#d4d4d4',
+    fontFamily: 'monospace',
+    fontSize: 13,
+    lineHeight: 22,
   },
 });

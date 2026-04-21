@@ -41,6 +41,13 @@ export default function ProfileScreen() {
   const [email, setEmail] = useState('');
   const [profileImage, setProfileImage] = useState<string | null>(null);
 
+  // Password change states
+  const [showPasswordSection, setShowPasswordSection] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+
   useEffect(() => {
     loadProfile();
   }, []);
@@ -234,6 +241,56 @@ export default function ProfileScreen() {
     return roles[role] || role;
   };
 
+  const handleChangePassword = async () => {
+    // Validation
+    if (!currentPassword.trim()) {
+      if (Platform.OS === 'web') window.alert('Bitte aktuelles Passwort eingeben');
+      else Alert.alert('Fehler', 'Bitte aktuelles Passwort eingeben');
+      return;
+    }
+
+    if (!newPassword.trim() || newPassword.length < 6) {
+      if (Platform.OS === 'web') window.alert('Neues Passwort muss mindestens 6 Zeichen haben');
+      else Alert.alert('Fehler', 'Neues Passwort muss mindestens 6 Zeichen haben');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      if (Platform.OS === 'web') window.alert('Passwörter stimmen nicht überein');
+      else Alert.alert('Fehler', 'Passwörter stimmen nicht überein');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      await apiService.post('/api/users/change-password', {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+
+      // Clear password fields
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowPasswordSection(false);
+
+      if (Platform.OS === 'web') {
+        window.alert('Passwort erfolgreich geändert');
+      } else {
+        Alert.alert('Erfolg', 'Passwort erfolgreich geändert');
+      }
+    } catch (error: any) {
+      const message = error.message || 'Fehler beim Ändern des Passworts';
+      if (Platform.OS === 'web') {
+        window.alert('Fehler: ' + message);
+      } else {
+        Alert.alert('Fehler', message);
+      }
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -322,6 +379,82 @@ export default function ProfileScreen() {
               {user ? getRoleLabel(user.role) : '-'}
             </Text>
           </View>
+        </View>
+
+        {/* Password Change Section */}
+        <View style={[styles.section, { backgroundColor: colors.card }]}>
+          <TouchableOpacity
+            style={styles.passwordHeader}
+            onPress={() => setShowPasswordSection(!showPasswordSection)}
+          >
+            <View style={styles.passwordHeaderLeft}>
+              <Ionicons name="lock-closed" size={20} color={colors.primary} />
+              <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Passwort ändern</Text>
+            </View>
+            <Ionicons
+              name={showPasswordSection ? 'chevron-up' : 'chevron-down'}
+              size={20}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+
+          {showPasswordSection && (
+            <View style={styles.passwordForm}>
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>Aktuelles Passwort</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  placeholder="Aktuelles Passwort"
+                  placeholderTextColor={colors.textSecondary}
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>Neues Passwort</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  placeholder="Neues Passwort (min. 6 Zeichen)"
+                  placeholderTextColor={colors.textSecondary}
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>Passwort bestätigen</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="Passwort wiederholen"
+                  placeholderTextColor={colors.textSecondary}
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.passwordButton, { backgroundColor: colors.primary }, changingPassword && styles.saveButtonDisabled]}
+                onPress={handleChangePassword}
+                disabled={changingPassword}
+              >
+                {changingPassword ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="key" size={18} color="#fff" />
+                    <Text style={styles.saveButtonText}>Passwort ändern</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Save Button */}
@@ -444,6 +577,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  passwordHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  passwordHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  passwordForm: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  passwordButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 12,
+    marginTop: 8,
   },
   saveButton: {
     flexDirection: 'row',

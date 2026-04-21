@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -213,7 +213,7 @@ export default function CreateEventPage() {
 
   const loadTemplates = async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
       const response = await fetch(`${BACKEND_URL}/api/project-templates`, {
         headers: { 'Authorization': `Bearer ${token}` },
       });
@@ -223,7 +223,7 @@ export default function CreateEventPage() {
 
   const loadCustomers = async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
       const response = await fetch(`${BACKEND_URL}/api/customers`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -329,7 +329,7 @@ export default function CreateEventPage() {
 
     setLoading(true);
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
 
       if (!token) {
         Alert.alert('Fehler', 'Nicht angemeldet. Bitte melden Sie sich erneut an.');

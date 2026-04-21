@@ -20,6 +20,9 @@ import apiService from '../../services/apiService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { printScreen } from '../../utils/printUtils';
 import SignaturePad from '../../components/SignaturePad';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Vibration, Dimensions } from 'react-native';
+import { useWebSocket } from '../../hooks/useWebSocket';
 
 interface PackingItem {
   id: string;
@@ -87,6 +90,11 @@ export default function PackingListPage() {
   const [signPadVisible, setSignPadVisible] = useState(false);
   const [signedByName, setSignedByName] = useState('');
 
+  // Scanner
+  const [permission, requestPermission] = useCameraPermissions();
+  const [showScanner, setShowScanner] = useState(false);
+  const [scannerReady, setScannerReady] = useState(false);
+
   const savePackingListSignature = async (base64Svg: string) => {
     if (!selectedEventId) return;
     try {
@@ -99,6 +107,7 @@ export default function PackingListPage() {
       Alert.alert('Fehler', 'Abzeichnen fehlgeschlagen');
     }
   };
+
 
   const loadEvents = useCallback(async () => {
     try {
@@ -134,6 +143,17 @@ export default function PackingListPage() {
       setRefreshing(false);
     }
   }, [selectedEventId]);
+
+  // 🔴 Live-WebSocket: Bildschirm sofort aktualisieren wenn ein anderer Nutzer etwas scannt
+  useWebSocket((msg) => {
+    if (
+      msg.type === 'packing_list_updated' ||
+      msg.type === 'item_checked_out' ||
+      msg.type === 'item_checked_in'
+    ) {
+      if (selectedEventId) loadPackingList();
+    }
+  });
 
   useEffect(() => {
     loadEvents();
@@ -286,6 +306,39 @@ export default function PackingListPage() {
     );
   };
 
+  const handleBarcodeScanned = async ({ type, data }: { type: string; data: string }) => {
+    if (scannerReady) return;
+    setScannerReady(true);
+    Vibration.vibrate(100);
+
+    const foundItem = items.find(item => item.inventory_code === data);
+    
+    if (!foundItem) {
+      Alert.alert('Nicht gefunden', `Kein Artikel mit Code ${data} auf dieser Packliste.`);
+      setTimeout(() => setScannerReady(false), 2000);
+      return;
+    }
+
+    if (viewMode === 'checkout') {
+      if (foundItem.checked_out) {
+        Alert.alert('Hinweis', 'Dieser Artikel ist bereits ausgecheckt.');
+      } else {
+        toggleSelectItem(foundItem.id);
+        Alert.alert('Erfolg', `${foundItem.article_name} ausgewählt.`);
+      }
+    } else {
+      if (!foundItem.checked_out) {
+        Alert.alert('Hinweis', 'Dieser Artikel wurde noch nicht ausgecheckt.');
+      } else if (foundItem.checked_in) {
+        Alert.alert('Hinweis', 'Dieser Artikel ist bereits eingecheckt.');
+      } else {
+        openCheckinModal(foundItem);
+        setShowScanner(false);
+      }
+    }
+    setTimeout(() => setScannerReady(false), 2000);
+  };
+
   // Group items by zone
   const groupedItems = items.reduce((acc, item) => {
     const zone = item.zone_name || 'Kein Lagerort';
@@ -348,6 +401,16 @@ export default function PackingListPage() {
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>📦 Lager-Logistik</Text>
         <View style={{ flexDirection: 'row', gap: 16 }}>
+          <TouchableOpacity onPress={async () => {
+            if (!permission?.granted) {
+              const res = await requestPermission();
+              if (res.granted) setShowScanner(true);
+            } else {
+              setShowScanner(true);
+            }
+          }}>
+            <Ionicons name="barcode-outline" size={24} color={colors.primary} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={printScreen}>
             <Ionicons name="print-outline" size={24} color={colors.primary} />
           </TouchableOpacity>
@@ -530,7 +593,7 @@ export default function PackingListPage() {
               <Text style={styles.zoneCount}>{zoneItems.length} Artikel</Text>
             </View>
             
-            {zoneItems.map(item => {
+            {zoneItems.sort((a, b) => (a.location_name || '').localeCompare(b.location_name || '', 'de')).map(item => {
               const isCheckoutMode = viewMode === 'checkout';
               const showInThisMode = isCheckoutMode 
                 ? !item.checked_out 
@@ -740,6 +803,47 @@ export default function PackingListPage() {
           </View>
         </View>
       </Modal>
+
+      {/* Scanner Modal */}
+      <Modal visible={showScanner} animationType="slide" transparent>
+        <View style={styles.scannerOverlay}>
+          <SafeAreaView style={styles.scannerContainer}>
+            <View style={styles.scannerHeader}>
+              <Text style={styles.scannerTitle}>Barcode scannen</Text>
+              <TouchableOpacity onPress={() => setShowScanner(false)} style={styles.scannerCloseButton}>
+                <Ionicons name="close" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.cameraContainer}>
+              <CameraView
+                style={styles.camera}
+                facing="back"
+                barcodeScannerSettings={{
+                  barcodeTypes: ['qr', 'ean13', 'ean8', 'code128', 'code39', 'code93'],
+                }}
+                onBarcodeScanned={scannerReady ? undefined : handleBarcodeScanned}
+              />
+              <View style={styles.scanFrame}>
+                <View style={[styles.corner, styles.topLeft]} />
+                <View style={[styles.corner, styles.topRight]} />
+                <View style={[styles.corner, styles.bottomLeft]} />
+                <View style={[styles.corner, styles.bottomRight]} />
+              </View>
+              {scannerReady && (
+                <View style={styles.scannerLoading}>
+                  <ActivityIndicator size="large" color="white" />
+                  <Text style={styles.scannerLoadingText}>Verarbeite...</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.scannerFooter}>
+              <Text style={styles.scannerHint}>
+                {viewMode === 'checkout' ? 'Scannen für Check-Out' : 'Scannen für Check-In'}
+              </Text>
+            </View>
+          </SafeAreaView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -807,4 +911,21 @@ const styles = StyleSheet.create({
   notesInput: { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 14, height: 80, textAlignVertical: 'top', marginBottom: 16 },
   checkinButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 8, gap: 8 },
   checkinButtonText: { color: 'white', fontSize: 16, fontWeight: '600' },
+  scannerOverlay: { flex: 1, backgroundColor: 'black' },
+  scannerContainer: { flex: 1 },
+  scannerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
+  scannerTitle: { color: 'white', fontSize: 18, fontWeight: 'bold' },
+  scannerCloseButton: { padding: 8 },
+  cameraContainer: { flex: 1, position: 'relative', overflow: 'hidden', borderRadius: 24, marginHorizontal: 16 },
+  camera: { flex: 1 },
+  scanFrame: { position: 'absolute', top: '50%', left: '50%', width: 250, height: 250, marginTop: -125, marginLeft: -125 },
+  corner: { position: 'absolute', width: 40, height: 40, borderColor: 'white', borderWidth: 4 },
+  topLeft: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0 },
+  topRight: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0 },
+  bottomLeft: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0 },
+  bottomRight: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0 },
+  scannerLoading: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+  scannerLoadingText: { color: 'white', marginTop: 12, fontSize: 16, fontWeight: '600' },
+  scannerFooter: { padding: 24, alignItems: 'center' },
+  scannerHint: { color: 'white', fontSize: 16, opacity: 0.8 },
 });

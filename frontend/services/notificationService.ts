@@ -1,8 +1,8 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { getToken } from './apiService';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || process.env.EXPO_PUBLIC_BACKEND_URL;
 
@@ -46,9 +46,9 @@ export async function registerForPushNotificationsAsync() {
     try {
       token = (await Notifications.getExpoPushTokenAsync()).data;
       console.log('Push token:', token);
-      
+
       // Save token to backend
-      const authToken = await AsyncStorage.getItem('auth_token');
+      const authToken = await getToken();
       if (authToken) {
         await fetch(`${BACKEND_URL}/api/notifications/register`, {
           method: 'POST',

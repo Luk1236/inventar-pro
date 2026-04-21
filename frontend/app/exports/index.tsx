@@ -14,9 +14,9 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
-import apiService from '../../services/apiService';
+import apiService, { getToken } from '../../services/apiService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import Constants from 'expo-constants';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || process.env.EXPO_PUBLIC_BACKEND_URL;
@@ -92,7 +92,7 @@ export default function ExportsPage() {
   const downloadFile = async (endpoint: string, filename: string) => {
     setExporting(endpoint);
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
       const url = `${BACKEND_URL}${endpoint}`;
 
       Alert.alert(

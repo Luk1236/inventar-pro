@@ -14,10 +14,9 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import apiService from '../../services/apiService';
+import apiService, { getToken } from '../../services/apiService';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -417,7 +416,7 @@ export default function ArticlesPage() {
 
   const loadData = async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
       if (!token) {
         router.replace('/');
         return;
@@ -500,7 +499,6 @@ export default function ArticlesPage() {
         <TouchableOpacity
           style={styles.articleHeader}
           onPress={() => {
-            console.log('Article card clicked:', article.id);
             router.push(`/articles/${article.id}`);
           }}
           activeOpacity={0.7}
@@ -543,7 +541,6 @@ export default function ArticlesPage() {
         <TouchableOpacity
           style={styles.editButtonLarge}
           onPress={() => {
-            console.log('✏️ Edit button clicked for article:', article.id);
             router.push(`/articles/edit/${article.id}`);
           }}
           activeOpacity={0.6}
@@ -555,9 +552,14 @@ export default function ArticlesPage() {
         <TouchableOpacity
           style={styles.deleteButtonLarge}
           onPress={() => {
-            if ((window as any).confirm(`Artikel "${article.name}" wirklich löschen?`)) {
-              handleDeleteArticle(article.id);
-            }
+            Alert.alert(
+              'Artikel löschen',
+              `Artikel "${article.name}" wirklich löschen?`,
+              [
+                { text: 'Abbrechen', style: 'cancel' },
+                { text: 'Löschen', style: 'destructive', onPress: () => handleDeleteArticle(article.id) },
+              ]
+            );
           }}
           activeOpacity={0.6}
         >

@@ -4,12 +4,24 @@ import { useColorScheme } from 'react-native';
 
 type Theme = 'light' | 'dark' | 'auto';
 
+// 6 Functional Colors based on Page4 design system
+interface FunctionalColors {
+  primary: string;      // Hauptfarbe - CTAs, aktive Elemente, Navigation
+  secondary: string;    // Akzentfarbe - Sekundäre Buttons, Filter, Highlights
+  success: string;      // Erfolg - Bestätigungen, Checkboxes, positive Aktionen
+  warning: string;      // Warnung - Achtung-Hinweise, wichtige Benachrichtigungen
+  danger: string;        // Fehler/Gefahr - Fehlermeldungen, Löschen-Buttons
+  neutral: string;      // Neutral - Hintergründe, Text, Rahmen
+}
+
 interface ThemeContextType {
   theme: Theme;
   isDark: boolean;
   toggleTheme: () => void;
   setTheme: (theme: Theme) => void;
   colors: ColorScheme;
+  functionalColors: FunctionalColors;
+  setFunctionalColors: (colors: FunctionalColors) => void;
 }
 
 interface ColorScheme {
@@ -19,11 +31,22 @@ interface ColorScheme {
   textSecondary: string;
   border: string;
   primary: string;
+  secondary: string;
   success: string;
   warning: string;
   danger: string;
   info: string;
 }
+
+// Default functional colors (Page4 inspired)
+const defaultFunctionalColors: FunctionalColors = {
+  primary: '#488fe0',     // Blau
+  secondary: '#8B5CF6',   // Lila
+  success: '#34C759',     // Grün
+  warning: '#FF9500',     // Orange
+  danger: '#FF3B30',      // Rot
+  neutral: '#6B7280',     // Grau
+};
 
 const lightColors: ColorScheme = {
   background: '#f8f9fa',
@@ -32,6 +55,7 @@ const lightColors: ColorScheme = {
   textSecondary: '#666666',
   border: '#e9ecef',
   primary: '#007AFF',
+  secondary: '#8B5CF6',
   success: '#34C759',
   warning: '#FF9500',
   danger: '#FF3B30',
@@ -45,6 +69,7 @@ const darkColors: ColorScheme = {
   textSecondary: '#98989d',
   border: '#38383a',
   primary: '#0A84FF',
+  secondary: '#A78BFA',
   success: '#30D158',
   warning: '#FF9F0A',
   danger: '#FF453A',
@@ -57,9 +82,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const systemColorScheme = useColorScheme();
   const [theme, setThemeState] = useState<Theme>('auto');
   const [isDark, setIsDark] = useState(systemColorScheme === 'dark');
+  const [functionalColors, setFunctionalColorsState] = useState<FunctionalColors>(defaultFunctionalColors);
 
   useEffect(() => {
     loadTheme();
+    loadFunctionalColors();
   }, []);
 
   useEffect(() => {
@@ -81,6 +108,17 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const loadFunctionalColors = async () => {
+    try {
+      const savedColors = await AsyncStorage.getItem('functional_colors');
+      if (savedColors) {
+        setFunctionalColorsState(JSON.parse(savedColors));
+      }
+    } catch (error) {
+      console.error('Error loading functional colors:', error);
+    }
+  };
+
   const setTheme = async (newTheme: Theme) => {
     try {
       await AsyncStorage.setItem('app_theme', newTheme);
@@ -90,15 +128,35 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const setFunctionalColors = async (colors: FunctionalColors) => {
+    try {
+      await AsyncStorage.setItem('functional_colors', JSON.stringify(colors));
+      setFunctionalColorsState(colors);
+    } catch (error) {
+      console.error('Error saving functional colors:', error);
+    }
+  };
+
   const toggleTheme = () => {
     const newTheme = isDark ? 'light' : 'dark';
     setTheme(newTheme);
   };
 
-  const colors = isDark ? darkColors : lightColors;
+  // functionalColors (admin-configurable in Settings) override the static
+  // light/dark palette for semantic roles (primary, secondary, etc.) so that
+  // the brand colour applies consistently across both themes.
+  const baseColors = isDark ? darkColors : lightColors;
+  const colors: ColorScheme = {
+    ...baseColors,
+    primary: functionalColors.primary,
+    secondary: functionalColors.secondary,
+    success: functionalColors.success,
+    warning: functionalColors.warning,
+    danger: functionalColors.danger,
+  };
 
   return (
-    <ThemeContext.Provider value={{ theme, isDark, toggleTheme, setTheme, colors }}>
+    <ThemeContext.Provider value={{ theme, isDark, toggleTheme, setTheme, colors, functionalColors, setFunctionalColors }}>
       {children}
     </ThemeContext.Provider>
   );

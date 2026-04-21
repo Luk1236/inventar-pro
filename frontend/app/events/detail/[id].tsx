@@ -300,6 +300,14 @@ export default function EventDetailPage() {
                 <Ionicons name="pencil" size={20} color="white" />
                 <Text style={styles.invoiceButtonText}>Lieferschein & Unterschrift</Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.invoiceButton, { backgroundColor: '#5856D6', marginTop: 10 }]}
+                onPress={() => router.push(`/events/detail/${id}/logistics`)}
+              >
+                <Ionicons name="bus" size={20} color="white" />
+                <Text style={styles.invoiceButtonText}>Logistik & LKW-Planung</Text>
+              </TouchableOpacity>
             </>
           ) : (
             <View style={styles.emptyBookings}>

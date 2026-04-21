@@ -18,9 +18,8 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { useTheme } from '../../contexts/ThemeContext';
-import apiService, { setBackendUrl } from '../../services/apiService';
+import apiService, { setBackendUrl, getToken } from '../../services/apiService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { validatePasswordChange } from '../../utils/passwordValidation';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -31,24 +30,26 @@ interface TaxClassItem { name: string; rate: string; }
 interface LedgerItem { name: string; account_number: string; }
 interface ImportantDateItem { name: string; date: string; }
 
+interface CurrentUser {
+  id: string;
+  username: string;
+  email?: string;
+  role?: string;
+  profile_image?: string;
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
   const insets = useSafeAreaInsets();
-  const { colors, isDark, toggleTheme } = useTheme();
+  const { colors, isDark, toggleTheme, setFunctionalColors: setThemeFunctionalColors } = useTheme();
+
+  // Current user
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
 
   // Toggle state
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
-
-  // Password change section
-  const [passwordSectionOpen, setPasswordSectionOpen] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordLoading, setPasswordLoading] = useState(false);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
 
   // Server URL section
   const [serverUrl, setServerUrlState] = useState('');
@@ -61,6 +62,8 @@ export default function SettingsPage() {
     einstellungen: false,
     kommunikation: false,
     finanzen: false,
+    server: false,
+    info: false,
   });
 
   // App settings from backend
@@ -76,14 +79,72 @@ export default function SettingsPage() {
   const [branding, setBranding] = useState({
     app_display_name: 'Inventar Pro',
     app_logo_icon: 'cube',
-    app_primary_color: '#007AFF',
+    app_primary_color: '#488fe0',
     app_slogan: 'Professionelle Lagerverwaltung',
   });
+
+  // 15 Page4-style Color Palettes (6 colors each)
+  const [showColorPalette, setShowColorPalette] = useState(false);
+  const [selectedPaletteIndex, setSelectedPaletteIndex] = useState(0);
+  const [showCustomPicker, setShowCustomPicker] = useState(false);
+  const [functionalColors, setFunctionalColorsLocal] = useState({
+    primary: '#488fe0',     // Hauptfarbe - CTAs, aktive Elemente
+    secondary: '#97bde8',   // Akzentfarbe - Sekundäre Buttons, Filter
+    success: '#34C759',     // Erfolg - Bestätigungen
+    warning: '#FF9500',     // Warnung - Achtung-Hinweise
+    danger: '#FF3B30',      // Fehler/Gefahr - Fehlermeldungen
+    neutral: '#404040',     // Neutral - Text, Rahmen
+  });
+
+  // Custom color input states
+  const [customColors, setCustomColors] = useState({
+    primary: '#488fe0',
+    secondary: '#97bde8',
+    success: '#34C759',
+    warning: '#FF9500',
+    danger: '#FF3B30',
+    neutral: '#404040',
+  });
+
+  // 15 Farbpaletten im Page4-Stil (jede mit 6 Farben)
+  const colorPalettes = [
+    { name: 'Klassisch Blau', colors: { primary: '#488fe0', secondary: '#97bde8', success: '#34C759', warning: '#FF9500', danger: '#FF3B30', neutral: '#404040' } },
+    { name: 'Ocean', colors: { primary: '#0077B6', secondary: '#90E0EF', success: '#2A9D8F', warning: '#E9C46A', danger: '#E76F51', neutral: '#264653' } },
+    { name: 'Forest', colors: { primary: '#2D6A4F', secondary: '#95D5B2', success: '#40916C', warning: '#B7E4C7', danger: '#1B4332', neutral: '#081C15' } },
+    { name: 'Sunset', colors: { primary: '#E85D04', secondary: '#FFBA08', success: '#9D4EDD', warning: '#F48C06', danger: '#DC2F02', neutral: '#1A1A2E' } },
+    { name: 'Lavender', colors: { primary: '#7B2CBF', secondary: '#C77DFF', success: '#57CC99', warning: '#FFD93D', danger: '#FF6B6B', neutral: '#240046' } },
+    { name: 'Modern Gray', colors: { primary: '#4A5568', secondary: '#A0AEC0', success: '#48BB78', warning: '#ED8936', danger: '#F56565', neutral: '#1A202C' } },
+    { name: 'Coral', colors: { primary: '#FF6B6B', secondary: '#FFA5A5', success: '#4ECDC4', warning: '#FFE66D', danger: '#C44569', neutral: '#2C2C54' } },
+    { name: 'Emerald', colors: { primary: '#10B981', secondary: '#6EE7B7', success: '#059669', warning: '#F59E0B', danger: '#EF4444', neutral: '#064E3B' } },
+    { name: 'Royal', colors: { primary: '#3B82F6', secondary: '#93C5FD', success: '#22C55E', warning: '#F97316', danger: '#EF4444', neutral: '#1E3A8A' } },
+    { name: 'Warm Earth', colors: { primary: '#B45309', secondary: '#FCD34D', success: '#047857', warning: '#D97706', danger: '#B91C1C', neutral: '#78350F' } },
+    { name: 'Cool Mint', colors: { primary: '#14B8A6', secondary: '#5EEAD4', success: '#22C55E', warning: '#FBBF24', danger: '#EF4444', neutral: '#134E4A' } },
+    { name: 'Berry', colors: { primary: '#DB2777', secondary: '#F9A8D4', success: '#10B981', warning: '#F59E0B', danger: '#DC2626', neutral: '#831843' } },
+    { name: 'Navy', colors: { primary: '#1E40AF', secondary: '#60A5FA', success: '#059669', warning: '#D97706', danger: '#B91C1C', neutral: '#0F172A' } },
+    { name: 'Autumn', colors: { primary: '#C2410C', secondary: '#FB923C', success: '#65A30D', warning: '#FACC15', danger: '#B91C1C', neutral: '#451A03' } },
+    { name: 'Minimal', colors: { primary: '#18181B', secondary: '#71717A', success: '#22C55E', warning: '#F59E0B', danger: '#EF4444', neutral: '#FAFAFA' } },
+  ];
+
+  const functionalColorLabels = {
+    primary: { name: 'Primary', german: 'Hauptfarbe', description: 'CTAs, aktive Elemente, Navigation' },
+    secondary: { name: 'Secondary', german: 'Akzentfarbe', description: 'Sekundäre Buttons, Filter, Highlights' },
+    success: { name: 'Success', german: 'Erfolg', description: 'Bestätigungen, positive Aktionen' },
+    warning: { name: 'Warning', german: 'Warnung', description: 'Achtung-Hinweise, wichtige Benachrichtigungen' },
+    danger: { name: 'Danger', german: 'Gefahr', description: 'Fehlermeldungen, Löschen-Buttons' },
+    neutral: { name: 'Neutral', german: 'Neutral', description: 'Hintergründe, Text, Rahmen' },
+  };
+
+  const applyPalette = (index: number) => {
+    const palette = colorPalettes[index];
+    setFunctionalColorsLocal(palette.colors);
+    setSelectedPaletteIndex(index);
+  };
 
   // ── Account ─────────────────────────────────────────────────────────────────
   const [showFirmendaten, setShowFirmendaten] = useState(false);
   const [firmendaten, setFirmendaten] = useState({
     company_name: '',
+    company_logo: '',
     company_address: '',
     company_phone: '',
     company_email: '',
@@ -187,7 +248,17 @@ export default function SettingsPage() {
     loadSettings();
     loadAppSettings();
     loadVersionHistory();
+    loadCurrentUser();
   }, []);
+
+  const loadCurrentUser = async () => {
+    try {
+      const user = await apiService.get<CurrentUser>('/api/users/me', { showErrorAlert: false });
+      setCurrentUser(user);
+    } catch (error) {
+      console.error('Error loading current user:', error);
+    }
+  };
 
   const loadSettings = async () => {
     try {
@@ -210,6 +281,7 @@ export default function SettingsPage() {
       // Firmendaten
       setFirmendaten({
         company_name: s.company_name || '',
+        company_logo: s.company_logo || '',
         company_address: s.company_address || '',
         company_phone: s.company_phone || '',
         company_email: s.company_email || '',
@@ -220,9 +292,29 @@ export default function SettingsPage() {
       setBranding({
         app_display_name: s.app_display_name || 'Inventar Pro',
         app_logo_icon: s.app_logo_icon || 'cube',
-        app_primary_color: s.app_primary_color || '#007AFF',
+        app_primary_color: s.app_primary_color || '#488fe0',
         app_slogan: s.app_slogan || 'Professionelle Lagerverwaltung',
       });
+
+      // Functional Colors
+      const loadedColors = {
+        primary: s.color_primary || '#488fe0',
+        secondary: s.color_secondary || '#97bde8',
+        success: s.color_success || '#34C759',
+        warning: s.color_warning || '#FF9500',
+        danger: s.color_danger || '#FF3B30',
+        neutral: s.color_neutral || '#404040',
+      };
+      setFunctionalColorsLocal(loadedColors);
+      setCustomColors(loadedColors);
+
+      // Find matching palette index
+      const paletteIndex = colorPalettes.findIndex(p =>
+        p.colors.primary === loadedColors.primary &&
+        p.colors.secondary === loadedColors.secondary &&
+        p.colors.success === loadedColors.success
+      );
+      setSelectedPaletteIndex(paletteIndex >= 0 ? paletteIndex : -1);
 
       // Nummernkreise
       setNummernkreise({
@@ -383,48 +475,24 @@ export default function SettingsPage() {
     );
   };
 
-  const handlePasswordChange = async () => {
-    setPasswordError(null);
-    setPasswordSuccess(null);
-    const validationError = validatePasswordChange(currentPassword, newPassword, confirmPassword);
-    if (validationError) {
-      setPasswordError(validationError);
-      return;
-    }
-    setPasswordLoading(true);
-    try {
-      await apiService.post('/api/users/change-password', { current_password: currentPassword, new_password: newPassword });
-      setPasswordSuccess('Passwort erfolgreich geändert.');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-    } catch (error: any) {
-      const status = error?.status ?? error?.response?.status;
-      if (status === 401 || status === 403) {
-        setPasswordError('Sitzung abgelaufen. Bitte neu einloggen.');
-      } else if (status === 400) {
-        setPasswordError('Aktuelles Passwort ist falsch.');
-      } else {
-        setPasswordError('Passwortänderung fehlgeschlagen. Bitte Verbindung prüfen.');
-      }
-    } finally {
-      setPasswordLoading(false);
-    }
-  };
-
   // ─── Helper renderers ────────────────────────────────────────────────────────
 
   const toggleGroup = (key: string) =>
     setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }));
 
-  const renderGroupHeader = (key: string, label: string, icon: string) => (
+  const renderGroupHeader = (key: string, label: string, icon: string, description?: string) => (
     <TouchableOpacity
       style={[styles.groupHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}
       onPress={() => toggleGroup(key)}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Ionicons name={icon as any} size={20} color={colors.primary} />
-        <Text style={[styles.groupHeaderText, { color: colors.text }]}>{label}</Text>
+        <View style={[styles.groupIconBox, { backgroundColor: colors.primary + '18' }]}>
+          <Ionicons name={icon as any} size={22} color={colors.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.groupHeaderText, { color: colors.text }]}>{label}</Text>
+          {description && <Text style={[styles.groupDescription, { color: colors.textSecondary }]}>{description}</Text>}
+        </View>
       </View>
       <Ionicons
         name={expandedGroups[key] ? 'chevron-up' : 'chevron-down'}
@@ -555,6 +623,7 @@ export default function SettingsPage() {
     >
       <StatusBar style={isDark ? 'light' : 'dark'} />
 
+      {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -563,19 +632,113 @@ export default function SettingsPage() {
         <View style={{ width: 24 }} />
       </View>
 
+      {/* User & Company Profile Card */}
+      <View style={[styles.profileCard, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        {/* Company Logo */}
+        {firmendaten.company_logo ? (
+          <Image source={{ uri: firmendaten.company_logo }} style={styles.companyLogo} />
+        ) : (
+          <View style={[styles.companyLogoPlaceholder, { backgroundColor: colors.primary + '20' }]}>
+            <Ionicons name="business" size={24} color={colors.primary} />
+          </View>
+        )}
+        {/* Company & User Info */}
+        <View style={styles.profileInfo}>
+          <Text style={[styles.companyName, { color: colors.text }]}>
+            {firmendaten.company_name || 'Firmenname'}
+          </Text>
+          <Text style={[styles.userName, { color: colors.textSecondary }]}>
+            {currentUser?.username || 'Benutzer'}
+          </Text>
+        </View>
+      </View>
+
       <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
 
         {/* ===================================================================
             ACCOUNT
         =================================================================== */}
-        {renderGroupHeader('account', 'Account', 'person-circle-outline')}
+        {renderGroupHeader('account', 'Account', 'person-circle-outline', 'Firmendaten, Branding, Verwaltung')}
         {expandedGroups.account && (
           <View style={[styles.groupContent, { backgroundColor: colors.card }]}>
 
-            {/* Firmendaten */}
+            {/* === Firma === */}
+            <Text style={[styles.subSectionTitle, { color: colors.primary }]}>Firma</Text>
             {renderSectionToggleRow('business-outline', 'Firmendaten', showFirmendaten, () => setShowFirmendaten(!showFirmendaten))}
             {showFirmendaten && (
               <View style={[styles.inlineForm, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+                {/* Firmenlogo */}
+                <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Firmenlogo</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 12 }}>
+                  <TouchableOpacity
+                    style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: 40,
+                      backgroundColor: colors.primary + '15',
+                      borderWidth: 2,
+                      borderColor: colors.primary + '40',
+                      borderStyle: 'dashed',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      overflow: 'hidden',
+                    }}
+                    onPress={async () => {
+                      try {
+                        const result = await new Promise<{ cancelled: boolean; assets?: { base64?: string; uri: string }[] }>((resolve) => {
+                          // Dynamically import expo-image-picker
+                          import('expo-image-picker').then(({ launchImageLibraryAsync, MediaTypeOptions, requestMediaLibraryPermissionsAsync }) => {
+                            requestMediaLibraryPermissionsAsync().then(({ status }) => {
+                              if (status !== 'granted') {
+                                Alert.alert('Berechtigung benötigt', 'Bitte erlauben Sie den Zugriff auf die Bilddatenbank');
+                                resolve({ cancelled: true });
+                                return;
+                              }
+                              launchImageLibraryAsync({
+                                mediaTypes: MediaTypeOptions.Images,
+                                allowsEditing: true,
+                                aspect: [1, 1],
+                                quality: 0.8,
+                                base64: true,
+                              }).then(resolve);
+                            });
+                          });
+                        });
+                        if (!result.cancelled && result.assets?.[0]) {
+                          const asset = result.assets[0];
+                          const base64Data = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+                          setFirmendaten(p => ({ ...p, company_logo: base64Data }));
+                        }
+                      } catch (error) {
+                        console.error('Image picker error:', error);
+                        Alert.alert('Fehler', 'Bild konnte nicht geladen werden');
+                      }
+                    }}
+                  >
+                    {firmendaten.company_logo ? (
+                      <Image source={{ uri: firmendaten.company_logo }} style={{ width: 76, height: 76, borderRadius: 38 }} />
+                    ) : (
+                      <View style={{ justifyContent: 'center', alignItems: 'center' }}>
+                        <Ionicons name="business" size={32} color={colors.primary} />
+                        <Text style={{ fontSize: 10, color: colors.textSecondary, marginTop: 4 }}>Logo</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600' }}>Rundes Firmenlogo</Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>Wird auf der Login-Seite angezeigt</Text>
+                    {firmendaten.company_logo ? (
+                      <TouchableOpacity
+                        onPress={() => setFirmendaten(p => ({ ...p, company_logo: '' }))}
+                        style={{ marginTop: 8 }}
+                      >
+                        <Text style={{ color: '#FF3B30', fontSize: 12 }}>Logo entfernen</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                </View>
+
+                {/* Textfelder */}
                 {([
                   { key: 'company_name', label: 'Firmenname', keyboard: 'default' },
                   { key: 'company_address', label: 'Adresse', keyboard: 'default' },
@@ -598,7 +761,8 @@ export default function SettingsPage() {
               </View>
             )}
 
-            {/* App Branding (Admin only) */}
+            {/* === Branding === */}
+            <Text style={[styles.subSectionTitle, { color: colors.primary, marginTop: 16 }]}>Branding</Text>
             {renderSectionToggleRow('color-palette-outline', 'App-Branding', showBranding, () => setShowBranding(!showBranding))}
             {showBranding && (
               <View style={[styles.inlineForm, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
@@ -623,20 +787,6 @@ export default function SettingsPage() {
                     <Ionicons name={branding.app_logo_icon as any} size={24} color={colors.primary} />
                   </View>
                 </View>
-                <Text style={[styles.formHint, { color: colors.textSecondary }]}>
-                  Verfügbare Icons: cube, cube-outline, business, archive, layers, grid, analytics, construct, settings, storefront
-                </Text>
-                <Text style={[styles.formLabel, { color: colors.textSecondary, marginTop: 12 }]}>Primärfarbe</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <TextInput
-                    style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text, flex: 1 }]}
-                    placeholder="#007AFF"
-                    placeholderTextColor={colors.textSecondary}
-                    value={branding.app_primary_color}
-                    onChangeText={v => setBranding(p => ({ ...p, app_primary_color: v }))}
-                  />
-                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: branding.app_primary_color, borderWidth: 2, borderColor: colors.border }} />
-                </View>
                 <Text style={[styles.formLabel, { color: colors.textSecondary, marginTop: 12 }]}>Slogan</Text>
                 <TextInput
                   style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
@@ -645,15 +795,169 @@ export default function SettingsPage() {
                   value={branding.app_slogan}
                   onChangeText={v => setBranding(p => ({ ...p, app_slogan: v }))}
                 />
-                {renderSaveButton(() => saveSettings(branding))}
+
+                {/* Farbpalette - 15 Paletten + Benutzerdefiniert */}
+                <TouchableOpacity
+                  style={[styles.navItem, { borderBottomColor: colors.border }]}
+                  onPress={() => setShowColorPalette(!showColorPalette)}
+                >
+                  <Ionicons name="color-palette-outline" size={20} color={colors.textSecondary} style={{ marginRight: 12 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.navItemLabel, { color: colors.text }]}>Farbpalette</Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>15 Vorlagen + Benutzerdefiniert</Text>
+                  </View>
+                  <Ionicons name={showColorPalette ? 'chevron-down' : 'chevron-forward'} size={16} color={colors.border} />
+                </TouchableOpacity>
+
+                {showColorPalette && (
+                  <View style={[styles.inlineForm, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+                    {/* 15 Farbpaletten zur Auswahl */}
+                    <Text style={[styles.formLabel, { color: colors.textSecondary, marginBottom: 12 }]}>Farbpaletten</Text>
+
+                    {colorPalettes.map((palette, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={[
+                          styles.paletteRow,
+                          { borderColor: selectedPaletteIndex === index && !showCustomPicker ? colors.primary : colors.border, backgroundColor: colors.card }
+                        ]}
+                        onPress={() => {
+                          setShowCustomPicker(false);
+                          applyPalette(index);
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.paletteName, { color: colors.text }]}>{palette.name}</Text>
+                          <View style={styles.colorSwatchRow}>
+                            <View style={[styles.colorSwatch, { backgroundColor: palette.colors.primary }]} />
+                            <View style={[styles.colorSwatch, { backgroundColor: palette.colors.secondary }]} />
+                            <View style={[styles.colorSwatch, { backgroundColor: palette.colors.success }]} />
+                            <View style={[styles.colorSwatch, { backgroundColor: palette.colors.warning }]} />
+                            <View style={[styles.colorSwatch, { backgroundColor: palette.colors.danger }]} />
+                            <View style={[styles.colorSwatch, { backgroundColor: palette.colors.neutral }]} />
+                          </View>
+                        </View>
+                        {selectedPaletteIndex === index && !showCustomPicker && (
+                          <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+
+                    {/* Benutzerdefinierte Farbpalette */}
+                    <Text style={[styles.formLabel, { color: colors.textSecondary, marginTop: 20, marginBottom: 12 }]}>Benutzerdefiniert</Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.paletteRow,
+                        { borderColor: showCustomPicker ? colors.primary : colors.border, backgroundColor: colors.card }
+                      ]}
+                      onPress={() => setShowCustomPicker(!showCustomPicker)}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.paletteName, { color: colors.text }]}>Eigene Farben</Text>
+                        <View style={styles.colorSwatchRow}>
+                          <View style={[styles.colorSwatch, { backgroundColor: customColors.primary }]} />
+                          <View style={[styles.colorSwatch, { backgroundColor: customColors.secondary }]} />
+                          <View style={[styles.colorSwatch, { backgroundColor: customColors.success }]} />
+                          <View style={[styles.colorSwatch, { backgroundColor: customColors.warning }]} />
+                          <View style={[styles.colorSwatch, { backgroundColor: customColors.danger }]} />
+                          <View style={[styles.colorSwatch, { backgroundColor: customColors.neutral }]} />
+                        </View>
+                      </View>
+                      <Ionicons name={showCustomPicker ? 'chevron-up' : 'chevron-down'} size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+
+                    {/* Custom Color Picker */}
+                    {showCustomPicker && (
+                      <View style={{ marginTop: 12, gap: 12 }}>
+                        {(['primary', 'secondary', 'success', 'warning', 'danger', 'neutral'] as const).map((colorKey) => (
+                          <View key={colorKey} style={styles.customColorRow}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={[styles.formLabel, { color: colors.text, marginBottom: 4 }]}>
+                                {functionalColorLabels[colorKey].german}
+                              </Text>
+                              <Text style={{ color: colors.textSecondary, fontSize: 11 }}>
+                                {functionalColorLabels[colorKey].description}
+                              </Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <View style={[styles.colorPreviewLarge, { backgroundColor: customColors[colorKey] }]} />
+                              <TextInput
+                                style={[styles.hexInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+                                placeholder="#000000"
+                                placeholderTextColor={colors.textSecondary}
+                                value={customColors[colorKey]}
+                                onChangeText={(v) => setCustomColors(p => ({ ...p, [colorKey]: v }))}
+                                maxLength={7}
+                              />
+                            </View>
+                          </View>
+                        ))}
+                        <TouchableOpacity
+                          style={[styles.saveButton, { backgroundColor: colors.primary }]}
+                          onPress={() => {
+                            setFunctionalColorsLocal(customColors);
+                            setShowCustomPicker(false);
+                            setSelectedPaletteIndex(-1);
+                          }}
+                        >
+                          <Text style={styles.saveButtonText}>Farben übernehmen</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    {/* Farbvorschau der aktiven Palette */}
+                    <View style={[styles.activePalettePreview, { borderColor: colors.border, marginTop: 20 }]}>
+                      <Text style={[styles.formLabel, { color: colors.textSecondary, marginBottom: 8 }]}>Aktive Palette - Vorschau</Text>
+                      <View style={styles.colorSwatchRowLarge}>
+                        <View style={[styles.colorSwatchLarge, { backgroundColor: functionalColors.primary }]}>
+                          <Text style={styles.colorSwatchLabel}>Primary</Text>
+                        </View>
+                        <View style={[styles.colorSwatchLarge, { backgroundColor: functionalColors.secondary }]}>
+                          <Text style={styles.colorSwatchLabel}>Secondary</Text>
+                        </View>
+                        <View style={[styles.colorSwatchLarge, { backgroundColor: functionalColors.success }]}>
+                          <Text style={styles.colorSwatchLabel}>Success</Text>
+                        </View>
+                        <View style={[styles.colorSwatchLarge, { backgroundColor: functionalColors.warning }]}>
+                          <Text style={styles.colorSwatchLabel}>Warning</Text>
+                        </View>
+                        <View style={[styles.colorSwatchLarge, { backgroundColor: functionalColors.danger }]}>
+                          <Text style={styles.colorSwatchLabel}>Danger</Text>
+                        </View>
+                        <View style={[styles.colorSwatchLarge, { backgroundColor: functionalColors.neutral }]}>
+                          <Text style={styles.colorSwatchLabel}>Neutral</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Save Button */}
+                    {renderSaveButton(async () => {
+                      await saveSettings({
+                        ...branding,
+                        color_primary: functionalColors.primary,
+                        color_secondary: functionalColors.secondary,
+                        color_success: functionalColors.success,
+                        color_warning: functionalColors.warning,
+                        color_danger: functionalColors.danger,
+                        color_neutral: functionalColors.neutral,
+                      });
+                      setThemeFunctionalColors(functionalColors);
+                    })}
+                  </View>
+                )}
               </View>
             )}
 
+            {/* === Verwaltung === */}
+            <Text style={[styles.subSectionTitle, { color: colors.primary, marginTop: 16 }]}>Verwaltung</Text>
             {renderNavItem('people-outline', 'Benutzerrollen', '/admin/users')}
             {renderNavItem('shield-checkmark-outline', 'Sicherheit', '/security')}
             {renderNavItem('archive-outline', 'Backups', '/admin/backup')}
+            {renderNavItem('server-outline', 'Datenbank', '/admin/database')}
+            {renderNavItem('extension-puzzle-outline', 'Integrationen', '/integrations')}
 
-            {/* Einstellungs-Versionen */}
+            {/* === System === */}
+            <Text style={[styles.subSectionTitle, { color: colors.primary, marginTop: 16 }]}>System</Text>
             {renderSectionToggleRow('git-branch-outline', 'Einstellungs-Versionen', showVersions, () => setShowVersions(!showVersions))}
             {showVersions && (
               <View style={[styles.inlineForm, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
@@ -669,9 +973,6 @@ export default function SettingsPage() {
                         <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>
                           {new Date(v.changed_at).toLocaleDateString('de-DE')} · {v.changed_by}
                         </Text>
-                        <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>
-                          {Object.keys(v.changes || {}).length} Änderung{Object.keys(v.changes || {}).length !== 1 ? 'en' : ''}
-                        </Text>
                       </View>
                       <TouchableOpacity
                         style={[styles.restoreButton, { backgroundColor: colors.primary }]}
@@ -685,35 +986,25 @@ export default function SettingsPage() {
               </View>
             )}
 
-            {renderNavItem('server-outline', 'Datenbank', '/admin/database')}
-            {renderNavItem('extension-puzzle-outline', 'Integrationen', '/integrations')}
-
-            {/* Lizenz — static info card */}
+            {/* === Lizenz === */}
             <TouchableOpacity
               style={[styles.navItem, { borderBottomColor: colors.border }]}
-              onPress={() => {
-                Alert.alert(
-                  'Lizenz',
-                  'Lizenz: Professional\nGültig bis: 31.12.2026\nBenutzer: unbegrenzt',
-                );
-              }}
+              onPress={() => Alert.alert('Lizenz', 'Lizenz: Professional\nGültig bis: 31.12.2026\nBenutzer: unbegrenzt')}
             >
               <Ionicons name="ribbon-outline" size={20} color={colors.textSecondary} style={{ marginRight: 12 }} />
               <View style={{ flex: 1 }}>
-                <Text style={[styles.navItemLabel, { color: colors.text, flex: 0 }]}>Lizenz</Text>
+                <Text style={[styles.navItemLabel, { color: colors.text }]}>Lizenz</Text>
                 <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>Professional · gültig bis 31.12.2026</Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.border} />
             </TouchableOpacity>
-
-            {renderNavItem('receipt-outline', 'Rechnungsverlauf', '/invoices')}
           </View>
         )}
 
         {/* ===================================================================
             EINSTELLUNGEN
         =================================================================== */}
-        {renderGroupHeader('einstellungen', 'Einstellungen', 'settings-outline')}
+        {renderGroupHeader('einstellungen', 'Einstellungen', 'settings-outline', 'Nummernkreise, Zeit, Projekte')}
         {expandedGroups.einstellungen && (
           <View style={[styles.groupContent, { backgroundColor: colors.card }]}>
 
@@ -943,7 +1234,7 @@ export default function SettingsPage() {
         {/* ===================================================================
             KOMMUNIKATION
         =================================================================== */}
-        {renderGroupHeader('kommunikation', 'Kommunikation', 'chatbubble-outline')}
+        {renderGroupHeader('kommunikation', 'Kommunikation', 'chatbubble-outline', 'E-Mail, Benachrichtigungen')}
         {expandedGroups.kommunikation && (
           <View style={[styles.groupContent, { backgroundColor: colors.card }]}>
 
@@ -1090,7 +1381,7 @@ export default function SettingsPage() {
         {/* ===================================================================
             FINANZEN
         =================================================================== */}
-        {renderGroupHeader('finanzen', 'Finanzen', 'cash-outline')}
+        {renderGroupHeader('finanzen', 'Finanzen', 'cash-outline', 'Mietfaktoren, Steuern, Zahlungen')}
         {expandedGroups.finanzen && (
           <View style={[styles.groupContent, { backgroundColor: colors.card }]}>
 
@@ -1456,172 +1747,100 @@ export default function SettingsPage() {
         )}
 
         {/* ===================================================================
-            PASSWORD CHANGE
+            SERVER
         =================================================================== */}
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 12 }]}>
-          <TouchableOpacity
-            style={styles.settingRow}
-            onPress={() => {
-              setPasswordSectionOpen(!passwordSectionOpen);
-              setPasswordError(null);
-              setPasswordSuccess(null);
-            }}
-          >
-            <View style={styles.settingInfo}>
-              <Ionicons name="lock-closed-outline" size={24} color={colors.text} style={styles.settingIcon} />
-              <Text style={[styles.sectionTitle, { color: colors.text, marginBottom: 0 }]}>Passwort ändern</Text>
+        {renderGroupHeader('server', 'Server', 'server-outline', 'Verbindung, URL konfigurieren')}
+        {expandedGroups.server && (
+          <View style={[styles.groupContent, { backgroundColor: colors.card }]}>
+            <View style={{ padding: 16 }}>
+              <Text style={{ fontSize: 13, color: colors.subText ?? colors.textSecondary, marginBottom: 6 }}>
+                Server-URL (Raspberry Pi IP oder Cloudflare-URL)
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                <TextInput
+                  style={{
+                    flex: 1,
+                    padding: 10,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    backgroundColor: colors.background,
+                    color: colors.text,
+                    fontSize: 14,
+                  }}
+                  value={serverUrl}
+                  onChangeText={setServerUrlState}
+                  placeholder="http://192.168.1.100:8002"
+                  placeholderTextColor={colors.subText ?? colors.textSecondary}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                />
+                <TouchableOpacity
+                  onPress={saveServerUrl}
+                  disabled={serverUrlSaving}
+                  style={{
+                    backgroundColor: serverUrlSaved ? '#34C759' : colors.primary,
+                    padding: 10,
+                    borderRadius: 8,
+                    width: 44,
+                    alignItems: 'center',
+                  }}
+                >
+                  {serverUrlSaving
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <Ionicons name={serverUrlSaved ? 'checkmark' : 'save-outline'} size={20} color="#fff" />
+                  }
+                </TouchableOpacity>
+              </View>
             </View>
-            <Ionicons
-              name={passwordSectionOpen ? 'chevron-up' : 'chevron-down'}
-              size={20}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
-
-          {passwordSectionOpen && (
-            <View style={{ marginTop: 12 }}>
-              <TextInput
-                style={[styles.passwordInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                placeholder="Aktuelles Passwort"
-                placeholderTextColor={colors.textSecondary}
-                secureTextEntry
-                value={currentPassword}
-                onChangeText={setCurrentPassword}
-                autoCapitalize="none"
-              />
-              <TextInput
-                style={[styles.passwordInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                placeholder="Neues Passwort"
-                placeholderTextColor={colors.textSecondary}
-                secureTextEntry
-                value={newPassword}
-                onChangeText={setNewPassword}
-                autoCapitalize="none"
-              />
-              <TextInput
-                style={[styles.passwordInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                placeholder="Neues Passwort bestätigen"
-                placeholderTextColor={colors.textSecondary}
-                secureTextEntry
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                autoCapitalize="none"
-              />
-
-              {passwordError ? (
-                <Text style={styles.passwordErrorText}>{passwordError}</Text>
-              ) : null}
-              {passwordSuccess ? (
-                <Text style={styles.passwordSuccessText}>{passwordSuccess}</Text>
-              ) : null}
-
-              <TouchableOpacity
-                style={[styles.passwordSubmitButton, { backgroundColor: colors.primary || '#007AFF' }]}
-                onPress={handlePasswordChange}
-                disabled={passwordLoading}
-              >
-                {passwordLoading ? (
-                  <ActivityIndicator color="#ffffff" />
-                ) : (
-                  <Text style={styles.passwordSubmitButtonText}>Passwort ändern</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
+          </View>
+        )}
 
         {/* ===================================================================
-            SERVER CONNECTION
+            INFO
         =================================================================== */}
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 12 }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Server-Verbindung</Text>
-          <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
-            <Text style={{ fontSize: 13, color: colors.subText ?? colors.textSecondary, marginBottom: 6 }}>
-              Server-URL (Raspberry Pi IP oder Cloudflare-URL)
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-              <TextInput
-                style={{
-                  flex: 1,
-                  padding: 10,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  backgroundColor: colors.card,
-                  color: colors.text,
-                  fontSize: 14,
-                }}
-                value={serverUrl}
-                onChangeText={setServerUrlState}
-                placeholder="http://192.168.1.100:8002"
-                placeholderTextColor={colors.subText ?? colors.textSecondary}
-                autoCapitalize="none"
-                keyboardType="url"
-              />
-              <TouchableOpacity
-                onPress={saveServerUrl}
-                disabled={serverUrlSaving}
-                style={{
-                  backgroundColor: serverUrlSaved ? '#34C759' : '#007AFF',
-                  padding: 10,
-                  borderRadius: 8,
-                  width: 44,
-                  alignItems: 'center',
-                }}
-              >
-                {serverUrlSaving
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Ionicons name={serverUrlSaved ? 'checkmark' : 'save-outline'} size={20} color="#fff" />
-                }
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+        {renderGroupHeader('info', 'Info', 'information-circle-outline', 'Version, App-Installation')}
+        {expandedGroups.info && (
+          <View style={[styles.groupContent, { backgroundColor: colors.card }]}>
+            <TouchableOpacity
+              style={[styles.settingRow, styles.settingButton, { borderBottomColor: colors.border }]}
+              onPress={() => router.push('/install' as any)}
+            >
+              <View style={styles.settingInfo}>
+                <Ionicons name="download-outline" size={24} color={colors.text} style={styles.settingIcon} />
+                <View>
+                  <Text style={[styles.settingLabel, { color: colors.text }]}>App installieren</Text>
+                  <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>Android, iOS & Web</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
 
-        {/* ===================================================================
-            APP INFO
-        =================================================================== */}
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 12 }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Info & Installation</Text>
-
-          <TouchableOpacity
-            style={[styles.settingRow, styles.settingButton]}
-            onPress={() => router.push('/install' as any)}
-          >
-            <View style={styles.settingInfo}>
-              <Ionicons name="download-outline" size={24} color={colors.text} style={styles.settingIcon} />
-              <View>
-                <Text style={[styles.settingLabel, { color: colors.text }]}>App installieren</Text>
-                <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>Android, iOS & Web</Text>
+            <View style={[styles.settingRow, { borderBottomColor: colors.border }]}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="information-circle-outline" size={24} color={colors.text} style={styles.settingIcon} />
+                <View>
+                  <Text style={[styles.settingLabel, { color: colors.text }]}>Version</Text>
+                  <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
+                    {Constants.expoConfig?.version || '1.0.2'}
+                  </Text>
+                </View>
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
 
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Ionicons name="information-circle-outline" size={24} color={colors.text} style={styles.settingIcon} />
-              <View>
-                <Text style={[styles.settingLabel, { color: colors.text }]}>Version</Text>
-                <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
-                  {Constants.expoConfig?.version || '1.6.0'}
-                </Text>
+            <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="cube-outline" size={24} color={colors.text} style={styles.settingIcon} />
+                <View>
+                  <Text style={[styles.settingLabel, { color: colors.text }]}>App Name</Text>
+                  <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
+                    {Constants.expoConfig?.name || 'Inventar Pro'}
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
-
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Ionicons name="cube-outline" size={24} color={colors.text} style={styles.settingIcon} />
-              <View>
-                <Text style={[styles.settingLabel, { color: colors.text }]}>App Name</Text>
-                <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
-                  {Constants.expoConfig?.name || 'EquipTrack Inventory'}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
+        )}
 
       </ScrollView>
     </SafeAreaView>
@@ -1651,6 +1870,40 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
+  // ─── Profile Card ──────────────────────────────────────────────────────────
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+    borderBottomWidth: 1,
+  },
+  companyLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#f0f0f0',
+  },
+  companyLogoPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  companyName: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  userName: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+
   // ─── Group styles ──────────────────────────────────────────────────────────
   groupHeader: {
     flexDirection: 'row',
@@ -1661,9 +1914,127 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     marginTop: 16,
   },
+  groupIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   groupHeaderText: {
     fontSize: 17,
     fontWeight: '700',
+  },
+  groupDescription: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  subSectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  colorPaletteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  colorPreview: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+  },
+  colorPreviewLarge: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+  },
+  functionalColorSection: {
+    marginBottom: 16,
+  },
+  colorPresetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  colorPresetButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  paletteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    marginBottom: 8,
+  },
+  paletteName: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  colorSwatchRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  colorSwatch: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+  },
+  colorSwatchRowLarge: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  colorSwatchLarge: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: 4,
+  },
+  colorSwatchLabel: {
+    color: 'white',
+    fontSize: 8,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  customColorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  hexInput: {
+    width: 90,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    fontSize: 13,
+    fontFamily: 'monospace',
+  },
+  activePalettePreview: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
   },
   groupContent: {
     marginBottom: 4,
@@ -1825,36 +2196,6 @@ const styles = StyleSheet.create({
   settingDescription: {
     fontSize: 12,
     marginTop: 2,
-  },
-  passwordInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    marginBottom: 12,
-  },
-  passwordErrorText: {
-    color: '#dc3545',
-    fontSize: 13,
-    marginBottom: 10,
-  },
-  passwordSuccessText: {
-    color: '#28a745',
-    fontSize: 13,
-    marginBottom: 10,
-  },
-  passwordSubmitButton: {
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-  },
-  passwordSubmitButtonText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '600',
   },
   // Version History
   versionItem: {

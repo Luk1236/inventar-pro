@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import Constants from 'expo-constants';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -258,7 +258,7 @@ export default function TaskDetailsPage() {
 
   const loadTaskDetails = useCallback(async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
       if (!token) {
         router.replace('/');
         return;
@@ -307,7 +307,7 @@ export default function TaskDetailsPage() {
 
   const completeTask = async () => {
     try {
-      const token = await AsyncStorage.getItem('auth_token');
+      const token = await getToken();
       const response = await fetch(`${BACKEND_URL}/api/maintenance/tasks/${id}/complete`, {
         method: 'PUT',
         headers: {
