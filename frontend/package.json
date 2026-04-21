@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "main": "expo-router/entry",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
@@ -67,13 +67,15 @@
     "react-native-webview": "13.15.0",
     "react-native-worklets": "0.5.1",
     "react-native-worklets-core": "^1.6.3",
-    "three": "^0.183.2"
+    "three": "^0.183.2",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@testing-library/jest-native": "^5.4.3",
     "@testing-library/react-native": "^12.9.0",
     "@types/react": "~19.1.10",
+    "babel-plugin-transform-import-meta": "^2.3.3",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
     "jest-expo": "^54.0.17",
