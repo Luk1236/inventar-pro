@@ -35,6 +35,16 @@ from websocket_handler import manager, websocket_endpoint
 # Pydantic models — extracted in Phase 2 refactor (see app/models.py)
 from app.models import *  # noqa: F401,F403
 
+# Auth dependencies — extracted in Phase 3 refactor (see app/deps/auth.py)
+from app.deps.auth import (  # noqa: F401
+    Permission,
+    ROLE_PERMISSIONS,
+    has_permission,
+    security,
+    get_current_user,
+    require_permission,
+)
+
 # Configure logging (must be early for use throughout file)
 logging.basicConfig(
     level=logging.INFO,
@@ -63,7 +73,6 @@ ROOT_DIR = Path(__file__).parent
 # Rate Limiter - Protects against brute force and DoS
 limiter = Limiter(key_func=get_remote_address)
 
-security = HTTPBearer()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Settings are loaded + validated in app.config (imported above). The names
@@ -116,111 +125,8 @@ async def health_check():
             status_code=503
         )
 
-# ===========================================
-# RBAC - Role-Based Access Control
-# ===========================================
-
-class Permission:
-    # Article permissions
-    VIEW_ARTICLES = "view_articles"
-    CREATE_ARTICLE = "create_article"
-    EDIT_ARTICLE = "edit_article"
-    DELETE_ARTICLE = "delete_article"
-    
-    # Stock permissions
-    VIEW_STOCK = "view_stock"
-    EDIT_STOCK = "edit_stock"
-    
-    # Event permissions
-    VIEW_EVENTS = "view_events"
-    CREATE_EVENT = "create_event"
-    EDIT_EVENT = "edit_event"
-    DELETE_EVENT = "delete_event"
-    
-    # Customer permissions
-    VIEW_CUSTOMERS = "view_customers"
-    CREATE_CUSTOMER = "create_customer"
-    EDIT_CUSTOMER = "edit_customer"
-    
-    # Invoice permissions
-    CREATE_INVOICE = "create_invoice"
-    VIEW_INVOICES = "view_invoices"
-
-    # Booking permissions
-    CREATE_BOOKING = "create_booking"
-    EDIT_BOOKING = "edit_booking"
-    VIEW_BOOKINGS = "view_bookings"
-
-    # Quote permissions
-    CREATE_QUOTE = "create_quote"
-    VIEW_QUOTES = "view_quotes"
-    EDIT_QUOTE = "edit_quote"
-
-    # Admin permissions
-    MANAGE_USERS = "manage_users"
-    VIEW_REPORTS = "view_reports"
-    ADMIN_ACCESS = "admin_access"
-    BACKUP_DATABASE = "backup_database"
-
-# Role permission mappings
-ROLE_PERMISSIONS = {
-    "admin": [
-        Permission.VIEW_ARTICLES, Permission.CREATE_ARTICLE, Permission.EDIT_ARTICLE, Permission.DELETE_ARTICLE,
-        Permission.VIEW_STOCK, Permission.EDIT_STOCK,
-        Permission.VIEW_EVENTS, Permission.CREATE_EVENT, Permission.EDIT_EVENT, Permission.DELETE_EVENT,
-        Permission.VIEW_CUSTOMERS, Permission.CREATE_CUSTOMER, Permission.EDIT_CUSTOMER,
-        Permission.MANAGE_USERS, Permission.VIEW_REPORTS, Permission.ADMIN_ACCESS, Permission.BACKUP_DATABASE,
-        Permission.CREATE_INVOICE, Permission.VIEW_INVOICES,
-        Permission.CREATE_BOOKING, Permission.EDIT_BOOKING, Permission.VIEW_BOOKINGS,
-        Permission.CREATE_QUOTE, Permission.VIEW_QUOTES, Permission.EDIT_QUOTE,
-    ],
-    "lager": [
-        Permission.VIEW_ARTICLES, Permission.CREATE_ARTICLE, Permission.EDIT_ARTICLE,
-        Permission.VIEW_STOCK, Permission.EDIT_STOCK,
-        Permission.VIEW_EVENTS, Permission.CREATE_EVENT, Permission.EDIT_EVENT,
-        Permission.VIEW_CUSTOMERS, Permission.CREATE_CUSTOMER,
-        Permission.VIEW_REPORTS, Permission.CREATE_INVOICE, Permission.VIEW_INVOICES,
-        Permission.CREATE_BOOKING, Permission.EDIT_BOOKING, Permission.VIEW_BOOKINGS,
-        Permission.CREATE_QUOTE, Permission.VIEW_QUOTES,
-    ],
-    "techniker": [
-        Permission.VIEW_ARTICLES, Permission.EDIT_ARTICLE,
-        Permission.VIEW_STOCK,
-        Permission.VIEW_EVENTS,
-        Permission.VIEW_CUSTOMERS,
-        Permission.VIEW_BOOKINGS,
-    ],
-    # F12: New fine-grained roles
-    "viewer": [
-        # Read-only access across all main entities
-        Permission.VIEW_ARTICLES,
-        Permission.VIEW_STOCK,
-        Permission.VIEW_EVENTS,
-        Permission.VIEW_CUSTOMERS,
-        Permission.VIEW_REPORTS,
-    ],
-    "fahrer": [
-        # Drivers: see events + articles (for loading/unloading), no customer/financial data
-        Permission.VIEW_ARTICLES,
-        Permission.VIEW_STOCK,
-        Permission.VIEW_EVENTS,
-    ],
-}
-
-def has_permission(user_role: str, permission: str) -> bool:
-    """Check if a role has a specific permission"""
-    return permission in ROLE_PERMISSIONS.get(user_role, [])
-
-def require_permission(permission: str):
-    """Dependency to check user permission"""
-    async def permission_checker(current_user: "User" = Depends(get_current_user)):
-        if not has_permission(current_user.role, permission):
-            raise HTTPException(
-                status_code=403, 
-                detail="Keine Berechtigung für diese Aktion"
-            )
-        return current_user
-    return permission_checker
+# RBAC (Permission class, ROLE_PERMISSIONS, has_permission, require_permission)
+# extracted to app/deps/auth.py (Phase 3 refactor — see imports above).
 
 # Models
 
@@ -314,31 +220,7 @@ def create_refresh_token(data: dict) -> str:
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=["HS256"])  # M1: hardcoded, no algorithm confusion
-        username: str = payload.get("sub")
-        # No default — missing "type" field must also be rejected
-        token_type: str = payload.get("type")
-
-        # Only allow access tokens for regular API calls
-        if token_type != "access":
-            raise credentials_exception
-            
-        if username is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
-    
-    user = await db.users.find_one({"username": username})
-    if user is None:
-        raise credentials_exception
-    return User(**user)
+# get_current_user() extracted to app/deps/auth.py (Phase 3 refactor).
 
 def _sanitize_email_field(text: str) -> str:
     """Remove SMTP header injection characters (CR/LF) from user-controlled data."""
