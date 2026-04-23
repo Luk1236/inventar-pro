@@ -3,8 +3,6 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
-from dotenv import load_dotenv
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr, field_validator
 from typing import List, Optional, Dict, Any
@@ -27,6 +25,11 @@ import io
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+
+# Centralized settings + DB connection (also loads .env + validates SECRET_KEY)
+from app.config import settings
+from app.database import client, db
+
 from websocket_handler import manager, websocket_endpoint
 
 # Configure logging (must be early for use throughout file)
@@ -48,11 +51,7 @@ _file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelna
 logging.getLogger().addHandler(_file_handler)
 logger = logging.getLogger(__name__)
 
-# Cross-platform sync will be implemented in next version
-# For now, we'll add basic cross-platform support
-
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
 
 # ===========================================
 # SECURITY CONFIGURATION
@@ -64,37 +63,23 @@ limiter = Limiter(key_func=get_remote_address)
 security = HTTPBearer()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-SECRET_KEY = os.environ.get("SECRET_KEY")
-_known_weak_keys = {
-    "change_this_to_a_secure_random_string_in_production",
-    "inventory_management_secret_key_2025",
-    "changeme",
-    "",
-}
-if not SECRET_KEY or SECRET_KEY in _known_weak_keys:
-    raise RuntimeError(
-        "⛔ CRITICAL: SECRET_KEY ist nicht gesetzt oder verwendet einen unsicheren Standardwert.\n"
-        "Bitte einen sicheren Key in der .env setzen:\n"
-        "  SECRET_KEY=" + secrets.token_hex(32) + "\n"
-        "Server wird nicht gestartet."
-    )
-
-ALGORITHM = "HS256"
-
-# MongoDB connection
-mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
-DB_NAME = os.environ.get('DB_NAME', 'inventory_db')
-client = AsyncIOMotorClient(mongo_url)
-db = client[DB_NAME]
+# Settings are loaded + validated in app.config (imported above). The names
+# below are module-level aliases kept for backward compatibility with the rest
+# of this file and external imports (tests swap `server.db`, etc.).
+SECRET_KEY = settings.SECRET_KEY
+ALGORITHM = settings.ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+REFRESH_TOKEN_EXPIRE_DAYS = settings.REFRESH_TOKEN_EXPIRE_DAYS
+DB_NAME = settings.DB_NAME
 
 # Backup directory
-BACKUP_DIR = Path(os.environ.get("BACKUP_DIR", str(Path(__file__).parent / "backups")))
+BACKUP_DIR = Path(os.environ.get("BACKUP_DIR", str(ROOT_DIR / "backups")))
 BACKUP_DIR.mkdir(exist_ok=True)
 BACKUP_FILE = BACKUP_DIR / "latest_backup.json"
-MAX_EXPORT_ROWS = 5000   # K2: Hard cap for all export endpoints (CSV/PDF/Excel)
-MAX_BACKUP_SIZE_MB = 500  # H2: Backup download size limit
-MAX_IMPORT_ROWS = 1000   # F10: Hard cap for bulk article import
-DASHBOARD_CACHE_TTL = 30  # F9: Dashboard stats cached for 30 seconds
+MAX_EXPORT_ROWS = settings.MAX_EXPORT_ROWS       # K2: export hard cap
+MAX_BACKUP_SIZE_MB = settings.MAX_BACKUP_SIZE_MB  # H2: backup download limit
+MAX_IMPORT_ROWS = settings.MAX_IMPORT_ROWS       # F10: bulk import cap
+DASHBOARD_CACHE_TTL = settings.DASHBOARD_CACHE_TTL  # F9: dashboard cache TTL (s)
 _ISO_DT_RE = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}')  # Strict ISO-8601 prefix
 
 # F9: In-memory dashboard cache — avoids 17 count_documents() calls on every page load
@@ -105,16 +90,12 @@ _dashboard_cache_ts: float = 0.0
 scheduler = AsyncIOScheduler()
 
 # Email configuration
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "")
-SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-NOTIFICATION_EMAIL = os.getenv("NOTIFICATION_EMAIL", "")
-
-# Token Configuration
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
-REFRESH_TOKEN_EXPIRE_DAYS = int(os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+ADMIN_EMAIL = settings.ADMIN_EMAIL
+SMTP_SERVER = settings.SMTP_SERVER
+SMTP_PORT = settings.SMTP_PORT
+SMTP_USERNAME = settings.SMTP_USERNAME
+SMTP_PASSWORD = settings.SMTP_PASSWORD
+NOTIFICATION_EMAIL = settings.NOTIFICATION_EMAIL
 
 app = FastAPI(title="Inventory Management System", version="1.0.0")
 api_router = APIRouter(prefix="/api")
@@ -8896,8 +8877,7 @@ app.include_router(api_router)
 
 # v1 router aliases are registered at the END of this file (after all @app routes)
 
-_allowed_origins_env = os.environ.get("ALLOWED_ORIGINS", "http://localhost:8002,http://localhost:8081")
-ALLOWED_ORIGINS = [o.strip() for o in _allowed_origins_env.split(",") if o.strip()]
+ALLOWED_ORIGINS = settings.allowed_origins_list
 if "*" in ALLOWED_ORIGINS:
     logging.critical("⛔ ALLOWED_ORIGINS enthält '*' – das ist ein Sicherheitsproblem! Bitte .env anpassen.")
     ALLOWED_ORIGINS = ["http://localhost:8002"]
