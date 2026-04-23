@@ -7266,57 +7266,7 @@ async def delete_crew_member(
         raise HTTPException(status_code=404, detail="Mitarbeiter nicht gefunden")
     return {"status": "deleted"}
 
-# Vehicle Endpoints
-@api_router.get("/vehicles")
-async def get_vehicles(current_user: User = Depends(get_current_user)):
-    """Get all vehicles"""
-    vehicles = await db.vehicles.find().sort("name", 1).to_list(100)
-    for vehicle in vehicles:
-        vehicle.pop("_id", None)
-    return vehicles
-
-@api_router.post("/vehicles")
-async def create_vehicle(
-    vehicle_data: VehicleCreate,
-    current_user: User = Depends(get_current_user)
-):
-    """Create a new vehicle"""
-    try:
-        import uuid as uuid_module
-        doc = vehicle_data.dict()
-        doc["id"] = str(uuid_module.uuid4())
-        doc["_id"] = doc["id"]
-        doc["created_at"] = datetime.utcnow().isoformat()
-        await db.vehicles.insert_one(doc)
-        return doc
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Interner Serverfehler. Details wurden protokolliert.")
-
-@api_router.put("/vehicles/{vehicle_id}")
-async def update_vehicle(
-    vehicle_id: str,
-    update_data: dict,
-    current_user: User = Depends(get_current_user)
-):
-    """Update a vehicle"""
-    result = await db.vehicles.update_one(
-        {"id": vehicle_id},
-        {"$set": update_data}
-    )
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Fahrzeug nicht gefunden")
-    return {"status": "success"}
-
-@api_router.delete("/vehicles/{vehicle_id}")
-async def delete_vehicle(
-    vehicle_id: str,
-    current_user: User = Depends(get_current_user)
-):
-    """Delete a vehicle"""
-    result = await db.vehicles.delete_one({"id": vehicle_id})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Fahrzeug nicht gefunden")
-    return {"status": "deleted"}
+# Vehicle endpoints extracted to app/routes/vehicles.py (Phase 4 refactor).
 
 # Crew Assignment Endpoints
 @api_router.get("/crew-assignments")
@@ -7738,6 +7688,12 @@ async def check_bundle_availability(
 
 # Include router AFTER all endpoints are defined
 app.add_api_websocket_route("/ws", websocket_endpoint)
+
+# Phase 4 refactor — domain routers extracted to app/routes/.
+# Registered on api_router so they inherit the "/api" prefix.
+from app.routes.vehicles import router as _vehicles_router
+api_router.include_router(_vehicles_router)
+
 app.include_router(api_router)
 
 # v1 router aliases are registered at the END of this file (after all @app routes)
@@ -8142,43 +8098,10 @@ async def get_public_invoice(request: Request, token: str):
         "payment_text": app_settings_doc.get("online_invoices_payment_text", ""),
     }
 
-# ===========================
-# FAHRZEUGE
-# ===========================
-
-@app.get("/api/vehicles")
-async def get_vehicles(current_user: dict = Depends(get_current_user)):
-    vehicles = await db.vehicles.find({}).to_list(500)
-    for v in vehicles:
-        v["id"] = str(v.get("_id", v.get("id", "")))
-        v.pop("_id", None)
-    return vehicles
-
-@app.post("/api/vehicles")
-async def create_vehicle(vehicle: Vehicle, current_user: dict = Depends(get_current_user)):
-    try:
-        doc = vehicle.dict()
-        doc["_id"] = doc["id"]
-        # Convert datetime to ISO format string for JSON serialization
-        if "created_at" in doc and isinstance(doc["created_at"], datetime):
-            doc["created_at"] = doc["created_at"].isoformat()
-        await db.vehicles.insert_one(doc)
-        return doc
-    except Exception as e:
-        import traceback
-        print(f"ERROR in create_vehicle: {e}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail="Interner Serverfehler. Details wurden protokolliert.")
-
-@app.put("/api/vehicles/{vehicle_id}")
-async def update_vehicle(vehicle_id: str, vehicle: VehicleCreate, current_user: dict = Depends(get_current_user)):
-    await db.vehicles.update_one({"_id": vehicle_id}, {"$set": vehicle.dict()})
-    return {"id": vehicle_id, **vehicle.dict()}
-
-@app.delete("/api/vehicles/{vehicle_id}")
-async def delete_vehicle(vehicle_id: str, current_user: dict = Depends(get_current_user)):
-    await db.vehicles.delete_one({"_id": vehicle_id})
-    return {"message": "Fahrzeug gelöscht"}
+# FAHRZEUGE: duplicate @app.*("/api/vehicles") block removed in Phase 4 refactor.
+# It was dead code — FastAPI matched the @api_router routes first, so this block
+# never executed (only surfaced as a Duplicate Operation ID warning in OpenAPI).
+# Canonical vehicle routes now live in app/routes/vehicles.py.
 
 # ===========================
 # AUFGABEN
