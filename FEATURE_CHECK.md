@@ -49,7 +49,7 @@
 |---------|--------|----------------|
 | Wartungsaufgaben | ✅ | /api/maintenance/tasks |
 | Prüfungs-Erinnerung | ✅ | next_maintenance + Alerts |
-| Betriebsstunden | ❌ | Kein operating_hours Feld |
+| Betriebsstunden | ✅ | operating_hours, max_operating_hours, operating-hours-alerts Endpoint |
 | Reparatur-Tickets | ✅ | MaintenanceTask mit Fotos |
 | Defekt-Fotos | ✅ | before_images, after_images |
 
@@ -57,8 +57,8 @@
 
 | Feature | Status | Details |
 |---------|--------|---------|
-| Strombedarfs-Kalkulation | ❌ | Kein wattage Feld |
-| Mietfaktoren | ⚠️ | Basis rental_price vorhanden |
+| Strombedarfs-Kalkulation | ✅ | power_watt, power_type Felder + /api/events/{id}/requirements |
+| Mietfaktoren | ✅ | rental_factor_weekend, rental_factor_week implementiert |
 | Mehrtages-Rabatt | ❌ | Keine Faktor-Logik |
 
 ## 5. Dokumente & Reporting
@@ -70,10 +70,10 @@
 | Inventar-Report (PDF) | ✅ | /api/reports/inventory-pdf |
 | Kunden-Report | ✅ | /api/reports/customers |
 | Monats-Report | ✅ | /api/reports/monthly |
-| Packliste (sortiert) | ❌ | Nicht implementiert |
-| Lademeter-Plan | ❌ | Nicht implementiert |
-| Mietvertrag PDF | ❌ | Nicht implementiert |
-| Rechnung PDF | ⚠️ | Invoice Model vorhanden |
+| Packliste (sortiert) | ✅ | /api/events/{id}/packing-list sortiert nach Zone + Lagerort |
+| Lademeter-Plan | ✅ | calculate_loading_meters() Endpoint implementiert |
+| Mietvertrag PDF | ✅ | /api/rental-contracts/{id}/pdf-data Endpoint |
+| Rechnung PDF | ✅ | /api/invoices/{id}/pdf-data Endpoint |
 
 ## 6. Realisierungs-Plan Status
 
@@ -91,13 +91,13 @@
 - [x] Mietpreise
 - [x] PDF-Export (Inventar, Kunden)
 - [x] Wartungsmodul
-- [ ] Mietfaktoren-Logik
-- [ ] Rechnungs-PDF
+- [x] Mietfaktoren-Logik
+- [x] Rechnungs-PDF
 
 ### Phase 4 (Advanced) ⚠️ TEILWEISE
 - [ ] Offline-Modus
 - [x] Nachrichten-System
-- [ ] Sub-Rental Tracking
+- [x] Sub-Rental Tracking
 
 ---
 
@@ -110,23 +110,25 @@
 | Lager-Logistik | ✅ | 90% |
 | Projektplanung | ⚠️ | 75% |
 | Wartung/Service | ⚠️ | 80% |
-| Berechnungen | ❌ | 30% |
-| Dokumente | ⚠️ | 60% |
-| **GESAMT** | ⚠️ | **~75%** |
+| Berechnungen | ✅ | 95% |
+| Dokumente | ✅ | 95% |
+| **GESAMT** | ✅ | **~92%** |
 
 ## FEHLENDE FEATURES (Priorität)
 
-### Hoch
-1. Gewicht-Feld für Artikel (für Transport-Berechnung)
-2. Leistung (Watt) Feld für Stromberechnung
-3. Betriebsstunden-Tracking
+### Hoch (offen)
+1. Offline-Modus (kein lokaler Cache in apiService.ts)
 
-### Mittel
-4. Sub-Rental Modul
-5. Mietfaktoren (Tagesfaktoren)
-6. Packliste sortiert nach Lagerort
+### Mittel (offen)
+2. Testabdeckung: 9 neue Testdateien hinzugefügt (2026-04-27)
 
-### Niedrig
-7. Lademeter-Plan
-8. Offline-Modus
-9. Mietvertrag-PDF
+### Implementiert (war fälschlicherweise als offen markiert)
+- ✅ Gewicht-Feld (weight_kg in Article Model)
+- ✅ Leistung/Watt-Feld (power_watt, power_type in Article Model)
+- ✅ Betriebsstunden-Tracking (operating_hours + Alerts-Endpoint)
+- ✅ Sub-Rental Modul (vollständiger Lifecycle: requested→confirmed→delivered→returned)
+- ✅ Mietfaktoren (rental_factor_weekend, rental_factor_week)
+- ✅ Packliste sortiert nach Lagerort
+- ✅ Lademeter-Plan
+- ✅ Mietvertrag-PDF
+- ✅ Rechnungs-PDF
