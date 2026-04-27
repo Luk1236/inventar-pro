@@ -91,6 +91,8 @@ backend/backups/
 backend/server_out.txt
 backend/server*.txt
 backend/diagnosis/report.html
+frontend/expo_out.txt
+frontend/expo*.txt
 
 # Claude Code / Superpowers state
 .superpowers/
