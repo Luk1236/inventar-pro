@@ -9033,10 +9033,33 @@ async def delete_rental_request(item_id: str, current_user: User = Depends(get_c
 
 
 # Startup event to ensure admin user exists
+def _validate_smtp_config():
+    """Log a single, clear warning at startup if SMTP is not fully configured.
+    Without this, mail-dependent features (password reset, user-approval
+    notifications, maintenance reminders) silently no-op and the operator
+    has no visibility into why no mail is being sent."""
+    missing = [name for name, val in (
+        ("SMTP_SERVER", SMTP_SERVER),
+        ("SMTP_USERNAME", SMTP_USERNAME),
+        ("SMTP_PASSWORD", SMTP_PASSWORD),
+        ("ADMIN_EMAIL", ADMIN_EMAIL),
+    ) if not val]
+    if missing:
+        logging.warning(
+            "SMTP not configured (missing: %s). Mail-dependent features will "
+            "be skipped: maintenance reminders, registration approval mails, "
+            "password reset. Set the variables in backend/.env to enable.",
+            ", ".join(missing),
+        )
+    else:
+        logging.info("SMTP configured: %s as %s", SMTP_SERVER, SMTP_USERNAME)
+
+
 @app.on_event("startup")
 async def startup_event():
     await ensure_admin_user()
-    
+    _validate_smtp_config()
+
     # ===========================================
     # DATABASE INDEXES - Performance Optimization
     # ===========================================
