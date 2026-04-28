@@ -2357,128 +2357,11 @@ async def send_message(request: Request, message_data: MessageCreate, current_us
     await db.messages.insert_one(message.dict())
     return message
 
-@api_router.get("/messages/conversations")
-async def get_conversations(current_user: User = Depends(get_current_user)):
-    """Get list of conversations with other users"""
-    # Find all users who have exchanged messages with current user
-    conversations = []
-    
-    # Get all unique users current user has communicated with
-    sent_to = await db.messages.find({"sender_id": current_user.id}).distinct("recipient_id")
-    received_from = await db.messages.find({"recipient_id": current_user.id}).distinct("sender_id")
-    
-    unique_user_ids = list(set(sent_to + received_from))
-    
-    for user_id in unique_user_ids:
-        user = await db.users.find_one({"id": user_id})
-        if not user:
-            continue
-        
-        # Get last message
-        last_message = await db.messages.find_one(
-            {
-                "$or": [
-                    {"sender_id": current_user.id, "recipient_id": user_id},
-                    {"sender_id": user_id, "recipient_id": current_user.id}
-                ]
-            },
-            sort=[("created_at", -1)]
-        )
-        
-        # Count unread messages from this user
-        unread_count = await db.messages.count_documents({
-            "sender_id": user_id,
-            "recipient_id": current_user.id,
-            "is_read": False
-        })
-        
-        conversations.append({
-            "user_id": user_id,
-            "username": user["username"],
-            "last_message": last_message.get("message_text") if last_message else None,
-            "last_message_time": last_message.get("created_at") if last_message else None,
-            "unread_count": unread_count
-        })
-    
-    # Sort by last message time
-    conversations.sort(key=lambda x: x["last_message_time"] or datetime.min, reverse=True)
-    
-    return conversations
-
-@api_router.get("/messages/{other_user_id}")
-async def get_messages_with_user(
-    other_user_id: str,
-    limit: int = 50,
-    current_user: User = Depends(get_current_user)
-):
-    """Get all messages between current user and another user"""
-    messages = await db.messages.find({
-        "$or": [
-            {"sender_id": current_user.id, "recipient_id": other_user_id},
-            {"sender_id": other_user_id, "recipient_id": current_user.id}
-        ]
-    }).sort("created_at", -1).limit(limit).to_list(limit)
-    
-    # Mark messages from other user as read
-    await db.messages.update_many(
-        {
-            "sender_id": other_user_id,
-            "recipient_id": current_user.id,
-            "is_read": False
-        },
-        {"$set": {"is_read": True, "updated_at": datetime.now(timezone.utc)}}
-    )
-    
-    # Reverse to show oldest first
-    messages.reverse()
-    
-    return [Message(**msg) for msg in messages]
-
-@api_router.get("/messages/unread/count")
-async def get_unread_count(current_user: User = Depends(get_current_user)):
-    """Get total unread message count"""
-    count = await db.messages.count_documents({
-        "recipient_id": current_user.id,
-        "is_read": False
-    })
-    return {"unread_count": count}
-
-@api_router.put("/messages/{message_id}")
-async def update_message(
-    message_id: str,
-    update_data: MessageUpdate,
-    current_user: User = Depends(get_current_user)
-):
-    """Edit own message text. Sets edited_at timestamp."""
-    message = await db.messages.find_one({"id": message_id})
-    if not message:
-        raise HTTPException(status_code=404, detail="Nachricht nicht gefunden")
-    if message.get("sender_id") != current_user.id:
-        raise HTTPException(status_code=403, detail="Nur eigene Nachrichten können bearbeitet werden")
-    await db.messages.update_one(
-        {"id": message_id},
-        {"$set": {
-            "message_text": update_data.message_text,
-            "edited_at": datetime.now(timezone.utc),
-            "updated_at": datetime.now(timezone.utc),
-        }}
-    )
-    updated = await db.messages.find_one({"id": message_id})
-    return Message(**updated)
-
-@api_router.delete("/messages/{message_id}")
-async def delete_message(
-    message_id: str,
-    current_user: User = Depends(get_current_user)
-):
-    """Delete own message."""
-    message = await db.messages.find_one({"id": message_id})
-    if not message:
-        raise HTTPException(status_code=404, detail="Nachricht nicht gefunden")
-    if message.get("sender_id") != current_user.id:
-        raise HTTPException(status_code=403, detail="Nur eigene Nachrichten können gelöscht werden")
-    await db.messages.delete_one({"id": message_id})
-    return {"message": "Nachricht gelöscht"}
+# Conversation list, thread fetch, unread count, edit + delete moved to
+# app/routes/messages.py (Phase 4 refactor). POST /messages stays here
+# because it relies on the slowapi @limiter.limit("10/minute") decorator
+# bound to this module's `limiter` instance — moving it would create a
+# circular import.
 
 @api_router.get("/users/all")
 async def get_all_users(current_user: User = Depends(get_current_user)):
@@ -7940,6 +7823,9 @@ app.add_api_websocket_route("/ws", websocket_endpoint)
 # Registered on api_router so they inherit the "/api" prefix.
 from app.routes.vehicles import router as _vehicles_router
 api_router.include_router(_vehicles_router)
+
+from app.routes.messages import router as _messages_router
+api_router.include_router(_messages_router)
 
 app.include_router(api_router)
 
