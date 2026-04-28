@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1}).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pip-audit
+
+      - name: Run pytest
+        working-directory: backend
+        env:
+          MONGO_URL: mongodb://localhost:27017
+          DB_NAME: inventory_test_db
+          ADMIN_PASSWORD: ci-test-password-12chars
+          SECRET_KEY: ci-test-secret-key-not-for-prod
+          ALLOWED_ORIGINS: http://localhost:8081
+        run: pytest tests/ -q --tb=short
+
+      - name: Security audit (pip-audit, non-blocking)
+        working-directory: backend
+        continue-on-error: true
+        run: pip-audit -r requirements.txt --strict
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        continue-on-error: true
+        run: npm run lint --if-present
+
+      - name: Test
+        working-directory: frontend
+        run: npm test -- --watchAll=false --passWithNoTests
+
+      - name: Security audit (npm, non-blocking)
+        working-directory: frontend
+        continue-on-error: true
+        run: npm audit --audit-level=high

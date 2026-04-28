@@ -1,0 +1,28 @@
+#!/bin/sh
+# Pre-push hook: run pytest before pushing so we never push broken backend.
+#
+# Skipped if no Mongo on localhost:27017 (so the hook doesn't block pushes
+# from machines that don't have a local DB).
+#
+# Install: cp scripts/hooks/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+
+set -e
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# Quick mongo reachability check — exit silently if no DB.
+if ! python -c "import socket; s=socket.socket(); s.settimeout(0.5); s.connect(('localhost',27017))" 2>/dev/null; then
+    echo "pre-push: no MongoDB on localhost:27017 — skipping pytest."
+    exit 0
+fi
+
+echo "pre-push: running backend pytest..."
+cd "$REPO_ROOT/backend"
+if ! python -m pytest tests/ -q --tb=short; then
+    echo ""
+    echo "pre-push: pytest failed — push aborted."
+    echo "  override (NOT recommended): git push --no-verify"
+    exit 1
+fi
+
+echo "pre-push: pytest green — proceeding with push."
