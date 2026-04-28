@@ -1,0 +1,17 @@
+#!/bin/sh
+# Pre-commit hook: bump frontend patch version IF the commit touches frontend/.
+#
+# Why: the previous always-bump variant produced one version increment per
+# commit (also for backend/docs/scripts changes), inflating the version
+# number with no functional meaning. Only release-relevant frontend changes
+# should bump the version.
+#
+# Install: cp scripts/hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+if git diff --cached --name-only | grep -q '^frontend/'; then
+    echo "Frontend changes detected -- bumping version..."
+    FRONTEND_DIR="$(git rev-parse --show-toplevel)/frontend"
+    (cd "$FRONTEND_DIR" && node scripts/bump-version.js patch) || exit 1
+    git add "$FRONTEND_DIR/app.json" "$FRONTEND_DIR/package.json"
+    echo "Version bumped and staged for commit."
+fi
