@@ -7022,8 +7022,8 @@ def generate_invoice_html(invoice: dict, event: dict, customer: dict, items: lis
         <tr>
             <td>{item.get('article_name', '')}<br><small>{item.get('inventory_code', '')}</small></td>
             <td>{item.get('quantity', 1)}</td>
-            <td>€{item.get('unit_price', 0):.2f}</td>
-            <td>€{item.get('total', 0):.2f}</td>
+            <td>€{(item.get('unit_price') or 0):.2f}</td>
+            <td>€{(item.get('total') or 0):.2f}</td>
         </tr>
         """
     
@@ -7109,9 +7109,9 @@ def generate_invoice_html(invoice: dict, event: dict, customer: dict, items: lis
         </table>
 
         <div class="totals">
-            <div class="total-row">Netto-Betrag: €{invoice.get('subtotal', 0):.2f}</div>
-            <div class="total-row">MwSt ({invoice.get('tax_rate', 19)}%): €{invoice.get('tax_amount', 0):.2f}</div>
-            <div class="total-row total-final">Gesamtbetrag: €{invoice.get('total_amount', 0):.2f}</div>
+            <div class="total-row">Netto-Betrag: €{(invoice.get('subtotal') or 0):.2f}</div>
+            <div class="total-row">MwSt ({invoice.get('tax_rate', 19)}%): €{(invoice.get('tax_amount') or 0):.2f}</div>
+            <div class="total-row total-final">Gesamtbetrag: €{(invoice.get('total_amount') or 0):.2f}</div>
         </div>
 
         <div class="footer-info">
@@ -7209,7 +7209,11 @@ async def get_invoice_pdf_data(
             items,
             app_settings
         )
-        
+
+        for doc in (invoice, event, customer):
+            if doc:
+                doc.pop("_id", None)
+
         return {
             "invoice": invoice,
             "event": event,
@@ -7217,7 +7221,7 @@ async def get_invoice_pdf_data(
             "items": items,
             "html": html
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -8242,7 +8246,9 @@ async def update_absence_request(req_id: str, req: AbsenceRequestCreate, current
 
 @app.delete("/api/absence-requests/{req_id}")
 async def delete_absence_request(req_id: str, current_user: dict = Depends(get_current_user)):
-    await db.absence_requests.delete_one({"_id": req_id})
+    result = await db.absence_requests.delete_one({"_id": req_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Antrag nicht gefunden")
     return {"message": "Antrag gelöscht"}
 
 # ===========================
@@ -8508,7 +8514,9 @@ async def update_cross_docking(cd_id: str, cd: CrossDockingCreate, current_user:
 
 @app.delete("/api/cross-docking/{cd_id}")
 async def delete_cross_docking(cd_id: str, current_user: User = Depends(get_current_user)):
-    await db.cross_docking.delete_one({"_id": cd_id})
+    result = await db.cross_docking.delete_one({"_id": cd_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Cross-Docking Eintrag nicht gefunden")
     return {"message": "Cross-Docking Eintrag gelöscht"}
 
 # ===========================
