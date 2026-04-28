@@ -2443,6 +2443,43 @@ async def get_unread_count(current_user: User = Depends(get_current_user)):
     })
     return {"unread_count": count}
 
+@api_router.put("/messages/{message_id}")
+async def update_message(
+    message_id: str,
+    update_data: MessageUpdate,
+    current_user: User = Depends(get_current_user)
+):
+    """Edit own message text. Sets edited_at timestamp."""
+    message = await db.messages.find_one({"id": message_id})
+    if not message:
+        raise HTTPException(status_code=404, detail="Nachricht nicht gefunden")
+    if message.get("sender_id") != current_user.id:
+        raise HTTPException(status_code=403, detail="Nur eigene Nachrichten können bearbeitet werden")
+    await db.messages.update_one(
+        {"id": message_id},
+        {"$set": {
+            "message_text": update_data.message_text,
+            "edited_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc),
+        }}
+    )
+    updated = await db.messages.find_one({"id": message_id})
+    return Message(**updated)
+
+@api_router.delete("/messages/{message_id}")
+async def delete_message(
+    message_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Delete own message."""
+    message = await db.messages.find_one({"id": message_id})
+    if not message:
+        raise HTTPException(status_code=404, detail="Nachricht nicht gefunden")
+    if message.get("sender_id") != current_user.id:
+        raise HTTPException(status_code=403, detail="Nur eigene Nachrichten können gelöscht werden")
+    await db.messages.delete_one({"id": message_id})
+    return {"message": "Nachricht gelöscht"}
+
 @api_router.get("/users/all")
 async def get_all_users(current_user: User = Depends(get_current_user)):
     """Get all users for starting new conversations"""
@@ -4475,13 +4512,20 @@ async def get_packing_list(
     
     # Calculate totals
     total_weight = sum(item["weight_kg"] * item["quantity"] for item in packing_items)
-    
+
+    # Include billable sub-rentals assigned to this event
+    raw_sub_rentals = await db.sub_rentals.find(
+        {"event_id": event_id, "billable_to_customer": True}
+    ).to_list(100)
+    sub_rentals = [_add_overdue_flag(r) for r in raw_sub_rentals]
+
     return {
         "event_id": event_id,
         "total_items": len(packing_items),
         "total_weight_kg": round(total_weight, 2),
         "items": packing_items,
-        "sorted_by": sort_by
+        "sorted_by": sort_by,
+        "sub_rentals": sub_rentals
     }
 
 # ============================================
@@ -6261,9 +6305,25 @@ async def get_availability_calendar(
         raise HTTPException(status_code=500, detail="Kalender konnte nicht abgerufen werden.")
 
 # Sub-Rental Management
+
+def _add_overdue_flag(rental: dict) -> dict:
+    """Compute overdue flag: delivered past rental_end. Also strips MongoDB _id."""
+    rental.pop("_id", None)
+    if rental.get("status") == "delivered" and rental.get("rental_end"):
+        rental_end = rental["rental_end"]
+        if isinstance(rental_end, str):
+            rental_end = datetime.fromisoformat(rental_end.replace("Z", "+00:00"))
+        if rental_end.tzinfo is None:
+            rental_end = rental_end.replace(tzinfo=timezone.utc)
+        rental["overdue"] = rental_end < datetime.now(timezone.utc)
+    else:
+        rental["overdue"] = False
+    return rental
+
 @api_router.get("/sub-rentals")
 async def get_sub_rentals(
     status: Optional[str] = Query(None, description="Filter by status"),
+    event_id: Optional[str] = Query(None, description="Filter by event"),
     current_user: User = Depends(get_current_user)
 ):
     """Get all sub-rental articles and records"""
@@ -6271,14 +6331,12 @@ async def get_sub_rentals(
         # Get articles marked as sub-rental
         query = {"is_sub_rental": True}
         sub_rental_articles = await db.articles.find(query).to_list(100)
-        
-        # Get supplier info
+
         results = []
         for article in sub_rental_articles:
             supplier = None
             if article.get("sub_rental_supplier_id"):
                 supplier = await db.suppliers.find_one({"id": article.get("sub_rental_supplier_id")})
-            
             results.append({
                 "id": article["id"],
                 "name": article["name"],
@@ -6291,24 +6349,43 @@ async def get_sub_rentals(
                 "weight_kg": article.get("weight_kg"),
                 "power_watt": article.get("power_watt")
             })
-        
-        # Also get sub-rental records
+
         rental_query = {}
         if status:
             rental_query["status"] = status
-        
-        sub_rentals = await db.sub_rentals.find(rental_query).sort("created_at", -1).to_list(100)
-        
+        if event_id:
+            rental_query["event_id"] = event_id
+
+        raw_rentals = await db.sub_rentals.find(rental_query).sort("created_at", -1).to_list(100)
+        sub_rentals = [_add_overdue_flag(r) for r in raw_rentals]
+
         return {
             "sub_rental_articles": results,
             "sub_rental_records": sub_rentals,
             "total_articles": len(results),
             "total_records": len(sub_rentals)
         }
-        
+
     except Exception as e:
         logging.error(f"Error getting sub-rentals: {str(e)}")
         raise HTTPException(status_code=500, detail="Fremdmietliste konnte nicht abgerufen werden.")
+
+@api_router.get("/sub-rentals/{rental_id}")
+async def get_sub_rental(
+    rental_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get a single sub-rental record"""
+    try:
+        rental = await db.sub_rentals.find_one({"id": rental_id})
+        if not rental:
+            raise HTTPException(status_code=404, detail="Sub-rental not found")
+        return _add_overdue_flag(rental)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error getting sub-rental: {str(e)}")
+        raise HTTPException(status_code=500, detail="Fremdmiete konnte nicht abgerufen werden.")
 
 @api_router.post("/sub-rentals")
 async def create_sub_rental(
@@ -6317,17 +6394,19 @@ async def create_sub_rental(
 ):
     """Create a new sub-rental record"""
     try:
-        # Get article
         article = await db.articles.find_one({"id": rental_data.article_id})
         if not article:
             raise HTTPException(status_code=404, detail="Article not found")
-        
-        # Get supplier
+
         supplier = await db.suppliers.find_one({"id": rental_data.supplier_id})
         if not supplier:
             raise HTTPException(status_code=404, detail="Supplier not found")
-        
-        # Create sub-rental record
+
+        if rental_data.event_id:
+            event = await db.events.find_one({"id": rental_data.event_id})
+            if not event:
+                raise HTTPException(status_code=404, detail="Event not found")
+
         sub_rental = {
             "id": str(uuid.uuid4()),
             "article_id": rental_data.article_id,
@@ -6338,14 +6417,16 @@ async def create_sub_rental(
             "quantity": rental_data.quantity,
             "rental_start": rental_data.rental_start,
             "rental_end": rental_data.rental_end,
-            "status": "active",
+            "status": "requested",
+            "event_id": rental_data.event_id,
+            "billable_to_customer": rental_data.billable_to_customer,
             "notes": rental_data.notes,
             "created_at": datetime.now(timezone.utc),
             "created_by": current_user.id
         }
-        
+
         await db.sub_rentals.insert_one(sub_rental)
-        
+
         # Update article atomically — $inc prevents race conditions with concurrent sub-rentals
         await db.articles.update_one(
             {"id": rental_data.article_id},
@@ -6359,35 +6440,185 @@ async def create_sub_rental(
                 "$inc": {"current_stock": rental_data.quantity}
             }
         )
-        
-        return sub_rental
-        
+
+        return _add_overdue_flag(sub_rental)
+
     except HTTPException:
         raise
     except Exception as e:
         logging.error(f"Error creating sub-rental: {str(e)}")
         raise HTTPException(status_code=500, detail="Fremdmiete konnte nicht erstellt werden.")
 
+@api_router.put("/sub-rentals/{rental_id}")
+async def update_sub_rental(
+    rental_id: str,
+    update_data: SubRentalUpdate,
+    current_user: User = Depends(get_current_user)
+):
+    """Update editable fields of a sub-rental"""
+    try:
+        rental = await db.sub_rentals.find_one({"id": rental_id})
+        if not rental:
+            raise HTTPException(status_code=404, detail="Sub-rental not found")
+
+        if update_data.event_id is not None:
+            event = await db.events.find_one({"id": update_data.event_id})
+            if not event:
+                raise HTTPException(status_code=404, detail="Event not found")
+
+        updates = {k: v for k, v in update_data.model_dump().items() if v is not None}
+        if not updates:
+            return _add_overdue_flag(rental)
+
+        updates["updated_at"] = datetime.now(timezone.utc)
+        await db.sub_rentals.update_one({"id": rental_id}, {"$set": updates})
+        updated = await db.sub_rentals.find_one({"id": rental_id})
+        return _add_overdue_flag(updated)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error updating sub-rental: {str(e)}")
+        raise HTTPException(status_code=500, detail="Fremdmiete konnte nicht aktualisiert werden.")
+
+@api_router.delete("/sub-rentals/{rental_id}")
+async def delete_sub_rental(
+    rental_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a sub-rental (only allowed when requested or cancelled)"""
+    try:
+        rental = await db.sub_rentals.find_one({"id": rental_id})
+        if not rental:
+            raise HTTPException(status_code=404, detail="Sub-rental not found")
+
+        if rental.get("status") not in ("requested", "cancelled"):
+            raise HTTPException(
+                status_code=400,
+                detail="Nur Fremdmieten im Status 'requested' oder 'cancelled' können gelöscht werden."
+            )
+
+        await db.sub_rentals.delete_one({"id": rental_id})
+
+        # Roll back stock increase from creation
+        qty = rental.get("quantity", 0)
+        if qty > 0:
+            await db.articles.update_one(
+                {"id": rental.get("article_id"), "current_stock": {"$gte": qty}},
+                {"$inc": {"current_stock": -qty}, "$set": {"updated_at": datetime.now(timezone.utc)}}
+            )
+
+        return {"message": "Sub-rental gelöscht"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error deleting sub-rental: {str(e)}")
+        raise HTTPException(status_code=500, detail="Fremdmiete konnte nicht gelöscht werden.")
+
+@api_router.put("/sub-rentals/{rental_id}/confirm")
+async def confirm_sub_rental(
+    rental_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Transition sub-rental from requested → confirmed"""
+    try:
+        rental = await db.sub_rentals.find_one({"id": rental_id})
+        if not rental:
+            raise HTTPException(status_code=404, detail="Sub-rental not found")
+        if rental.get("status") != "requested":
+            raise HTTPException(status_code=400, detail="Nur 'requested' Fremdmieten können bestätigt werden.")
+        await db.sub_rentals.update_one(
+            {"id": rental_id},
+            {"$set": {"status": "confirmed", "updated_at": datetime.now(timezone.utc)}}
+        )
+        updated = await db.sub_rentals.find_one({"id": rental_id})
+        return _add_overdue_flag(updated)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error confirming sub-rental: {str(e)}")
+        raise HTTPException(status_code=500, detail="Fremdmiete konnte nicht bestätigt werden.")
+
+@api_router.put("/sub-rentals/{rental_id}/deliver")
+async def deliver_sub_rental(
+    rental_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Transition sub-rental from confirmed → delivered"""
+    try:
+        rental = await db.sub_rentals.find_one({"id": rental_id})
+        if not rental:
+            raise HTTPException(status_code=404, detail="Sub-rental not found")
+        if rental.get("status") != "confirmed":
+            raise HTTPException(status_code=400, detail="Nur 'confirmed' Fremdmieten können als geliefert markiert werden.")
+        await db.sub_rentals.update_one(
+            {"id": rental_id},
+            {"$set": {"status": "delivered", "updated_at": datetime.now(timezone.utc)}}
+        )
+        updated = await db.sub_rentals.find_one({"id": rental_id})
+        return _add_overdue_flag(updated)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error delivering sub-rental: {str(e)}")
+        raise HTTPException(status_code=500, detail="Fremdmiete konnte nicht als geliefert markiert werden.")
+
+@api_router.put("/sub-rentals/{rental_id}/cancel")
+async def cancel_sub_rental(
+    rental_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Cancel a sub-rental and roll back stock"""
+    try:
+        rental = await db.sub_rentals.find_one({"id": rental_id})
+        if not rental:
+            raise HTTPException(status_code=404, detail="Sub-rental not found")
+        if rental.get("status") in ("returned", "cancelled"):
+            raise HTTPException(status_code=400, detail="Diese Fremdmiete kann nicht storniert werden.")
+
+        await db.sub_rentals.update_one(
+            {"id": rental_id},
+            {"$set": {"status": "cancelled", "updated_at": datetime.now(timezone.utc)}}
+        )
+
+        # Roll back stock
+        qty = rental.get("quantity", 0)
+        if qty > 0:
+            await db.articles.update_one(
+                {"id": rental.get("article_id"), "current_stock": {"$gte": qty}},
+                {"$inc": {"current_stock": -qty}, "$set": {"updated_at": datetime.now(timezone.utc)}}
+            )
+
+        updated = await db.sub_rentals.find_one({"id": rental_id})
+        return _add_overdue_flag(updated)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error cancelling sub-rental: {str(e)}")
+        raise HTTPException(status_code=500, detail="Fremdmiete konnte nicht storniert werden.")
+
 @api_router.put("/sub-rentals/{rental_id}/return")
 async def return_sub_rental(
     rental_id: str,
     current_user: User = Depends(get_current_user)
 ):
-    """Mark a sub-rental as returned"""
+    """Mark a sub-rental as returned (delivered → returned)"""
     try:
         rental = await db.sub_rentals.find_one({"id": rental_id})
         if not rental:
             raise HTTPException(status_code=404, detail="Sub-rental not found")
-        
-        # Update status
+
         await db.sub_rentals.update_one(
             {"id": rental_id},
             {"$set": {
                 "status": "returned",
-                "rental_end": datetime.now(timezone.utc)
+                "rental_end": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc)
             }}
         )
-        
+
         # Reduce article stock atomically — prevents race condition on concurrent returns
         qty = rental.get("quantity", 0)
         if qty > 0:
@@ -6395,10 +6626,9 @@ async def return_sub_rental(
                 {"id": rental.get("article_id"), "current_stock": {"$gte": qty}},
                 {"$inc": {"current_stock": -qty}, "$set": {"updated_at": datetime.now(timezone.utc)}}
             )
-            # If guard fails (stock already 0), still proceed — sub-rental may have been partial
-        
+
         return {"message": "Sub-rental returned successfully"}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -7209,7 +7439,7 @@ async def get_invoice_pdf_data(
             items,
             app_settings
         )
-
+        
         for doc in (invoice, event, customer):
             if doc:
                 doc.pop("_id", None)

@@ -679,6 +679,10 @@ class MessageCreate(BaseModel):
     message_text: str = Field(..., max_length=10000)
 
 
+class MessageUpdate(BaseModel):
+    message_text: str = Field(..., max_length=10000)
+
+
 class Conversation(BaseModel):
     user_id: str
     username: str
@@ -1130,6 +1134,18 @@ class SubRentalCreate(BaseModel):
     rental_start: Optional[datetime] = None
     rental_end: Optional[datetime] = None
     notes: Optional[str] = None
+    event_id: Optional[str] = None
+    billable_to_customer: bool = False
+
+
+class SubRentalUpdate(BaseModel):
+    cost: Optional[float] = None
+    quantity: Optional[int] = None
+    rental_start: Optional[datetime] = None
+    rental_end: Optional[datetime] = None
+    notes: Optional[str] = None
+    event_id: Optional[str] = None
+    billable_to_customer: Optional[bool] = None
 
 
 class SubRental(BaseModel):
@@ -1142,7 +1158,9 @@ class SubRental(BaseModel):
     quantity: int
     rental_start: Optional[datetime] = None
     rental_end: Optional[datetime] = None
-    status: str = "active"  # active, returned, cancelled
+    status: str = "requested"  # requested, confirmed, delivered, returned, cancelled
+    event_id: Optional[str] = None
+    billable_to_customer: bool = False
     notes: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     created_by: str

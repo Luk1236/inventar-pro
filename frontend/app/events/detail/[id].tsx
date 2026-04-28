@@ -44,6 +44,18 @@ interface BookingSummary {
   total_value: number;
 }
 
+interface SubRentalRecord {
+  id: string;
+  article_name: string;
+  supplier_name: string;
+  cost: number;
+  quantity: number;
+  status: string;
+  billable_to_customer: boolean;
+  overdue: boolean;
+  rental_end?: string;
+}
+
 interface EventRequirements {
   weight: {
     total_kg: number;
@@ -82,6 +94,7 @@ export default function EventDetailPage() {
   const [bookings, setBookings] = useState<BookingSummary | null>(null);
   const [requirements, setRequirements] = useState<EventRequirements | null>(null);
   const [customerName, setCustomerName] = useState('');
+  const [subRentals, setSubRentals] = useState<SubRentalRecord[]>([]);
 
   const loadEventDetails = useCallback(async () => {
     try {
@@ -122,13 +135,25 @@ export default function EventDetailPage() {
     }
   }, [id]);
 
+  const loadSubRentals = useCallback(async () => {
+    try {
+      const data = await apiService.get<{ sub_rental_records: SubRentalRecord[] }>(
+        `/api/sub-rentals?event_id=${id}`, { showErrorAlert: false }
+      );
+      setSubRentals(data.sub_rental_records || []);
+    } catch (error) {
+      console.error('Error loading sub-rentals:', error);
+    }
+  }, [id]);
+
   useEffect(() => {
     if (id) {
       loadEventDetails();
       loadBookings();
       loadRequirements();
+      loadSubRentals();
     }
-  }, [id, loadEventDetails, loadBookings, loadRequirements]);
+  }, [id, loadEventDetails, loadBookings, loadRequirements, loadSubRentals]);
 
   const createInvoice = async () => {
     if (!bookings || bookings.bookings.length === 0) {
@@ -422,6 +447,37 @@ export default function EventDetailPage() {
                 ))}
               </View>
             )}
+          </View>
+        )}
+
+        {/* Assigned Sub-Rentals */}
+        {subRentals.length > 0 && (
+          <View style={[styles.section, { backgroundColor: colors.card }]}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>🔄 Zugewiesene Fremdmieten</Text>
+              <TouchableOpacity onPress={() => router.push('/sub-rentals')}>
+                <Text style={{ color: colors.primary || '#007AFF', fontSize: 13 }}>Alle</Text>
+              </TouchableOpacity>
+            </View>
+            {subRentals.map(rental => (
+              <View key={rental.id} style={[styles.bookingItem, { borderLeftWidth: 3, borderLeftColor: rental.overdue ? '#FF3B30' : '#FF9500' }]}>
+                <View style={styles.bookingInfo}>
+                  <Text style={[styles.bookingName, { color: colors.text }]}>{rental.article_name}</Text>
+                  <Text style={[styles.bookingDetails, { color: colors.textSecondary }]}>
+                    von {rental.supplier_name} · {rental.quantity}x
+                    {rental.billable_to_customer ? ' · abrechenbar' : ''}
+                  </Text>
+                </View>
+                <View>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>
+                    €{(rental.cost * rental.quantity).toFixed(2)}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: rental.overdue ? '#FF3B30' : colors.textSecondary, textAlign: 'right' }}>
+                    {rental.overdue ? 'ÜBERFÄLLIG' : rental.status}
+                  </Text>
+                </View>
+              </View>
+            ))}
           </View>
         )}
       </ScrollView>

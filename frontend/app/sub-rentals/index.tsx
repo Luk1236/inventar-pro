@@ -11,6 +11,7 @@ import {
   TextInput,
   Alert,
   RefreshControl,
+  Switch,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -44,6 +45,9 @@ interface SubRentalRecord {
   rental_start?: string;
   rental_end?: string;
   status: string;
+  event_id?: string;
+  billable_to_customer: boolean;
+  overdue: boolean;
   notes?: string;
   created_at: string;
 }
@@ -59,6 +63,11 @@ interface Supplier {
   name: string;
 }
 
+interface Event {
+  id: string;
+  event_name: string;
+}
+
 export default function SubRentalsPage() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
@@ -67,13 +76,16 @@ export default function SubRentalsPage() {
   const [subRentalRecords, setSubRentalRecords] = useState<SubRentalRecord[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<'articles' | 'records'>('articles');
-  
+
   // Form state
   const [selectedArticleId, setSelectedArticleId] = useState('');
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
+  const [selectedEventId, setSelectedEventId] = useState('');
+  const [billableToCustomer, setBillableToCustomer] = useState(false);
   const [cost, setCost] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [notes, setNotes] = useState('');
@@ -85,23 +97,22 @@ export default function SubRentalsPage() {
 
   const loadData = async () => {
     try {
-      // Load sub-rentals
       const subRentalsData = await apiService.get<{
         sub_rental_articles: SubRentalArticle[];
         sub_rental_records: SubRentalRecord[];
       }>('/api/sub-rentals', { showErrorAlert: false });
-      
+
       setSubRentalArticles(subRentalsData.sub_rental_articles || []);
       setSubRentalRecords(subRentalsData.sub_rental_records || []);
-      
-      // Load articles for creating new sub-rental
-      const articlesData = await apiService.get<Article[]>('/api/articles', { showErrorAlert: false });
+
+      const [articlesData, suppliersData, eventsData] = await Promise.all([
+        apiService.get<Article[]>('/api/articles', { showErrorAlert: false }),
+        apiService.get<Supplier[]>('/api/suppliers', { showErrorAlert: false }),
+        apiService.get<Event[]>('/api/events', { showErrorAlert: false }),
+      ]);
       setArticles(articlesData || []);
-      
-      // Load suppliers
-      const suppliersData = await apiService.get<Supplier[]>('/api/suppliers', { showErrorAlert: false });
       setSuppliers(suppliersData || []);
-      
+      setEvents(eventsData || []);
     } catch (error) {
       console.error('Error loading sub-rentals:', error);
     } finally {
@@ -121,11 +132,13 @@ export default function SubRentalsPage() {
       await apiService.post('/api/sub-rentals', {
         article_id: selectedArticleId,
         supplier_id: selectedSupplierId,
+        event_id: selectedEventId || undefined,
+        billable_to_customer: billableToCustomer,
         cost: parseFloat(cost),
         quantity: parseInt(quantity),
         notes: notes || undefined,
       });
-      
+
       Alert.alert('Erfolg', 'Zumietung erfolgreich erstellt');
       setModalVisible(false);
       resetForm();
@@ -137,51 +150,63 @@ export default function SubRentalsPage() {
     }
   };
 
-  const handleReturnSubRental = async (rentalId: string) => {
-    Alert.alert(
-      'Zumietung zurückgeben',
-      'Möchten Sie diese Zumietung als zurückgegeben markieren?',
-      [
-        { text: 'Abbrechen', style: 'cancel' },
-        {
-          text: 'Zurückgeben',
-          onPress: async () => {
-            try {
-              await apiService.put(`/api/sub-rentals/${rentalId}/return`, {});
-              Alert.alert('Erfolg', 'Zumietung wurde zurückgegeben');
-              loadData();
-            } catch (error) {
-              Alert.alert('Fehler', 'Aktion konnte nicht ausgeführt werden');
-            }
-          },
+  const handleStatusAction = (rentalId: string, action: 'confirm' | 'deliver' | 'return' | 'cancel') => {
+    const labels: Record<string, { title: string; message: string; btn: string }> = {
+      confirm: { title: 'Bestätigen', message: 'Zumietung bestätigen?', btn: 'Bestätigen' },
+      deliver: { title: 'Als geliefert markieren', message: 'Als geliefert markieren?', btn: 'Geliefert' },
+      return: { title: 'Zurückgeben', message: 'Als zurückgegeben markieren?', btn: 'Zurückgeben' },
+      cancel: { title: 'Stornieren', message: 'Zumietung stornieren?', btn: 'Stornieren' },
+    };
+    const { title, message, btn } = labels[action];
+
+    Alert.alert(title, message, [
+      { text: 'Abbrechen', style: 'cancel' },
+      {
+        text: btn,
+        style: action === 'cancel' ? 'destructive' : 'default',
+        onPress: async () => {
+          try {
+            await apiService.put(`/api/sub-rentals/${rentalId}/${action}`, {});
+            loadData();
+          } catch {
+            Alert.alert('Fehler', 'Aktion konnte nicht ausgeführt werden');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const resetForm = () => {
     setSelectedArticleId('');
     setSelectedSupplierId('');
+    setSelectedEventId('');
+    setBillableToCustomer(false);
     setCost('');
     setQuantity('1');
     setNotes('');
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string, overdue?: boolean) => {
+    if (overdue) return '#FF3B30';
     switch (status?.toLowerCase()) {
-      case 'active': return '#34C759';
+      case 'requested': return '#FF9500';
+      case 'confirmed': return '#007AFF';
+      case 'delivered': return '#34C759';
       case 'returned': return '#666';
       case 'cancelled': return '#FF3B30';
       case 'ok': return '#34C759';
       case 'defekt': return '#FF3B30';
       case 'gesperrt': return '#FF9500';
-      default: return colors.primary;
+      default: return '#888';
     }
   };
 
-  const getStatusText = (status: string) => {
+  const getStatusText = (status: string, overdue?: boolean) => {
+    if (overdue) return 'ÜBERFÄLLIG';
     switch (status?.toLowerCase()) {
-      case 'active': return 'Aktiv';
+      case 'requested': return 'Angefragt';
+      case 'confirmed': return 'Bestätigt';
+      case 'delivered': return 'Geliefert';
       case 'returned': return 'Zurückgegeben';
       case 'cancelled': return 'Storniert';
       case 'ok': return 'OK';
@@ -200,11 +225,8 @@ export default function SubRentalsPage() {
     return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amount);
   };
 
-  // Calculate totals
-  const totalActiveRentals = subRentalRecords.filter(r => r.status === 'active').length;
-  const totalCost = subRentalRecords
-    .filter(r => r.status === 'active')
-    .reduce((sum, r) => sum + r.cost * r.quantity, 0);
+  const activeRecords = subRentalRecords.filter(r => !['returned', 'cancelled'].includes(r.status));
+  const totalCost = activeRecords.reduce((sum, r) => sum + r.cost * r.quantity, 0);
 
   if (loading) {
     return (
@@ -222,7 +244,7 @@ export default function SubRentalsPage() {
   return (
     <SafeAreaView style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }, { backgroundColor: colors.background }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      
+
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
@@ -244,7 +266,7 @@ export default function SubRentalsPage() {
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
           <Ionicons name="document-text-outline" size={24} color="#34C759" />
-          <Text style={[styles.statNumber, { color: colors.text }]}>{totalActiveRentals}</Text>
+          <Text style={[styles.statNumber, { color: colors.text }]}>{activeRecords.length}</Text>
           <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Aktive Mietungen</Text>
         </View>
         <View style={styles.statDivider} />
@@ -321,7 +343,7 @@ export default function SubRentalsPage() {
                       </Text>
                     </View>
                   </View>
-                  
+
                   <View style={styles.articleDetails}>
                     <View style={styles.detailRow}>
                       <Ionicons name="business-outline" size={14} color={colors.textSecondary} />
@@ -342,7 +364,7 @@ export default function SubRentalsPage() {
                       </Text>
                     </View>
                   </View>
-                  
+
                   {(article.weight_kg || article.power_watt) && (
                     <View style={styles.specsRow}>
                       {article.weight_kg && (
@@ -381,13 +403,13 @@ export default function SubRentalsPage() {
                         von {record.supplier_name}
                       </Text>
                     </View>
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(record.status) + '20' }]}>
-                      <Text style={[styles.statusText, { color: getStatusColor(record.status) }]}>
-                        {getStatusText(record.status)}
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(record.status, record.overdue) + '20' }]}>
+                      <Text style={[styles.statusText, { color: getStatusColor(record.status, record.overdue) }]}>
+                        {getStatusText(record.status, record.overdue)}
                       </Text>
                     </View>
                   </View>
-                  
+
                   <View style={styles.recordDetails}>
                     <View style={styles.recordDetailRow}>
                       <Text style={[styles.recordLabel, { color: colors.textSecondary }]}>Menge:</Text>
@@ -399,35 +421,79 @@ export default function SubRentalsPage() {
                         {formatCurrency(record.cost * record.quantity)}
                       </Text>
                     </View>
+                    {record.rental_end && (
+                      <View style={styles.recordDetailRow}>
+                        <Text style={[styles.recordLabel, { color: colors.textSecondary }]}>Rückgabe:</Text>
+                        <Text style={[styles.recordValue, { color: record.overdue ? '#FF3B30' : colors.text }]}>
+                          {formatDate(record.rental_end)}
+                        </Text>
+                      </View>
+                    )}
                     <View style={styles.recordDetailRow}>
                       <Text style={[styles.recordLabel, { color: colors.textSecondary }]}>Erstellt:</Text>
                       <Text style={[styles.recordValue, { color: colors.text }]}>
                         {formatDate(record.created_at)}
                       </Text>
                     </View>
+                    {record.billable_to_customer && (
+                      <View style={styles.recordDetailRow}>
+                        <Text style={[styles.recordLabel, { color: colors.textSecondary }]}>Abrechenbar:</Text>
+                        <Text style={[styles.recordValue, { color: '#34C759' }]}>Ja</Text>
+                      </View>
+                    )}
                   </View>
-                  
+
                   {record.notes && (
                     <Text style={[styles.recordNotes, { color: colors.textSecondary }]}>
                       📝 {record.notes}
                     </Text>
                   )}
-                  
-                  {record.status === 'active' && (
-                    <TouchableOpacity
-                      style={[styles.returnButton, { backgroundColor: colors.primary }]}
-                      onPress={() => handleReturnSubRental(record.id)}
-                    >
-                      <Ionicons name="return-down-back" size={16} color="white" />
-                      <Text style={styles.returnButtonText}>Zurückgeben</Text>
-                    </TouchableOpacity>
-                  )}
+
+                  {/* Status action buttons */}
+                  <View style={styles.actionRow}>
+                    {record.status === 'requested' && (
+                      <TouchableOpacity
+                        style={[styles.actionButton, { backgroundColor: '#007AFF' }]}
+                        onPress={() => handleStatusAction(record.id, 'confirm')}
+                      >
+                        <Ionicons name="checkmark-circle-outline" size={16} color="white" />
+                        <Text style={styles.actionButtonText}>Bestätigen</Text>
+                      </TouchableOpacity>
+                    )}
+                    {record.status === 'confirmed' && (
+                      <TouchableOpacity
+                        style={[styles.actionButton, { backgroundColor: '#34C759' }]}
+                        onPress={() => handleStatusAction(record.id, 'deliver')}
+                      >
+                        <Ionicons name="checkmark-done-outline" size={16} color="white" />
+                        <Text style={styles.actionButtonText}>Als geliefert markieren</Text>
+                      </TouchableOpacity>
+                    )}
+                    {record.status === 'delivered' && (
+                      <TouchableOpacity
+                        style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                        onPress={() => handleStatusAction(record.id, 'return')}
+                      >
+                        <Ionicons name="return-down-back" size={16} color="white" />
+                        <Text style={styles.actionButtonText}>Zurückgeben</Text>
+                      </TouchableOpacity>
+                    )}
+                    {!['returned', 'cancelled'].includes(record.status) && (
+                      <TouchableOpacity
+                        style={[styles.actionButton, { backgroundColor: '#FF3B3020', borderWidth: 1, borderColor: '#FF3B30' }]}
+                        onPress={() => handleStatusAction(record.id, 'cancel')}
+                      >
+                        <Ionicons name="close-circle-outline" size={16} color="#FF3B30" />
+                        <Text style={[styles.actionButtonText, { color: '#FF3B30' }]}>Stornieren</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
               ))
             )}
           </>
         )}
-        
+
         <View style={{ height: 40 }} />
       </ScrollView>
 
@@ -484,6 +550,37 @@ export default function SubRentalsPage() {
                     />
                   ))}
                 </Picker>
+              </View>
+
+              {/* Event Selection (optional) */}
+              <Text style={[styles.inputLabel, { color: colors.text }]}>Event (optional)</Text>
+              <View style={[styles.pickerContainer, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Picker
+                  selectedValue={selectedEventId}
+                  onValueChange={setSelectedEventId}
+                  style={{ color: colors.text }}
+                >
+                  <Picker.Item label="Kein Event" value="" />
+                  {events.map(event => (
+                    <Picker.Item
+                      key={event.id}
+                      label={event.event_name}
+                      value={event.id}
+                    />
+                  ))}
+                </Picker>
+              </View>
+
+              {/* Billable toggle */}
+              <View style={styles.toggleRow}>
+                <Text style={[styles.inputLabel, { color: colors.text, marginTop: 0, marginBottom: 0 }]}>
+                  Dem Kunden berechnen
+                </Text>
+                <Switch
+                  value={billableToCustomer}
+                  onValueChange={setBillableToCustomer}
+                  trackColor={{ false: '#ddd', true: colors.primary }}
+                />
               </View>
 
               {/* Cost */}
@@ -745,19 +842,31 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontStyle: 'italic',
   },
-  returnButton: {
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 8,
-    marginTop: 12,
     gap: 6,
   },
-  returnButtonText: {
+  actionButtonText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 4,
   },
   // Modal styles
   modalOverlay: {
