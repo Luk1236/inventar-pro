@@ -113,17 +113,30 @@ app = FastAPI(title="Inventory Management System", version="1.0.0")
 api_router = APIRouter(prefix="/api")
 
 # M4 — Health check (used by load balancers, Docker HEALTHCHECK, monitoring)
-@app.get("/health", tags=["health"])
-async def health_check():
+async def _health_payload():
     try:
         await db.command("ping")
-        return {"status": "ok", "db": "connected", "version": "1.0.0"}
+        return {"status": "ok", "db": "connected", "version": "1.0.0"}, 200
     except Exception:
-        from fastapi.responses import JSONResponse
-        return JSONResponse(
-            {"status": "degraded", "db": "unreachable", "version": "1.0.0"},
-            status_code=503
-        )
+        return {"status": "degraded", "db": "unreachable", "version": "1.0.0"}, 503
+
+@app.get("/health", tags=["health"])
+async def health_check():
+    payload, status = await _health_payload()
+    if status == 200:
+        return payload
+    from fastapi.responses import JSONResponse
+    return JSONResponse(payload, status_code=status)
+
+# Alias under the /api prefix so the same probe works behind reverse proxies
+# that only expose /api (Cloudflare tunnel, Traefik, nginx api-gateway pattern).
+@api_router.get("/health", tags=["health"])
+async def api_health_check():
+    payload, status = await _health_payload()
+    if status == 200:
+        return payload
+    from fastapi.responses import JSONResponse
+    return JSONResponse(payload, status_code=status)
 
 # RBAC (Permission class, ROLE_PERMISSIONS, has_permission, require_permission)
 # extracted to app/deps/auth.py (Phase 3 refactor — see imports above).
