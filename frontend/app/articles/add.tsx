@@ -54,6 +54,9 @@ interface ArticleFormData {
   min_stock_level: string;
   price_per_unit: string;
   rental_price: string;
+  rental_price_day: string;
+  rental_price_week: string;
+  rental_price_month: string;
   image_base64: string;
   // NEW: Equipment-spezifische Felder
   weight_kg: string;
@@ -93,6 +96,9 @@ export default function AddArticlePage() {
     min_stock_level: '0',
     price_per_unit: '0',
     rental_price: '',
+    rental_price_day: '',
+    rental_price_week: '',
+    rental_price_month: '',
     image_base64: '',
     weight_kg: '',
     power_watt: '',
@@ -442,6 +448,9 @@ export default function AddArticlePage() {
         price_per_unit: Number(formData.price_per_unit) || 0,
         min_stock_level: Number(formData.min_stock_level) || 0,
         rental_price: toFloat(formData.rental_price),
+        rental_price_day: toFloat(formData.rental_price_day),
+        rental_price_week: toFloat(formData.rental_price_week),
+        rental_price_month: toFloat(formData.rental_price_month),
         supplier_id: formData.supplier_id || null,
         storage_location_id: formData.storage_location_id || null,
         power_type: formData.power_type || null,
@@ -724,7 +733,7 @@ export default function AddArticlePage() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Mietpreis pro Tag (€)</Text>
+            <Text style={styles.label}>Basis-Mietpreis pro Tag (€)</Text>
             <TextInput
               style={styles.input}
               value={formData.rental_price}
@@ -733,6 +742,46 @@ export default function AddArticlePage() {
               placeholderTextColor={colors.textSecondary}
               keyboardType="decimal-pad"
             />
+          </View>
+
+          {/* Staffelpreise */}
+          <Text style={[styles.label, { marginBottom: 4, color: colors.textSecondary, fontSize: 13 }]}>
+            Staffelpreise (optional)
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 20 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.label, { fontSize: 12 }]}>1-3 Tage (€)</Text>
+              <TextInput
+                style={styles.input}
+                value={formData.rental_price_day}
+                onChangeText={(text) => setFormData(prev => ({ ...prev, rental_price_day: text }))}
+                placeholder="z.B. 50.00"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="decimal-pad"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.label, { fontSize: 12 }]}>4-7 Tage (€)</Text>
+              <TextInput
+                style={styles.input}
+                value={formData.rental_price_week}
+                onChangeText={(text) => setFormData(prev => ({ ...prev, rental_price_week: text }))}
+                placeholder="z.B. 120.00"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="decimal-pad"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.label, { fontSize: 12 }]}>{'>'} 7 Tage (€)</Text>
+              <TextInput
+                style={styles.input}
+                value={formData.rental_price_month}
+                onChangeText={(text) => setFormData(prev => ({ ...prev, rental_price_month: text }))}
+                placeholder="z.B. 350.00"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="decimal-pad"
+              />
+            </View>
           </View>
         </View>
 
