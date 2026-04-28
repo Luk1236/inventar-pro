@@ -59,7 +59,7 @@
 |---------|--------|---------|
 | Strombedarfs-Kalkulation | ✅ | power_watt, power_type Felder + /api/events/{id}/requirements |
 | Mietfaktoren | ✅ | rental_factor_weekend, rental_factor_week implementiert |
-| Mehrtages-Rabatt | ❌ | Keine Faktor-Logik |
+| Mehrtages-Rabatt | ✅ | Staffelpreise rental_price_day/week/month + _calculate_rental_price (Tiers 1-3/4-7/>7) + /api/articles/{id}/rental-tiers |
 
 ## 5. Dokumente & Reporting
 
