@@ -7776,6 +7776,42 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestLoggingMiddleware)
 
 
+# K2 — Mutation rate limiting: 60 POST/PUT/DELETE per minute per IP
+# Auth endpoints have their own tighter limits; this covers all other mutations.
+_mutation_counters: dict = {}
+
+class MutationRateLimitMiddleware(BaseHTTPMiddleware):
+    _window = 60      # seconds
+    _max_requests = 60
+
+    async def dispatch(self, request, call_next):
+        if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+            auth = request.headers.get("Authorization", "")
+            # Skip public endpoints (no auth header) — they have their own limits.
+            # Skip loopback / test clients (127.x, ::1, testclient).
+            _raw_ip = request.headers.get("X-Forwarded-For") or (
+                request.client.host if request.client else None
+            )
+            if auth.startswith("Bearer ") and _raw_ip and _raw_ip not in ("127.0.0.1", "::1", "testclient", "localhost") and not _raw_ip.startswith("127."):
+                import time as _time
+                ip = _raw_ip
+                now = _time.time()
+                bucket = _mutation_counters.get(ip, {"count": 0, "reset": now + self._window})
+                if now > bucket["reset"]:
+                    bucket = {"count": 0, "reset": now + self._window}
+                bucket["count"] += 1
+                _mutation_counters[ip] = bucket
+                if bucket["count"] > self._max_requests:
+                    return JSONResponse(
+                        status_code=429,
+                        content={"detail": "Zu viele Anfragen. Bitte warten Sie kurz."},
+                        headers={"Retry-After": str(int(bucket["reset"] - now))},
+                    )
+        return await call_next(request)
+
+app.add_middleware(MutationRateLimitMiddleware)
+
+
 # V3: Global exception handler — converts unhandled DB / runtime errors to HTTP 503
 # so clients always get a structured JSON response instead of a 500 traceback.
 @app.exception_handler(Exception)
