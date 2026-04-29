@@ -830,8 +830,41 @@ body {
   <div id="tip-badges"></div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>
+<!--
+  three.js loader with multi-CDN fallback. Pinned to r128 because the
+  HTML below uses the global THREE namespace, which the UMD build only
+  ships up to ~r150. Bumping requires rewriting to ESM imports.
+
+  TODO: vendor three.min.js into frontend/assets/ and inject via blob URL
+  for true offline support (right now the WebView still fails without
+  network — multi-CDN only protects against single-provider outages).
+-->
 <script>
+(function() {
+  var SOURCES = [
+    'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js',
+    'https://unpkg.com/three@0.128.0/build/three.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'
+  ];
+  function load(i) {
+    if (i >= SOURCES.length) {
+      document.body.innerHTML = '<div style="padding:40px;color:#ef4444;font-family:sans-serif">'
+        + '<h2>3D-Engine konnte nicht geladen werden</h2>'
+        + '<p>Alle drei.js-Quellen nicht erreichbar. Internetverbindung pr&uuml;fen.</p></div>';
+      return;
+    }
+    var s = document.createElement('script');
+    s.src = SOURCES[i];
+    s.onload = function() { window.dispatchEvent(new Event('three-loaded')); };
+    s.onerror = function() { load(i + 1); };
+    document.head.appendChild(s);
+  }
+  load(0);
+})();
+<\/script>
+<script>
+// Wait for three.js before running the main scene script.
+window.addEventListener('three-loaded', function() {
 // ============================================
 // KONFIGURATION
 // ============================================
@@ -1535,6 +1568,8 @@ onResize();
 buildScene();
 updateCamera();
 animate();
+
+}); // close window.addEventListener('three-loaded', ...)
 <\/script>
 </body>
 </html>`;
