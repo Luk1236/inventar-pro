@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { Suspense, useState, useEffect, useCallback } from 'react'
 import {
   View, Text, TouchableOpacity, ActivityIndicator,
   StyleSheet, Platform,
@@ -6,10 +6,21 @@ import {
 import { router } from 'expo-router'
 import apiService from '../../services/apiService'
 
-// Metro picks VisualizerCanvas.web.tsx on web, VisualizerCanvas.tsx on native
-import VisualizerCanvas from './VisualizerCanvas'
-// Data-driven 3D visualizer (uses real storage zone data)
-import { WarehouseVisualizer3D } from '../../components/warehouse'
+// Lazy: three.js + R3F + three-mesh-bvh + stats-gl together pull ~5 MB into
+// the bundle. Defer until the user actually opens this page so the rest of
+// the app loads faster.
+// Metro picks VisualizerCanvas.web.tsx on web, VisualizerCanvas.tsx on native.
+const VisualizerCanvas = React.lazy(() => import('./VisualizerCanvas'))
+const WarehouseVisualizer3D = React.lazy(() =>
+  import('../../components/warehouse').then(m => ({ default: m.WarehouseVisualizer3D }))
+)
+
+const ThreeDFallback = () => (
+  <View style={styles.center}>
+    <ActivityIndicator size="large" color="#488fe0" />
+    <Text style={styles.hint}>3D-Engine wird geladen…</Text>
+  </View>
+)
 
 type ViewMode = 'planer' | 'live'
 
@@ -66,7 +77,9 @@ export default function Warehouse3DScreen() {
           // Parametric planner — web-only via VisualizerCanvas.web.tsx
           Platform.OS === 'web' ? (
             <div style={{ width: '100%', height: '100%' }}>
-              <VisualizerCanvas />
+              <Suspense fallback={<ThreeDFallback />}>
+                <VisualizerCanvas />
+              </Suspense>
             </div>
           ) : (
             <View style={styles.center}>
@@ -86,10 +99,12 @@ export default function Warehouse3DScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <WarehouseVisualizer3D
-            config={{ blocks: zones.length || 4, levels: 4, spotsPerLevel: 6 }}
-            data={zones}
-          />
+          <Suspense fallback={<ThreeDFallback />}>
+            <WarehouseVisualizer3D
+              config={{ blocks: zones.length || 4, levels: 4, spotsPerLevel: 6 }}
+              data={zones}
+            />
+          </Suspense>
         )}
       </View>
     </View>
