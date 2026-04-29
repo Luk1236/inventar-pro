@@ -504,7 +504,9 @@ export default function IsometricWarehouse({ zones, locations, articles, selecte
 
         {/* Bearbeitungs-Panel */}
         <div style={{ position:'absolute', top:14, left:14, display:'flex', flexDirection:'column', gap:8 }}>
-          <button onClick={toggleEditMode} style={{
+          <button onClick={toggleEditMode}
+            title={editMode ? 'Bearbeitung verlassen' : 'Layout bearbeiten — Regale per Drag verschieben, Pfeiltasten ←→↑↓ zum 90°-Drehen'}
+            style={{
             padding:'9px 16px', borderRadius:12,
             border:`1px solid ${editMode ? '#FF9500' : 'rgba(255,255,255,0.2)'}`,
             background: editMode ? 'rgba(255,149,0,0.28)' : 'rgba(255,255,255,0.10)',
@@ -515,8 +517,16 @@ export default function IsometricWarehouse({ zones, locations, articles, selecte
             display:'flex', alignItems:'center', gap:7,
           }}>
             <span style={{fontSize:15}}>{editMode ? '✓' : '✏'}</span>
-            {editMode ? 'Bearbeiten aktiv' : 'Bearbeiten'}
+            {editMode ? 'Bearbeiten aktiv' : 'Layout bearbeiten'}
           </button>
+          {!editMode && (
+            <div style={{
+              fontSize:10, color:'rgba(255,255,255,0.45)',
+              padding:'0 4px', maxWidth:180, lineHeight:1.4,
+            }}>
+              Drag = Verschieben · ← → = 90° drehen
+            </div>
+          )}
 
           {editMode && (
             <div style={{
