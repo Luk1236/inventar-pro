@@ -10,7 +10,7 @@ import { Platform } from 'react-native';
 import Svg, { G, Polygon, Rect, Text as SvgText, Defs, LinearGradient, Stop, Filter, FeGaussianBlur, FeFlood, FeComposite, FeMerge, FeMergeNode, Line as SvgLine } from 'react-native-svg';
 import {
   isoProject, getArticlesForLocation,
-  getLocationsForZone, sortByDepth, getLocationCapacity,
+  getLocationsForZone, sortByDepth, getLocationCapacity, getHeatmapColor,
   Article, StorageZone, StorageLocation, TILE_SIZE,
 } from '../../utils/warehouseUtils';
 import IsometricShelf, { SHELF_W, SHELF_D, SHELF_H, shelfEffDims } from './IsometricShelf';
@@ -141,16 +141,8 @@ export default function IsometricWarehouse({ zones, locations, articles, selecte
   const svgH = Math.max(550, (maxGx + maxGz) * TILE_SIZE * 0.65 + 380);
   const originX = svgW / 2, originY = 320;
 
-  // ── Heatmap-Farbe pro Location ─────────────────────────────────────────────
-  function heatColor(locId: string): string {
-    const arts = getArticlesForLocation(articles, locId);
-    if (arts.length === 0) return '#607D8B';
-    const avgRatio = arts.reduce((s, a) => s + (a.current_stock / Math.max(a.min_stock_level ?? 1, 1)), 0) / arts.length;
-    if (avgRatio < 1)  return '#EF5350'; // Kritisch → Rot
-    if (avgRatio < 2)  return '#FF9800'; // Knapp → Orange
-    if (avgRatio < 4)  return '#4CAF50'; // OK → Grün
-    return '#26C6DA';                    // Überfüllt → Cyan (Slow Mover)
-  }
+  // ── Heatmap-Farbe pro Location (via geteiltem util) ───────────────────────
+  const heatColor = (locId: string) => getHeatmapColor(getArticlesForLocation(articles, locId));
 
   // ── Filter: welche Regale sollen ghost-mäßig ausgeblendet werden ───────────
   function isGhosted(locId: string): boolean {

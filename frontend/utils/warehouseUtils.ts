@@ -28,6 +28,27 @@ export function getLocationFillRatio(
   return Math.min(articleCount / cap, 1);
 }
 
+/**
+ * Heatmap color for a location based on the average stock-vs-minimum ratio
+ * of its articles. Same scale used by both 2D and 3D warehouse views so
+ * "kritisch / knapp / OK / Slow Mover" reads consistently.
+ *  < 1  → red  (kritisch, unter Mindestbestand)
+ *  < 2  → orange (knapp)
+ *  < 4  → green (OK)
+ *  >=4  → cyan (Slow Mover, deutlich überfüllt)
+ */
+export function getHeatmapColor(articles: Article[]): string {
+  if (articles.length === 0) return '#607D8B';
+  const avgRatio = articles.reduce(
+    (sum, a) => sum + (a.current_stock / Math.max(a.min_stock_level ?? 1, 1)),
+    0,
+  ) / articles.length;
+  if (avgRatio < 1) return '#EF5350';
+  if (avgRatio < 2) return '#FF9800';
+  if (avgRatio < 4) return '#4CAF50';
+  return '#26C6DA';
+}
+
 export interface Article {
   id: string;
   name: string;

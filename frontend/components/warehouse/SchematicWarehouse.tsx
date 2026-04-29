@@ -5,7 +5,7 @@ import React, { useMemo, useRef, useState, useCallback } from 'react';
 import { Platform } from 'react-native';
 import Svg, { G, Rect, Text as T, Line, Defs, Pattern, Path } from 'react-native-svg';
 import {
-  getArticlesForLocation, getLocationsForZone, getLocationCapacity,
+  getArticlesForLocation, getLocationsForZone, getLocationCapacity, getHeatmapColor,
   Article, StorageZone, StorageLocation,
 } from '../../utils/warehouseUtils';
 
@@ -49,9 +49,11 @@ function palletColor(ratio: number) {
 
 const ROT_LABELS = ['', '90°', '180°', '270°'];
 
-function ShelfCol({ x, y, loc, arts, color, selected, rotation, highlighted, onPress, onHoverIn, onHoverOut }: {
+function ShelfCol({ x, y, loc, arts, color, selected, rotation, highlighted, heatmapMode, onPress, onHoverIn, onHoverOut }: {
   x: number; y: number; loc: StorageLocation; arts: Article[];
-  color: string; selected: boolean; rotation: number; highlighted?: boolean; onPress: () => void;
+  color: string; selected: boolean; rotation: number; highlighted?: boolean;
+  heatmapMode?: boolean;
+  onPress: () => void;
   onHoverIn?: (e: any) => void; onHoverOut?: () => void;
 }) {
   // Rotated shelves (90°/270°) swap width ↔ depth → appear narrower in plan
@@ -68,7 +70,11 @@ function ShelfCol({ x, y, loc, arts, color, selected, rotation, highlighted, onP
   const totalSlots = LEVELS * (isRotated ? 1 : 3);
   const filledSlots = Math.min(arts.length, totalSlots);
   const fillRatio = totalSlots > 0 ? filledSlots / totalSlots : 0;
-  const fillColor = fillRatio >= 0.92 ? '#EF5350' : fillRatio >= 0.7 ? '#FF9800' : '#4CAF50';
+  // Heatmap recolors the fill bar by stock-vs-minimum ratio (matches 3D iso view).
+  // Default colors track shelf occupancy (>92% red = full).
+  const fillColor = heatmapMode
+    ? getHeatmapColor(arts)
+    : fillRatio >= 0.92 ? '#EF5350' : fillRatio >= 0.7 ? '#FF9800' : '#4CAF50';
 
   return (
     <G onPress={onPress} onMouseEnter={onHoverIn} onMouseLeave={onHoverOut}>
@@ -166,12 +172,13 @@ function ShelfCol({ x, y, loc, arts, color, selected, rotation, highlighted, onP
   );
 }
 
-function ZoneBlock({ zone, locs, arts, y, zi, selectedId, rotations, searchMatches, collapsed, onToggle, onSelect, onHoverIn, onHoverOut }: {
+function ZoneBlock({ zone, locs, arts, y, zi, selectedId, rotations, searchMatches, collapsed, heatmapMode, onToggle, onSelect, onHoverIn, onHoverOut }: {
   zone: StorageZone; locs: StorageLocation[]; arts: Article[];
   y: number; zi: number; selectedId: string | null;
   rotations: Record<string, number>;
   searchMatches: string[];
   collapsed: boolean;
+  heatmapMode?: boolean;
   onToggle: () => void;
   onSelect: (id: string) => void;
   onHoverIn: (e: any, loc: StorageLocation, locArts: Article[]) => void;
@@ -285,6 +292,7 @@ function ZoneBlock({ zone, locs, arts, y, zi, selectedId, rotations, searchMatch
                 color={color}
                 selected={loc.id === selectedId}
                 rotation={rotations[loc.id] ?? 0}
+                heatmapMode={heatmapMode}
                 onPress={() => onSelect(loc.id)}
                 highlighted={searchMatches.includes(loc.id)}
                 onHoverIn={(e) => onHoverIn(e, loc, getArticlesForLocation(arts, loc.id))}
@@ -314,6 +322,7 @@ function ZoneBlock({ zone, locs, arts, y, zi, selectedId, rotations, searchMatch
 export default function SchematicWarehouse({ zones, locations, articles, selectedLocationId, onLocationSelect, rotations = {}, searchMatches = [], collapsedZones = new Set(), onToggleZone }: Props) {
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [heatmapMode, setHeatmapMode] = useState(false);
   const dragging = useRef(false);
   const lastMouse = useRef({ x: 0, y: 0 });
   const [tooltip, setTooltip] = useState<{ x: number; y: number; loc: StorageLocation; arts: Article[] } | null>(null);
@@ -388,6 +397,7 @@ export default function SchematicWarehouse({ zones, locations, articles, selecte
             rotations={rotations}
             searchMatches={searchMatches}
             collapsed={collapsedZones.has(zd.zone.id)}
+            heatmapMode={heatmapMode}
             onToggle={() => onToggleZone?.(zd.zone.id)}
             onSelect={onLocationSelect}
             onHoverIn={handleHoverIn}
@@ -408,8 +418,25 @@ export default function SchematicWarehouse({ zones, locations, articles, selecte
           {scene}
         </div>
 
-        {/* Zoom controls */}
+        {/* Zoom controls + Heatmap toggle */}
         <div style={{ position: 'absolute', top: 16, right: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button
+            onClick={() => setHeatmapMode(v => !v)}
+            title={heatmapMode
+              ? 'Heatmap aus — Standard-Füllstand-Farben'
+              : 'Heatmap an — Regale nach Stock-vs-Mindestbestand einfärben'}
+            style={{
+              width: 38, height: 38, borderRadius: 10,
+              background: heatmapMode ? 'rgba(255,200,0,0.28)' : 'rgba(255,255,255,0.10)',
+              border: `1px solid ${heatmapMode ? 'rgba(255,200,0,0.7)' : 'rgba(255,255,255,0.2)'}`,
+              backdropFilter: 'blur(8px)',
+              color: heatmapMode ? '#FFC800' : 'white',
+              fontSize: 18, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: heatmapMode ? '0 0 10px rgba(255,200,0,0.3)' : '0 2px 10px rgba(0,0,0,0.4)',
+            }}>
+            🌡
+          </button>
           {[['＋', () => setScale(s => Math.min(4, s * 1.25))], ['－', () => setScale(s => Math.max(0.2, s * 0.8))], ['○', () => { setScale(1); setOffset({ x: 0, y: 0 }); }]].map(([label, fn]: any) => (
             <button key={label} onClick={fn} style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(255,255,255,0.10)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', fontSize: label === '○' ? 18 : 22, fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(0,0,0,0.4)' }}>
               {label}
