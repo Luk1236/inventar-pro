@@ -10,7 +10,7 @@ import { Platform } from 'react-native';
 import Svg, { G, Polygon, Rect, Text as SvgText, Defs, LinearGradient, Stop, Filter, FeGaussianBlur, FeFlood, FeComposite, FeMerge, FeMergeNode, Line as SvgLine } from 'react-native-svg';
 import {
   isoProject, getArticlesForLocation,
-  getLocationsForZone, sortByDepth,
+  getLocationsForZone, sortByDepth, getLocationCapacity,
   Article, StorageZone, StorageLocation, TILE_SIZE,
 } from '../../utils/warehouseUtils';
 import IsometricShelf, { SHELF_W, SHELF_D, SHELF_H, shelfEffDims } from './IsometricShelf';
@@ -416,7 +416,7 @@ export default function IsometricWarehouse({ zones, locations, articles, selecte
           const zoneArtCount = articles.filter(a =>
             zoneLocs.some(l => l.id === a.storage_location_id)
           ).length;
-          const zoneMaxSlots = zoneLocs.length * 9;
+          const zoneMaxSlots = zoneLocs.reduce((s, l) => s + getLocationCapacity(l), 0);
           const zoneFillPct = zoneMaxSlots > 0 ? Math.round((zoneArtCount / zoneMaxSlots) * 100) : 0;
           const lblW = 180, lblH = 22;
           // Maße-String: wenn grid_width/grid_depth gesetzt, echte Meter anzeigen

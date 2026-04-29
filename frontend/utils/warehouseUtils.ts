@@ -1,5 +1,33 @@
 export const TILE_SIZE = 40;
 
+// ─── Warehouse layout constants ──────────────────────────────────────────
+// Used by SchematicWarehouse, IsometricWarehouse, app/warehouse/index.tsx
+// for fill-ratio calculation. Keeping them here means a future "real
+// per-location capacity" lookup needs only one swap point.
+//
+// Default: 3 levels × 3 spots-per-level = 9 slots/location. Override via
+// `StorageLocation.capacity` if a specific location has a different size.
+export const DEFAULT_LEVELS_PER_LOCATION = 3;
+export const DEFAULT_SPOTS_PER_LEVEL = 3;
+export const DEFAULT_SLOTS_PER_LOCATION =
+  DEFAULT_LEVELS_PER_LOCATION * DEFAULT_SPOTS_PER_LEVEL;
+
+/** Capacity for a location: explicit override if set, default 9 otherwise. */
+export function getLocationCapacity(location: { capacity?: number | null }): number {
+  return location.capacity && location.capacity > 0
+    ? location.capacity
+    : DEFAULT_SLOTS_PER_LOCATION;
+}
+
+/** Fill ratio (0..1) for a single location. */
+export function getLocationFillRatio(
+  location: { capacity?: number | null },
+  articleCount: number,
+): number {
+  const cap = getLocationCapacity(location);
+  return Math.min(articleCount / cap, 1);
+}
+
 export interface Article {
   id: string;
   name: string;

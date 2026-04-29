@@ -15,6 +15,8 @@ import {
   StorageZone,
   StorageLocation,
   getArticlesForLocation,
+  getLocationFillRatio,
+  getLocationCapacity,
 } from '../../utils/warehouseUtils';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -125,7 +127,7 @@ export default function WarehouseScreen() {
     const map = new Map<string, number>();
     for (const loc of locations) {
       const count = articles.filter(a => a.storage_location_id === loc.id).length;
-      map.set(loc.id, Math.min(count / 9, 1));
+      map.set(loc.id, getLocationFillRatio(loc, count));
     }
     return map;
   }, [locations, articles]);
@@ -353,7 +355,7 @@ export default function WarehouseScreen() {
                 const zoneLocs = locations.filter(l => l.zone_id === zone.id);
                 const zoneArts = articles.filter(a =>
                   zoneLocs.some(l => l.id === a.storage_location_id));
-                const maxSlots = zoneLocs.length * 9;
+                const maxSlots = zoneLocs.reduce((s, l) => s + getLocationCapacity(l), 0);
                 const fillPct = maxSlots > 0 ? Math.round((zoneArts.length / maxSlots) * 100) : 0;
                 const color = zoneColors[zi % zoneColors.length];
                 return (

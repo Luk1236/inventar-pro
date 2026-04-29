@@ -5,7 +5,7 @@ import React, { useMemo, useRef, useState, useCallback } from 'react';
 import { Platform } from 'react-native';
 import Svg, { G, Rect, Text as T, Line, Defs, Pattern, Path } from 'react-native-svg';
 import {
-  getArticlesForLocation, getLocationsForZone,
+  getArticlesForLocation, getLocationsForZone, getLocationCapacity,
   Article, StorageZone, StorageLocation,
 } from '../../utils/warehouseUtils';
 
@@ -182,7 +182,7 @@ function ZoneBlock({ zone, locs, arts, y, zi, selectedId, rotations, searchMatch
   // Zone-level stats for the header label
   const locIds = new Set(locs.map(l => l.id));
   const usedArticles = arts.filter(a => a.storage_location_id != null && locIds.has(a.storage_location_id)).length;
-  const maxSlots = locs.length * 9;
+  const maxSlots = locs.reduce((s, l) => s + getLocationCapacity(l), 0);
   const fillPct = maxSlots > 0 ? Math.round((usedArticles / maxSlots) * 100) : 0;
   const statsText = `${locs.length} Regale · ${fillPct}% belegt`;
 
