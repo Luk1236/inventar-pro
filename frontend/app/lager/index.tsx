@@ -339,9 +339,11 @@ export default function WarehouseScreen() {
           <SchematicWarehouse
             zones={zones} locations={filteredLocations} articles={articles}
             selectedLocationId={selectedLocationId} onLocationSelect={setSelectedLocationId}
-            rotations={rotations}
+            rotations={rotations} setRotations={setRotations}
+            customPos={customPos}
             searchMatches={searchMatches}
             collapsedZones={collapsedZones} onToggleZone={toggleZone}
+            onLayoutChange={handleLayoutChange}
           />
         )}
 

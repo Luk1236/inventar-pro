@@ -16,9 +16,16 @@ interface Props {
   selectedLocationId: string | null;
   onLocationSelect: (id: string) => void;
   rotations?: Record<string, number>;
+  setRotations?: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  /** Read-only: existing positions (from IsometricWarehouse drag).
+   *  Used to preserve gx/gz when rotation is changed in 2D edit mode. */
+  customPos?: Record<string, { gx: number; gz: number }>;
   searchMatches?: string[];
   collapsedZones?: Set<string>;
   onToggleZone?: (zoneId: string) => void;
+  /** Optional persistence callback — same signature as IsometricWarehouse so
+   *  parent can wire one handler for both 2D and 3D edit. */
+  onLayoutChange?: (locId: string, layout: { gx: number; gz: number; rotation: number }) => void;
 }
 
 /* ─── Layout constants ──────────────────────────────── */
@@ -319,13 +326,41 @@ function ZoneBlock({ zone, locs, arts, y, zi, selectedId, rotations, searchMatch
   );
 }
 
-export default function SchematicWarehouse({ zones, locations, articles, selectedLocationId, onLocationSelect, rotations = {}, searchMatches = [], collapsedZones = new Set(), onToggleZone }: Props) {
+export default function SchematicWarehouse({ zones, locations, articles, selectedLocationId, onLocationSelect, rotations = {}, setRotations, customPos = {}, searchMatches = [], collapsedZones = new Set(), onToggleZone, onLayoutChange }: Props) {
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [heatmapMode, setHeatmapMode] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editSelectedId, setEditSelectedId] = useState<string | null>(null);
+  const editSelectedIdRef = useRef<string | null>(null);
+  editSelectedIdRef.current = editSelectedId;
   const dragging = useRef(false);
   const lastMouse = useRef({ x: 0, y: 0 });
   const [tooltip, setTooltip] = useState<{ x: number; y: number; loc: StorageLocation; arts: Article[] } | null>(null);
+
+  // Arrow-key rotation in edit mode (web only). Same UX as IsometricWarehouse.
+  useEffect(() => {
+    if (!editMode || Platform.OS !== 'web' || !setRotations) return;
+    const onKey = (e: KeyboardEvent) => {
+      const id = editSelectedIdRef.current;
+      if (!id) return;
+      if (['ArrowLeft','ArrowUp','ArrowRight','ArrowDown'].includes(e.key)) {
+        e.preventDefault();
+        const delta = (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? 3 : 1;
+        setRotations(prev => {
+          const newRot = ((prev[id] ?? 0) + delta) % 4;
+          if (onLayoutChange) {
+            // Preserve existing position; 2D edit only changes rotation.
+            const cur = customPos[id] ?? { gx: 0, gz: 0 };
+            onLayoutChange(id, { gx: cur.gx, gz: cur.gz, rotation: newRot });
+          }
+          return { ...prev, [id]: newRot };
+        });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [editMode, setRotations, onLayoutChange]);
 
   const handleHoverIn = useCallback((e: any, loc: StorageLocation, arts: Article[]) => {
     setTooltip({ x: e.clientX, y: e.clientY, loc, arts });
@@ -393,13 +428,13 @@ export default function SchematicWarehouse({ zones, locations, articles, selecte
             key={zd.zone.id}
             zone={zd.zone} locs={zd.locs} arts={articles}
             y={zoneYs[i]} zi={zd.zi}
-            selectedId={selectedLocationId}
+            selectedId={editMode ? editSelectedId : selectedLocationId}
             rotations={rotations}
             searchMatches={searchMatches}
             collapsed={collapsedZones.has(zd.zone.id)}
             heatmapMode={heatmapMode}
             onToggle={() => onToggleZone?.(zd.zone.id)}
-            onSelect={onLocationSelect}
+            onSelect={editMode ? setEditSelectedId : onLocationSelect}
             onHoverIn={handleHoverIn}
             onHoverOut={handleHoverOut}
           />
@@ -417,6 +452,43 @@ export default function SchematicWarehouse({ zones, locations, articles, selecte
         <div style={{ transform: `translate(${offset.x}px,${offset.y}px) scale(${scale})`, transformOrigin: 'center center', display: 'inline-block' }}>
           {scene}
         </div>
+
+        {/* Edit-Mode Toggle (top-left, only when persistence is wired) */}
+        {setRotations && (
+          <div style={{ position: 'absolute', top: 16, left: 16, display: 'flex', flexDirection: 'column', gap: 8, zIndex: 10 }}>
+            <button
+              onClick={() => { setEditMode(v => !v); if (editMode) setEditSelectedId(null); }}
+              title={editMode ? 'Bearbeitung verlassen' : 'Layout bearbeiten — Regal anklicken, dann Pfeiltasten ←→↑↓ zum 90°-Drehen'}
+              style={{
+                padding: '9px 16px', borderRadius: 12,
+                border: `1px solid ${editMode ? '#FF9500' : 'rgba(255,255,255,0.2)'}`,
+                background: editMode ? 'rgba(255,149,0,0.28)' : 'rgba(255,255,255,0.10)',
+                backdropFilter: 'blur(12px)', color: editMode ? '#FF9500' : 'white',
+                fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 7,
+              }}>
+              <span style={{ fontSize: 15 }}>{editMode ? '✓' : '✏'}</span>
+              {editMode ? 'Bearbeiten aktiv' : 'Layout bearbeiten'}
+            </button>
+            {!editMode && (
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', padding: '0 4px', maxWidth: 200, lineHeight: 1.4 }}>
+                Klick + ← → = Regal drehen
+              </div>
+            )}
+            {editMode && editSelectedId && (
+              <div style={{
+                background: 'rgba(5,12,28,0.9)', borderRadius: 10, padding: '8px 12px',
+                border: '1px solid rgba(255,149,0,0.25)', color: '#FFD700',
+                fontSize: 11, fontWeight: 700,
+              }}>
+                ▶ {locations.find(l => l.id === editSelectedId)?.name ?? editSelectedId}
+                <div style={{ color: 'rgba(255,255,255,0.55)', fontWeight: 400, marginTop: 4 }}>
+                  ← → ↑ ↓ = 90° drehen
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Zoom controls + Heatmap toggle */}
         <div style={{ position: 'absolute', top: 16, right: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
