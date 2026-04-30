@@ -58,7 +58,10 @@ export default function RootLayout() {
               <Stack.Screen name="quotes/public/[token]" options={{ headerShown: false }} />
               <Stack.Screen name="time-tracking/index" />
               <Stack.Screen name="time-tracking/create" />
-              <Stack.Screen name="warehouse/index" options={{ headerShown: true, title: 'Lager 3D' }} />
+              <Stack.Screen name="lager/index" options={{ headerShown: true, title: 'Lager' }} />
+              <Stack.Screen name="lager-planer/index" options={{ headerShown: false }} />
+              {/* Backwards-compat redirects for legacy URLs */}
+              <Stack.Screen name="warehouse/index" options={{ headerShown: false }} />
               <Stack.Screen name="warehouse-3d/index" options={{ headerShown: false }} />
               <Stack.Screen name="vehicles/index" />
               <Stack.Screen name="tasks/index" />

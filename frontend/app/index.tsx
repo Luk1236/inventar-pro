@@ -1509,8 +1509,8 @@ export default function Index() {
               {renderSubItem('cube-outline', 'Artikel', '/articles', stats?.total_articles)}
               {renderSubItem('folder-outline', 'Kategorien', '/categories')}
               {renderSubItem('location-outline', 'Lagerorte', '/storage/locations')}
-              {renderSubItem('business-outline', 'Lager 3D', '/warehouse')}
-              {renderSubItem('cube-outline', 'Lager Visualizer', '/warehouse-3d')}
+              {renderSubItem('business-outline', 'Lager', '/lager')}
+              {renderSubItem('cube-outline', 'Lager-Planer', '/lager-planer')}
               {renderSubItem('git-merge-outline', 'Kombinationen', '/bundles')}
               {renderSubItem('swap-horizontal-outline', 'Cross-Docking', '/cross-docking')}
               {renderSubItem('list-circle-outline', 'Lager-Tracking-Log', '/tracking-log')}
