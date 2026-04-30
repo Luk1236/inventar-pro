@@ -1,7 +1,7 @@
 // frontend/components/warehouse/SchematicWarehouse.tsx
 // Flat 2D schematic warehouse view — professional dashboard style.
 
-import React, { useMemo, useRef, useState, useCallback } from 'react';
+import React, { useMemo, useRef, useState, useCallback, useEffect } from 'react';
 import { Platform } from 'react-native';
 import Svg, { G, Rect, Text as T, Line, Defs, Pattern, Path } from 'react-native-svg';
 import {

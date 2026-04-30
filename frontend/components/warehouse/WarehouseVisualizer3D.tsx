@@ -66,7 +66,7 @@ function generate3DHtml(
   }
 ): string {
   const { blocks, levels, spotsPerLevel, name } = config;
-  const { isDark, selectedSpot, enableAnimation, highlightArticleId, multiSelectMode, selectedSpots } = options;
+  const { isDark, selectedSpot, enableAnimation, highlightArticleId, multiSelectMode, selectedSpots, showSearch, showFilters } = options;
 
   // Premium Farbschema
   const colors = isDark ? {
