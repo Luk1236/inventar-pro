@@ -43,6 +43,9 @@ interface Props {
   searchMatches?: string[];
   collapsedZones?: Set<string>;
   onToggleZone?: (zoneId: string) => void;
+  /** Called whenever a shelf is moved or rotated in edit mode.
+   *  Parent typically persists this to the backend. */
+  onLayoutChange?: (locId: string, layout: { gx: number; gz: number; rotation: number }) => void;
 }
 
 const ZONE_PALETTE = [
@@ -53,7 +56,7 @@ const ZONE_PALETTE = [
   { fill: 'rgba(229,57,53,0.15)',  stroke: '#E53935', text: '#EF9A9A' },
 ];
 
-export default function IsometricWarehouse({ zones, locations, articles, selectedLocationId, onLocationSelect, customPos, setCustomPos, rotations, setRotations, searchMatches = [], collapsedZones = new Set(), onToggleZone }: Props) {
+export default function IsometricWarehouse({ zones, locations, articles, selectedLocationId, onLocationSelect, customPos, setCustomPos, rotations, setRotations, searchMatches = [], collapsedZones = new Set(), onToggleZone, onLayoutChange }: Props) {
   // ── Ansicht ────────────────────────────────────────────────────────────────
   const [scale, setScale]         = useState(1);
   const [offset, setOffset]       = useState({ x: 0, y: 0 });
@@ -93,7 +96,15 @@ export default function IsometricWarehouse({ zones, locations, articles, selecte
       if (['ArrowLeft','ArrowUp','ArrowRight','ArrowDown'].includes(e.key)) {
         e.preventDefault();
         const delta = (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? 3 : 1;
-        setRotations(prev => ({ ...prev, [id]: ((prev[id] ?? 0) + delta) % 4 }));
+        setRotations(prev => {
+          const newRot = ((prev[id] ?? 0) + delta) % 4;
+          // Persist this layout change (parent typically POSTs to backend).
+          const cur = locationsWithPosRef.current.find(l => l.loc.id === id);
+          if (cur && onLayoutChange) {
+            onLayoutChange(id, { gx: cur.gx, gz: cur.gz, rotation: newRot });
+          }
+          return { ...prev, [id]: newRot };
+        });
       }
     };
     window.addEventListener('keydown', onKey);
@@ -267,7 +278,12 @@ export default function IsometricWarehouse({ zones, locations, articles, selecte
           return gx < l.gx + l.effW - eps && gx + effW > l.gx + eps &&
                  gz < l.gz + l.effD - eps && gz + effD > l.gz + eps;
         });
-        if (!hasCollision) setCustomPos(prev => ({ ...prev, [id]: { gx, gz } }));
+        if (!hasCollision) {
+          setCustomPos(prev => ({ ...prev, [id]: { gx, gz } }));
+          if (onLayoutChange) {
+            onLayoutChange(id, { gx, gz, rotation: dragRot });
+          }
+        }
       }
 
       draggingIdRef.current = null;

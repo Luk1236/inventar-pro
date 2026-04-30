@@ -241,6 +241,15 @@ class StorageZone(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class StorageLocationLayout(BaseModel):
+    """Persisted position/rotation of a shelf in the IsometricWarehouse view.
+    gx/gz are grid units (1 unit = TILE_SIZE pixels in the SVG projection),
+    rotation is 0..3 (each step = 90 degrees clockwise)."""
+    gx: float
+    gz: float
+    rotation: int = Field(0, ge=0, le=3)
+
+
 class StorageLocation(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     zone_id: str
@@ -250,6 +259,7 @@ class StorageLocation(BaseModel):
     image_base64: Optional[str] = None  # Location photo
     images: List[str] = []  # Multiple images
     qr_code: Optional[str] = None
+    layout_pos: Optional[StorageLocationLayout] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 

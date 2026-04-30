@@ -1534,8 +1534,27 @@ async def delete_storage_location(
     result = await db.storage_locations.delete_one({"id": location_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Storage location not found")
-    
+
     return {"message": "Storage location deleted successfully"}
+
+@api_router.put("/storage-locations/{location_id}/layout", response_model=StorageLocation)
+async def update_storage_location_layout(
+    location_id: str,
+    layout: StorageLocationLayout,
+    current_user: User = Depends(get_current_user),
+):
+    """Persist a single shelf's layout (gx/gz/rotation) from the warehouse
+    iso/2D editor. Lightweight endpoint: only touches `layout_pos`, no
+    qr_code regeneration or other side-effects of the full PUT route."""
+    result = await db.storage_locations.update_one(
+        {"id": location_id},
+        {"$set": {"layout_pos": layout.dict()}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Storage location not found")
+    updated = await db.storage_locations.find_one({"id": location_id})
+    updated.pop("_id", None)
+    return StorageLocation(**updated)
 
 
 # Inventory Movements

@@ -83,10 +83,40 @@ export default function WarehouseScreen() {
       setZones(z);
       setLocations(l);
       setArticles(a);
+      // Restore persisted shelf layout (gx/gz/rotation) from each location.
+      const pos: Record<string, { gx: number; gz: number }> = {};
+      const rots: Record<string, number> = {};
+      for (const loc of l) {
+        const lp = (loc as any).layout_pos;
+        if (lp) {
+          pos[loc.id] = { gx: lp.gx, gz: lp.gz };
+          rots[loc.id] = lp.rotation ?? 0;
+        }
+      }
+      setCustomPos(pos);
+      setRotations(rots);
     } catch (err: any) {
       setError(err.message || 'Fehler beim Laden');
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  // Save indicator + persistence callback for the IsometricWarehouse editor.
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const saveTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleLayoutChange = useCallback(async (
+    locId: string,
+    layout: { gx: number; gz: number; rotation: number },
+  ) => {
+    setSaveStatus('saving');
+    try {
+      await apiService.put(`/api/storage-locations/${locId}/layout`, layout, { showErrorAlert: false });
+      setSaveStatus('saved');
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => setSaveStatus('idle'), 1800);
+    } catch {
+      setSaveStatus('error');
     }
   }, []);
 
@@ -280,6 +310,17 @@ export default function WarehouseScreen() {
               {searchMatches.length} Treffer
             </Text>
           )}
+          {saveStatus !== 'idle' && (
+            <Text style={{
+              fontSize: 11,
+              color: saveStatus === 'error' ? '#EF5350' : saveStatus === 'saving' ? '#94a3b8' : '#22C55E',
+              alignSelf: 'center', marginLeft: 8, fontWeight: '600',
+            }}>
+              {saveStatus === 'saving' ? '⏳ Speichern…'
+                : saveStatus === 'saved' ? '💾 Gespeichert'
+                : '⚠ Speichern fehlgeschlagen'}
+            </Text>
+          )}
         </View>
       </View>
 
@@ -292,6 +333,7 @@ export default function WarehouseScreen() {
             rotations={rotations} setRotations={setRotations}
             searchMatches={searchMatches}
             collapsedZones={collapsedZones} onToggleZone={toggleZone}
+            onLayoutChange={handleLayoutChange}
           />
         ) : (
           <SchematicWarehouse
