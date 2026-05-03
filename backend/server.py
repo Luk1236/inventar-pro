@@ -7889,7 +7889,7 @@ async def update_app_settings(settings: AppSettings, current_user: User = Depend
         # Create version history entry
         version_entry = {
             "version": new_version,
-            "changed_at": datetime.utcnow(),
+            "changed_at": datetime.now(timezone.utc),
             "changed_by": current_user.username,
             "changes": changes
         }
@@ -8081,7 +8081,7 @@ async def create_task(task: TaskCreate, current_user: User = Depends(get_current
         doc = {
             "_id": task_id,
             "id": task_id,
-            "created_at": _dt.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "created_by": getattr(current_user, "username", str(current_user)),
             **task.model_dump(),
         }
@@ -8219,7 +8219,7 @@ async def start_stock_count(current_user: dict = Depends(get_current_user)):
         "name": f"Bestandszählung {dt.now().strftime('%d.%m.%Y')}",
         "status": "offen",
         "items": items,
-        "created_at": dt.utcnow(),
+        "created_at": datetime.now(timezone.utc),
         "created_by": current_user.username,
         "notes": ""
     }
@@ -8342,12 +8342,12 @@ async def create_purchase_order(po: PurchaseOrderCreate, current_user: User = De
     import uuid as _uuid
     from datetime import datetime as _dt
     po_id = str(_uuid.uuid4())
-    year = _dt.utcnow().year
+    year = datetime.now(timezone.utc).year
     count = await db.purchase_orders.count_documents({"order_number": {"$regex": f"^PO-{year}-"}})
     doc = {
         "_id": po_id,
         "id": po_id,
-        "created_at": _dt.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "created_by": current_user.username,
         "order_number": f"PO-{year}-{count + 1:04d}",
         **po.model_dump(),
@@ -8547,7 +8547,7 @@ async def create_communication_log(log: CommunicationLogCreate, current_user: Us
     doc = {
         "_id": log_id,
         "id": log_id,
-        "created_at": _dt.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "created_by": current_user.username,
         **log.model_dump(),
     }

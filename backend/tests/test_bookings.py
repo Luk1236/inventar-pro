@@ -9,7 +9,7 @@ Tests für kritische Buchungslogik:
 """
 import pytest
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 # ─────────────────────────────────────────
@@ -44,8 +44,8 @@ async def create_customer(client, auth_headers) -> dict:
 
 async def create_event(client, auth_headers, customer_id: str) -> dict:
     code = uuid.uuid4().hex[:8]
-    start = (datetime.utcnow() + timedelta(days=10)).isoformat()
-    end = (datetime.utcnow() + timedelta(days=12)).isoformat()
+    start = (datetime.now(timezone.utc) + timedelta(days=10)).isoformat()
+    end = (datetime.now(timezone.utc) + timedelta(days=12)).isoformat()
     resp = await client.post("/api/events", headers=auth_headers, json={
         "customer_id": customer_id,
         "event_type": "Messe",
@@ -153,8 +153,8 @@ async def test_booking_rejects_return_before_pickup(client, auth_headers):
     event = await create_event(client, auth_headers, customer["id"])
     article = await create_article(client, auth_headers, stock=5)
 
-    pickup = (datetime.utcnow() + timedelta(days=10)).isoformat()
-    early_return = (datetime.utcnow() + timedelta(days=5)).isoformat()  # vor pickup!
+    pickup = (datetime.now(timezone.utc) + timedelta(days=10)).isoformat()
+    early_return = (datetime.now(timezone.utc) + timedelta(days=5)).isoformat()  # vor pickup!
 
     resp = await client.post("/api/bookings", headers=auth_headers, json={
         "event_id": event["id"],

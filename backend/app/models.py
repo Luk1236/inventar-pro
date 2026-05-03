@@ -3,8 +3,13 @@
 Keine Logik-Änderungen, nur Struktur. Re-exportiert via
 `from app.models import *` in server.py.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+
+def _utcnow() -> datetime:
+    """Timezone-aware UTC now — replaces deprecated datetime.utcnow()."""
+    return datetime.now(timezone.utc)
 from uuid import UUID
 import uuid
 
@@ -27,7 +32,7 @@ class User(BaseModel):
     is_active: bool = True
     is_approved: bool = False  # New field for admin approval
     profile_image: Optional[str] = None  # Base64 profile image
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class UserCreate(BaseModel):
@@ -84,7 +89,7 @@ class Category(BaseModel):
     name: str = Field(..., max_length=255)
     description: Optional[str] = Field(None, max_length=2000)
     parent_id: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class Supplier(BaseModel):
@@ -96,7 +101,7 @@ class Supplier(BaseModel):
     address: Optional[str] = None
     website: Optional[str] = None
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class SupplierCreate(BaseModel):
@@ -114,7 +119,7 @@ class Team(BaseModel):
     name: str
     description: Optional[str] = None
     members: List[str] = []  # List of user IDs
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
     created_by: str
 
 
@@ -134,7 +139,7 @@ class AuditLog(BaseModel):
     user_name: Optional[str] = None
     changes: Optional[dict] = None  # Before/after values
     ip_address: Optional[str] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utcnow)
 
 
 class Article(BaseModel):
@@ -179,8 +184,8 @@ class Article(BaseModel):
     images: List[str] = []  # Multiple images as base64 strings
     qr_code: Optional[str] = None
     archived: bool = False
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
 
 class ArticleCreate(BaseModel):
@@ -238,7 +243,7 @@ class StorageZone(BaseModel):
     qr_code: Optional[str] = None
     grid_width: Optional[int] = None   # Anzahl Felder in X-Richtung (1 Feld = 1,5 m)
     grid_depth: Optional[int] = None   # Anzahl Felder in Z-Richtung (1 Feld = 1,5 m)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class StorageLocationLayout(BaseModel):
@@ -260,7 +265,7 @@ class StorageLocation(BaseModel):
     images: List[str] = []  # Multiple images
     qr_code: Optional[str] = None
     layout_pos: Optional[StorageLocationLayout] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class InventoryMovement(BaseModel):
@@ -273,7 +278,7 @@ class InventoryMovement(BaseModel):
     user_id: str
     reason: Optional[str] = None
     reference_number: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class MovementCreate(BaseModel):
@@ -300,8 +305,8 @@ class MaintenanceTask(BaseModel):
     estimated_duration: Optional[int] = None  # minutes
     actual_duration: Optional[int] = None  # minutes
     created_by: str  # user_id
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
 
 class MaintenanceTaskCreate(BaseModel):
@@ -330,7 +335,7 @@ class DGUVV3Inspection(BaseModel):
     measurement_values: Optional[Dict[str, Any]] = None  # z.B. {"schutzleiterwiderstand": 0.3, "iso_widerstand": 2.5}
     certificate_image: Optional[str] = None  # Base64 image of certificate
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
     created_by: str
 
 
@@ -370,8 +375,8 @@ class RepairTicket(BaseModel):
     warranty_claim: bool = False
     external_repair: bool = False
     external_repair_vendor: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
     closed_at: Optional[datetime] = None
 
 
@@ -409,7 +414,7 @@ class MaintenanceRecord(BaseModel):
     next_maintenance_date: Optional[datetime] = None
     status_after: str = "OK"  # OK, defekt, gesperrt
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class MaintenanceRecordCreate(BaseModel):
@@ -433,7 +438,7 @@ class MaintenanceChecklist(BaseModel):
     items: List[Dict[str, Any]]  # [{"title": "Check cables", "required": true, "type": "checkbox"}]
     created_by: str
     is_template: bool = True
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class MaintenanceChecklistCreate(BaseModel):
@@ -453,7 +458,7 @@ class MaintenanceExecution(BaseModel):
     checklist_results: List[Dict[str, Any]]  # completed checklist with results
     overall_status: str = "passed"  # passed, failed, partial
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class MaintenanceExecutionCreate(BaseModel):
@@ -491,8 +496,8 @@ class Bundle(BaseModel):
     is_active: bool = True
     image_base64: Optional[str] = None
     # Metadata
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
     created_by: str
 
 
@@ -541,7 +546,7 @@ class PackingListItem(BaseModel):
     checkin_notes: Optional[str] = None
     checkin_photos: List[str] = []  # Base64 photos of damage
     # Metadata
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class PackingListCheckout(BaseModel):
@@ -580,8 +585,8 @@ class Customer(BaseModel):
     notes: Optional[str] = None
     contact_persons: List[ContactPerson] = []
     is_active: bool = True
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
 
 class CustomerCreate(BaseModel):
@@ -616,8 +621,8 @@ class Event(BaseModel):
     total_value: Optional[float] = None
     notes: Optional[str] = None
     created_by: str  # user_id
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
 
 class EventCreate(BaseModel):
@@ -645,8 +650,8 @@ class Booking(BaseModel):
     return_date: Optional[datetime] = None
     notes: Optional[str] = None
     serial_number_ids: List[str] = []  # F3: assigned serial numbers
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
 
 class BookingCreate(BaseModel):
@@ -680,8 +685,8 @@ class Message(BaseModel):
     recipient_id: str
     message_text: str
     is_read: bool = False
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
 
 class MessageCreate(BaseModel):
@@ -703,7 +708,7 @@ class Conversation(BaseModel):
 
 class SettingsVersionHistory(BaseModel):
     version: int
-    changed_at: datetime = Field(default_factory=datetime.utcnow)
+    changed_at: datetime = Field(default_factory=_utcnow)
     changed_by: Optional[str] = None
     changes: dict = Field(default_factory=dict)
 
@@ -780,12 +785,12 @@ class Invoice(BaseModel):
     notes: Optional[str] = None
     status: str = "draft"  # draft, sent, paid, cancelled
     payment_status: str = "offen"  # offen, teilweise, bezahlt, überfällig
-    issue_date: datetime = Field(default_factory=datetime.utcnow)
+    issue_date: datetime = Field(default_factory=_utcnow)
     due_date: Optional[datetime] = None
     paid_date: Optional[datetime] = None
     created_by: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
     public_token: Optional[str] = None
 
 
@@ -812,7 +817,7 @@ class TimeEntry(TimeEntryCreate):
     hours_worked: float = 0
     hourly_rate: float = 0
     total_pay: float = 0
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class QuoteItem(BaseModel):
@@ -840,9 +845,9 @@ class Quote(QuoteCreate):
     quote_number: str = ""
     status: str = "entwurf"
     total_net: float = 0
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
     created_by: str = ""
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
 
 class BOMItem(BaseModel):
@@ -861,8 +866,8 @@ class BillOfMaterials(BaseModel):
     image_base64: Optional[str] = None
     is_active: bool = True
     created_by: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
 
 class BOMCreate(BaseModel):
@@ -886,8 +891,8 @@ class ProjectTemplateCreate(BaseModel):
 class ProjectTemplate(ProjectTemplateCreate):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     created_by: str = ""
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
 
 class CustomFieldDefCreate(BaseModel):
@@ -902,7 +907,7 @@ class CustomFieldDefCreate(BaseModel):
 
 class CustomFieldDef(CustomFieldDefCreate):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class EventInvitationCreate(BaseModel):
@@ -915,7 +920,7 @@ class EventInvitation(EventInvitationCreate):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     token: str = Field(default_factory=lambda: str(uuid.uuid4()))
     status: str = "pending"   # pending | accepted | declined
-    sent_at: datetime = Field(default_factory=datetime.utcnow)
+    sent_at: datetime = Field(default_factory=_utcnow)
     responded_at: Optional[datetime] = None
 
 
@@ -928,8 +933,8 @@ class WebhookCreate(BaseModel):
 
 class Webhook(WebhookCreate):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
 
 class RentalCalculationRequest(BaseModel):
@@ -999,7 +1004,7 @@ class TaskCreate(BaseModel):
 
 class Task(TaskCreate):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
     created_by: str = ""
 
 
@@ -1016,7 +1021,7 @@ class SerialNumberCreate(BaseModel):
 
 class SerialNumber(SerialNumberCreate):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class AbsenceRequestCreate(BaseModel):
@@ -1031,7 +1036,7 @@ class AbsenceRequestCreate(BaseModel):
 
 class AbsenceRequest(AbsenceRequestCreate):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class StockCountItem(BaseModel):
@@ -1050,7 +1055,7 @@ class StockCountCreate(BaseModel):
 class StockCount(StockCountCreate):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     status: str = "offen"
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
     created_by: str = ""
 
 
@@ -1069,7 +1074,7 @@ class InspectionCreate(BaseModel):
 
 class Inspection(InspectionCreate):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class ScanActionRequest(BaseModel):
@@ -1172,7 +1177,7 @@ class SubRental(BaseModel):
     event_id: Optional[str] = None
     billable_to_customer: bool = False
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
     created_by: str
 
 
@@ -1194,7 +1199,7 @@ class RentalContract(BaseModel):
     signature_customer: Optional[str] = None  # Base64 signature
     signature_date: Optional[datetime] = None
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
     created_by: str
 
 
@@ -1207,7 +1212,7 @@ class CrewMember(BaseModel):
     hourly_rate: float = 0
     skills: List[str] = []
     is_available: bool = True
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class Vehicle(BaseModel):
@@ -1218,7 +1223,7 @@ class Vehicle(BaseModel):
     capacity_kg: float = 0
     loading_meters: float = 0
     is_available: bool = True
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class CrewAssignment(BaseModel):
@@ -1229,7 +1234,7 @@ class CrewAssignment(BaseModel):
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     notes: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class PurchaseOrderItem(BaseModel):
@@ -1254,7 +1259,7 @@ class PurchaseOrderCreate(BaseModel):
 class PurchaseOrder(PurchaseOrderCreate):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     order_number: str = ""
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
     created_by: str = ""
 
 
@@ -1273,7 +1278,7 @@ class ActivityCreate(BaseModel):
 
 class Activity(ActivityCreate):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class CrossDockingCreate(BaseModel):
@@ -1291,7 +1296,7 @@ class CrossDockingCreate(BaseModel):
 
 class CrossDocking(CrossDockingCreate):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class JobBoardEntryCreate(BaseModel):
@@ -1311,7 +1316,7 @@ class JobBoardEntryCreate(BaseModel):
 
 class JobBoardEntry(JobBoardEntryCreate):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class CommunicationLogCreate(BaseModel):
@@ -1331,7 +1336,7 @@ class CommunicationLogCreate(BaseModel):
 
 class CommunicationLog(CommunicationLogCreate):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
     created_by: str = ""
 
 
@@ -1349,5 +1354,5 @@ class RentalRequestCreate(BaseModel):
 
 class RentalRequest(RentalRequestCreate):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
     created_by: str = ""

@@ -13,7 +13,7 @@ Tests (backend/tests/test_vehicles.py) confirm the Set-A contract:
 - PUT → `{"status": "success"}` (Set A shape, not Set B's `{"id": ...}`)
 - DELETE → `{"status": "deleted"}` (Set A shape, not Set B's `{"message": ...}`)
 """
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid as uuid_module
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -52,7 +52,7 @@ async def create_vehicle(
         doc = vehicle_data.model_dump()
         doc["id"] = str(uuid_module.uuid4())
         doc["_id"] = doc["id"]
-        doc["created_at"] = datetime.utcnow().isoformat()
+        doc["created_at"] = datetime.now(timezone.utc).isoformat()
         await db.vehicles.insert_one(doc)
         return doc
     except Exception:

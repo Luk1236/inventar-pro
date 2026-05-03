@@ -1,7 +1,7 @@
 # backend/tests/test_auth.py
 import pytest
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 async def _create_approved_user(test_db, role="lager"):
@@ -17,7 +17,7 @@ async def _create_approved_user(test_db, role="lager"):
         "role": role,
         "is_approved": True,
         "hashed_password": get_password_hash(password),
-        "created_at": datetime.utcnow(),
+        "created_at": datetime.now(timezone.utc),
         "is_active": True,
     })
     return username, password
