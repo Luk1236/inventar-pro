@@ -741,60 +741,7 @@ async def reset_password(body: ResetPasswordRequest):
 # ─── End F2 ───────────────────────────────────────────────────────────────────
 
 # Categories
-@api_router.post("/categories", response_model=Category)
-async def create_category(category: Category, current_user: User = Depends(get_current_user)):
-    if current_user.role not in ("admin", "manager"):
-        raise HTTPException(status_code=403, detail="Keine Berechtigung zum Erstellen von Kategorien")
-    await db.categories.insert_one(category.model_dump())
-    return category
-
-@api_router.get("/categories", response_model=List[Category])
-async def get_categories(current_user: User = Depends(get_current_user)):
-    categories = await db.categories.find().to_list(1000)
-    return [Category(**cat) for cat in categories]
-
-@api_router.get("/categories/{category_id}", response_model=Category)
-async def get_category(category_id: str, current_user: User = Depends(get_current_user)):
-    category = await db.categories.find_one({"id": category_id})
-    if not category:
-        raise HTTPException(status_code=404, detail="Category not found")
-    return Category(**category)
-
-@api_router.put("/categories/{category_id}", response_model=Category)
-async def update_category(
-    category_id: str,
-    category_data: Category,
-    current_user: User = Depends(get_current_user)
-):
-    category_dict = category_data.model_dump()
-    category_dict.pop('id', None)  # Don't update ID
-    
-    result = await db.categories.update_one(
-        {"id": category_id},
-        {"$set": category_dict}
-    )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Category not found")
-    
-    updated_category = await db.categories.find_one({"id": category_id})
-    return Category(**updated_category)
-
-@api_router.delete("/categories/{category_id}")
-async def delete_category(category_id: str, current_user: User = Depends(get_current_user)):
-    if current_user.role not in ("admin", "manager"):
-        raise HTTPException(status_code=403, detail="Keine Berechtigung zum Löschen von Kategorien")
-    # Check if category is used by articles
-    articles_using_category = await db.articles.count_documents({"category_id": category_id})
-    if articles_using_category > 0:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Category is used by {articles_using_category} article(s). Please reassign or delete them first."
-        )
-    
-    result = await db.categories.delete_one({"id": category_id})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Category not found")
-    return {"message": "Category deleted successfully"}
+# Category endpoints extracted to app/routes/categories.py (Phase 4 refactor).
 
 # Suppliers
 # Supplier endpoints extracted to app/routes/suppliers.py (Phase 4 refactor).
@@ -7803,6 +7750,9 @@ api_router.include_router(_messages_router)
 
 from app.routes.suppliers import router as _suppliers_router
 api_router.include_router(_suppliers_router)
+
+from app.routes.categories import router as _categories_router
+api_router.include_router(_categories_router)
 
 app.include_router(api_router)
 
