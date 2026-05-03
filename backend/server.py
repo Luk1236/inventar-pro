@@ -2223,83 +2223,9 @@ async def get_all_users(current_user: User = Depends(get_current_user)):
         "role": user["role"]
     } for user in users]
 
-# Customer Management
-@api_router.post("/customers", response_model=Customer)
-async def create_customer(customer_data: CustomerCreate, current_user: User = Depends(require_permission(Permission.CREATE_CUSTOMER))):
-    customer_number = await generate_customer_number()
-    customer = Customer(**customer_data.model_dump(), customer_number=customer_number)
-    await db.customers.insert_one(customer.model_dump())
-    await create_audit_log("CREATE", "customer", current_user, customer.id, customer.company_name or customer.contact_name, {"new": customer.model_dump()})
-    return customer
-
-@api_router.get("/customers", response_model=List[Customer])
-async def get_customers(
-    search: Optional[str] = None,
-    current_user: User = Depends(get_current_user)
-):
-    query = {"is_active": True}
-    if search:
-        safe_search = re.escape(search)
-        query["$or"] = [
-            {"company_name": {"$regex": safe_search, "$options": "i"}},
-            {"contact_person": {"$regex": safe_search, "$options": "i"}},
-            {"customer_number": {"$regex": safe_search, "$options": "i"}},
-            {"email": {"$regex": safe_search, "$options": "i"}}
-        ]
-    
-    customers = await db.customers.find(query).sort("created_at", -1).to_list(1000)
-    return [Customer(**customer) for customer in customers]
-
-@api_router.get("/customers/{customer_id}", response_model=Customer)
-async def get_customer(customer_id: str, current_user: User = Depends(get_current_user)):
-    customer = await db.customers.find_one({"id": customer_id})
-    if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
-    return Customer(**customer)
-
-@api_router.put("/customers/{customer_id}", response_model=Customer)
-async def update_customer(
-    customer_id: str,
-    customer_data: CustomerCreate,
-    current_user: User = Depends(require_permission(Permission.EDIT_CUSTOMER))
-):
-    # Get old customer for audit log
-    old_customer = await db.customers.find_one({"id": customer_id})
-
-    customer_dict = customer_data.model_dump()
-    customer_dict["updated_at"] = datetime.now(timezone.utc)
-
-    result = await db.customers.update_one(
-        {"id": customer_id},
-        {"$set": customer_dict}
-    )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Customer not found")
-
-    updated_customer = await db.customers.find_one({"id": customer_id})
-    await create_audit_log("UPDATE", "customer", current_user, customer_id, updated_customer.get("company_name") or updated_customer.get("contact_name"), {"old": old_customer, "new": customer_dict})
-    return Customer(**updated_customer)
-
-@api_router.delete("/customers/{customer_id}")
-async def delete_customer(customer_id: str, current_user: User = Depends(require_permission(Permission.EDIT_CUSTOMER))):
-    # Get customer before deletion for audit log
-    customer = await db.customers.find_one({"id": customer_id})
-    customer_name = customer.get("company_name") or customer.get("contact_name") if customer else customer_id
-
-    # V7: Soft-delete with audit trail
-    result = await db.customers.update_one(
-        {"id": customer_id, "is_active": {"$ne": False}},
-        {"$set": {
-            "is_active": False,
-            "deleted_at": datetime.now(timezone.utc).isoformat(),
-            "deleted_by": current_user.id,
-            "updated_at": datetime.now(timezone.utc)
-        }}
-    )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Customer not found")
-    await create_audit_log("DELETE", "customer", current_user, customer_id, customer_name, {"deleted": True})
-    return {"message": "Customer deleted successfully"}
+# Customer endpoints extracted to app/routes/customers.py (Phase 4 refactor).
+# generate_customer_number() and create_audit_log() stay in server.py and
+# are imported lazily by the routes module.
 
 # Event Management  
 @api_router.post("/events", response_model=Event)
@@ -7682,6 +7608,9 @@ api_router.include_router(_categories_router)
 
 from app.routes.teams import router as _teams_router
 api_router.include_router(_teams_router)
+
+from app.routes.customers import router as _customers_router
+api_router.include_router(_customers_router)
 
 app.include_router(api_router)
 
