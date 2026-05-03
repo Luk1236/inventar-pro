@@ -746,81 +746,7 @@ async def reset_password(body: ResetPasswordRequest):
 # Suppliers
 # Supplier endpoints extracted to app/routes/suppliers.py (Phase 4 refactor).
 
-# Teams
-@api_router.post("/teams", response_model=Team)
-async def create_team(team_data: TeamCreate, current_user: User = Depends(require_permission(Permission.MANAGE_USERS))):
-    
-    team = Team(**team_data.model_dump(), created_by=current_user.username)
-    await db.teams.insert_one(team.model_dump())
-    return team
-
-@api_router.get("/teams", response_model=List[Team])
-async def get_teams(current_user: User = Depends(get_current_user)):
-    teams = await db.teams.find().to_list(1000)
-    return [Team(**team) for team in teams]
-
-@api_router.get("/teams/{team_id}", response_model=Team)
-async def get_team(team_id: str, current_user: User = Depends(get_current_user)):
-    team = await db.teams.find_one({"id": team_id})
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
-    return Team(**team)
-
-@api_router.put("/teams/{team_id}", response_model=Team)
-async def update_team(
-    team_id: str,
-    team_data: TeamCreate,
-    current_user: User = Depends(require_permission(Permission.MANAGE_USERS))
-):
-    
-    team_dict = team_data.model_dump()
-    result = await db.teams.update_one(
-        {"id": team_id},
-        {"$set": team_dict}
-    )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Team not found")
-    
-    updated_team = await db.teams.find_one({"id": team_id})
-    return Team(**updated_team)
-
-@api_router.delete("/teams/{team_id}")
-async def delete_team(team_id: str, current_user: User = Depends(require_permission(Permission.MANAGE_USERS))):
-    
-    result = await db.teams.delete_one({"id": team_id})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Team not found")
-    return {"message": "Team deleted successfully"}
-
-@api_router.post("/teams/{team_id}/members/{user_id}")
-async def add_team_member(team_id: str, user_id: str, current_user: User = Depends(require_permission(Permission.MANAGE_USERS))):
-    
-    # Check if user exists
-    user = await db.users.find_one({"username": user_id})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Add user to team
-    result = await db.teams.update_one(
-        {"id": team_id},
-        {"$addToSet": {"members": user_id}}
-    )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Team not found")
-    
-    return {"message": "Member added successfully"}
-
-@api_router.delete("/teams/{team_id}/members/{user_id}")
-async def remove_team_member(team_id: str, user_id: str, current_user: User = Depends(require_permission(Permission.MANAGE_USERS))):
-    
-    result = await db.teams.update_one(
-        {"id": team_id},
-        {"$pull": {"members": user_id}}
-    )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Team not found")
-    
-    return {"message": "Member removed successfully"}
+# Team endpoints extracted to app/routes/teams.py (Phase 4 refactor).
 
 # Audit Logs
 _SENSITIVE_AUDIT_FIELDS = {'password', 'hashed_password', 'token', 'secret', 'api_key', 'refresh_token'}
@@ -7753,6 +7679,9 @@ api_router.include_router(_suppliers_router)
 
 from app.routes.categories import router as _categories_router
 api_router.include_router(_categories_router)
+
+from app.routes.teams import router as _teams_router
+api_router.include_router(_teams_router)
 
 app.include_router(api_router)
 
