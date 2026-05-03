@@ -49,7 +49,7 @@ async def create_vehicle(
     """Create a new vehicle."""
     db = _get_db()
     try:
-        doc = vehicle_data.dict()
+        doc = vehicle_data.model_dump()
         doc["id"] = str(uuid_module.uuid4())
         doc["_id"] = doc["id"]
         doc["created_at"] = datetime.utcnow().isoformat()

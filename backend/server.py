@@ -472,12 +472,12 @@ async def register(request: Request, user_data: UserCreate):
     
     # Hash password and create user
     hashed_password = get_password_hash(user_data.password)
-    user_dict = user_data.dict()
+    user_dict = user_data.model_dump()
     del user_dict['password']
     
     # New users are not approved by default and cannot login until approved
     user = User(**user_dict, is_approved=False)
-    user_with_password = {**user.dict(), "hashed_password": hashed_password}
+    user_with_password = {**user.model_dump(), "hashed_password": hashed_password}
     
     await db.users.insert_one(user_with_password)
     
@@ -745,7 +745,7 @@ async def reset_password(body: ResetPasswordRequest):
 async def create_category(category: Category, current_user: User = Depends(get_current_user)):
     if current_user.role not in ("admin", "manager"):
         raise HTTPException(status_code=403, detail="Keine Berechtigung zum Erstellen von Kategorien")
-    await db.categories.insert_one(category.dict())
+    await db.categories.insert_one(category.model_dump())
     return category
 
 @api_router.get("/categories", response_model=List[Category])
@@ -766,7 +766,7 @@ async def update_category(
     category_data: Category,
     current_user: User = Depends(get_current_user)
 ):
-    category_dict = category_data.dict()
+    category_dict = category_data.model_dump()
     category_dict.pop('id', None)  # Don't update ID
     
     result = await db.categories.update_one(
@@ -797,59 +797,14 @@ async def delete_category(category_id: str, current_user: User = Depends(get_cur
     return {"message": "Category deleted successfully"}
 
 # Suppliers
-@api_router.post("/suppliers", response_model=Supplier)
-async def create_supplier(supplier_data: SupplierCreate, current_user: User = Depends(get_current_user)):
-    if current_user.role not in ("admin", "manager"):
-        raise HTTPException(status_code=403, detail="Keine Berechtigung zum Erstellen von Lieferanten")
-    supplier = Supplier(**supplier_data.dict())
-    await db.suppliers.insert_one(supplier.dict())
-    return supplier
-
-@api_router.get("/suppliers", response_model=List[Supplier])
-async def get_suppliers(current_user: User = Depends(get_current_user)):
-    suppliers = await db.suppliers.find().to_list(1000)
-    return [Supplier(**sup) for sup in suppliers]
-
-@api_router.get("/suppliers/{supplier_id}", response_model=Supplier)
-async def get_supplier(supplier_id: str, current_user: User = Depends(get_current_user)):
-    supplier = await db.suppliers.find_one({"id": supplier_id})
-    if not supplier:
-        raise HTTPException(status_code=404, detail="Supplier not found")
-    return Supplier(**supplier)
-
-@api_router.put("/suppliers/{supplier_id}", response_model=Supplier)
-async def update_supplier(
-    supplier_id: str,
-    supplier_data: SupplierCreate,
-    current_user: User = Depends(get_current_user)
-):
-    supplier_dict = supplier_data.dict()
-    
-    result = await db.suppliers.update_one(
-        {"id": supplier_id},
-        {"$set": supplier_dict}
-    )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Supplier not found")
-    
-    updated_supplier = await db.suppliers.find_one({"id": supplier_id})
-    return Supplier(**updated_supplier)
-
-@api_router.delete("/suppliers/{supplier_id}")
-async def delete_supplier(supplier_id: str, current_user: User = Depends(get_current_user)):
-    if current_user.role not in ("admin", "manager"):
-        raise HTTPException(status_code=403, detail="Keine Berechtigung zum Löschen von Lieferanten")
-    result = await db.suppliers.delete_one({"id": supplier_id})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Supplier not found")
-    return {"message": "Supplier deleted successfully"}
+# Supplier endpoints extracted to app/routes/suppliers.py (Phase 4 refactor).
 
 # Teams
 @api_router.post("/teams", response_model=Team)
 async def create_team(team_data: TeamCreate, current_user: User = Depends(require_permission(Permission.MANAGE_USERS))):
     
-    team = Team(**team_data.dict(), created_by=current_user.username)
-    await db.teams.insert_one(team.dict())
+    team = Team(**team_data.model_dump(), created_by=current_user.username)
+    await db.teams.insert_one(team.model_dump())
     return team
 
 @api_router.get("/teams", response_model=List[Team])
@@ -871,7 +826,7 @@ async def update_team(
     current_user: User = Depends(require_permission(Permission.MANAGE_USERS))
 ):
     
-    team_dict = team_data.dict()
+    team_dict = team_data.model_dump()
     result = await db.teams.update_one(
         {"id": team_id},
         {"$set": team_dict}
@@ -950,7 +905,7 @@ async def create_audit_log(
         user_name=user.username,
         changes=_sanitize_audit_changes(changes),
     )
-    await db.audit_logs.insert_one(log.dict())
+    await db.audit_logs.insert_one(log.model_dump())
 
 @api_router.get("/audit-logs", response_model=List[AuditLog])
 async def get_audit_logs(
@@ -1028,8 +983,8 @@ async def create_article(article_data: ArticleCreate, current_user: User = Depen
     # Use inventory_code directly as QR code (it already has the prefix)
     qr_code = article_data.inventory_code
 
-    article = Article(**article_data.dict(), qr_code=qr_code)
-    await db.articles.insert_one(article.dict())
+    article = Article(**article_data.model_dump(), qr_code=qr_code)
+    await db.articles.insert_one(article.model_dump())
     await manager.broadcast(json.dumps({"type": "article_created", "id": str(article.id)}))
     return article
 
@@ -1093,7 +1048,7 @@ async def get_articles_paginated(
     articles = await db.articles.find(query).sort(sort_by, sort_dir).skip(skip).limit(page_size).to_list(page_size)
     
     return {
-        "items": [Article(**art).dict() for art in articles],
+        "items": [Article(**art).model_dump() for art in articles],
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -1303,7 +1258,7 @@ async def update_article(
     article_data: ArticleCreate,
     current_user: User = Depends(require_permission(Permission.EDIT_ARTICLE))
 ):
-    article_dict = article_data.dict()
+    article_dict = article_data.model_dump()
     article_dict["updated_at"] = datetime.now(timezone.utc)
 
     result = await db.articles.update_one(
@@ -1455,7 +1410,7 @@ async def scan_action(body: ScanActionRequest, current_user: User = Depends(get_
 @api_router.post("/storage-zones", response_model=StorageZone)
 async def create_storage_zone(zone: StorageZone, current_user: User = Depends(get_current_user)):
     zone.qr_code = f"ZONE-{zone.name.upper()}"
-    await db.storage_zones.insert_one(zone.dict())
+    await db.storage_zones.insert_one(zone.model_dump())
     return zone
 
 @api_router.get("/storage-zones", response_model=List[StorageZone])
@@ -1492,7 +1447,7 @@ async def delete_storage_zone(zone_id: str, current_user: User = Depends(get_cur
 @api_router.post("/storage-locations", response_model=StorageLocation)
 async def create_storage_location(location: StorageLocation, current_user: User = Depends(get_current_user)):
     location.qr_code = f"LOC-{location.zone_id}-{location.name}"
-    await db.storage_locations.insert_one(location.dict())
+    await db.storage_locations.insert_one(location.model_dump())
     return location
 
 @api_router.get("/storage-locations", response_model=List[StorageLocation])
@@ -1520,7 +1475,7 @@ async def update_storage_location(
     location_update.qr_code = f"LOC-{location_update.zone_id}-{location_update.name}"
     await db.storage_locations.update_one(
         {"id": location_id},
-        {"$set": location_update.dict()}
+        {"$set": location_update.model_dump()}
     )
     
     return location_update
@@ -1548,7 +1503,7 @@ async def update_storage_location_layout(
     qr_code regeneration or other side-effects of the full PUT route."""
     result = await db.storage_locations.update_one(
         {"id": location_id},
-        {"$set": {"layout_pos": layout.dict()}},
+        {"$set": {"layout_pos": layout.model_dump()}},
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Storage location not found")
@@ -1563,7 +1518,7 @@ async def create_movement(
     movement_data: MovementCreate, 
     current_user: User = Depends(get_current_user)
 ):
-    movement = InventoryMovement(**movement_data.dict(), user_id=current_user.id)
+    movement = InventoryMovement(**movement_data.model_dump(), user_id=current_user.id)
     
     # Verify article exists first
     article = await db.articles.find_one({"id": movement.article_id})
@@ -1585,7 +1540,7 @@ async def create_movement(
             raise HTTPException(status_code=400, detail="Insufficient stock")
     # TRANSFER: no stock change needed
     
-    await db.movements.insert_one(movement.dict())
+    await db.movements.insert_one(movement.model_dump())
 
     # Log to sync_history for cross-platform sync
     await db.sync_history.insert_one({
@@ -1595,7 +1550,7 @@ async def create_movement(
         "user_id": current_user.id,
         "username": current_user.username,
         "timestamp": datetime.now(timezone.utc),
-        "data": movement.dict()
+        "data": movement.model_dump()
     })
 
     return movement
@@ -1619,8 +1574,8 @@ async def create_maintenance_task(
     task_data: MaintenanceTaskCreate,
     current_user: User = Depends(get_current_user)
 ):
-    task = MaintenanceTask(**task_data.dict(), created_by=current_user.id)
-    await db.maintenance_tasks.insert_one(task.dict())
+    task = MaintenanceTask(**task_data.model_dump(), created_by=current_user.id)
+    await db.maintenance_tasks.insert_one(task.model_dump())
 
     # Send notification if due date is within 7 days
     if task.due_date and task.due_date <= datetime.now(timezone.utc) + timedelta(days=7):
@@ -1666,7 +1621,7 @@ async def update_maintenance_task(
     task_data: MaintenanceTaskCreate,
     current_user: User = Depends(get_current_user)
 ):
-    task_dict = task_data.dict()
+    task_dict = task_data.model_dump()
     task_dict["updated_at"] = datetime.now(timezone.utc)
     
     result = await db.maintenance_tasks.update_one(
@@ -1706,8 +1661,8 @@ async def create_maintenance_record(
     record_data: MaintenanceRecordCreate,
     current_user: User = Depends(get_current_user)
 ):
-    record = MaintenanceRecord(**record_data.dict(), performed_by=current_user.id)
-    await db.maintenance_records.insert_one(record.dict())
+    record = MaintenanceRecord(**record_data.model_dump(), performed_by=current_user.id)
+    await db.maintenance_records.insert_one(record.model_dump())
     
     # Update article status and next maintenance date
     update_data = {
@@ -1764,8 +1719,8 @@ async def create_maintenance_checklist(
     checklist_data: MaintenanceChecklistCreate,
     current_user: User = Depends(get_current_user)
 ):
-    checklist = MaintenanceChecklist(**checklist_data.dict(), created_by=current_user.id)
-    await db.maintenance_checklists.insert_one(checklist.dict())
+    checklist = MaintenanceChecklist(**checklist_data.model_dump(), created_by=current_user.id)
+    await db.maintenance_checklists.insert_one(checklist.model_dump())
     return checklist
 
 @api_router.get("/maintenance/checklists", response_model=List[MaintenanceChecklist])
@@ -1808,12 +1763,12 @@ async def create_dguv_inspection(
         protocol_number = inspection_data.protocol_number or await generate_dguv_protocol_number()
         
         inspection = DGUVV3Inspection(
-            **inspection_data.dict(),
+            **inspection_data.model_dump(),
             protocol_number=protocol_number,
             created_by=current_user.id
         )
         
-        await db.dguv_inspections.insert_one(inspection.dict())
+        await db.dguv_inspections.insert_one(inspection.model_dump())
         
         # Update article with next inspection date
         await db.articles.update_one(
@@ -1836,7 +1791,7 @@ async def create_dguv_inspection(
             due_date=inspection_data.next_inspection_date,
             created_by=current_user.id
         )
-        await db.maintenance_tasks.insert_one(next_task.dict())
+        await db.maintenance_tasks.insert_one(next_task.model_dump())
         
         return inspection
         
@@ -1942,7 +1897,7 @@ async def update_operating_hours(
                 due_date=datetime.now(timezone.utc) + timedelta(days=7),
                 created_by=current_user.id
             )
-            await db.maintenance_tasks.insert_one(task.dict())
+            await db.maintenance_tasks.insert_one(task.model_dump())
 
         await db.articles.update_one({"id": str(article_id)}, {"$set": update_data})
 
@@ -1999,12 +1954,12 @@ async def create_repair_ticket(
         ticket_number = await generate_ticket_number()
         
         ticket = RepairTicket(
-            **ticket_data.dict(),
+            **ticket_data.model_dump(),
             ticket_number=ticket_number,
             reported_by=current_user.id
         )
         
-        await db.repair_tickets.insert_one(ticket.dict())
+        await db.repair_tickets.insert_one(ticket.model_dump())
         
         # Update article status to defective
         if ticket_data.severity in ["high", "critical"]:
@@ -2022,7 +1977,7 @@ async def create_repair_ticket(
             priority=ticket_data.severity,
             created_by=current_user.id
         )
-        await db.maintenance_tasks.insert_one(task.dict())
+        await db.maintenance_tasks.insert_one(task.model_dump())
         
         return ticket
         
@@ -2201,8 +2156,8 @@ async def create_maintenance_execution(
     execution_data: MaintenanceExecutionCreate,
     current_user: User = Depends(get_current_user)
 ):
-    execution = MaintenanceExecution(**execution_data.dict(), performed_by=current_user.id)
-    await db.maintenance_executions.insert_one(execution.dict())
+    execution = MaintenanceExecution(**execution_data.model_dump(), performed_by=current_user.id)
+    await db.maintenance_executions.insert_one(execution.model_dump())
     return execution
 
 # Dashboard stats (updated with maintenance)
@@ -2373,7 +2328,7 @@ async def send_message(request: Request, message_data: MessageCreate, current_us
         message_text=message_data.message_text
     )
     
-    await db.messages.insert_one(message.dict())
+    await db.messages.insert_one(message.model_dump())
     return message
 
 # Conversation list, thread fetch, unread count, edit + delete moved to
@@ -2399,9 +2354,9 @@ async def get_all_users(current_user: User = Depends(get_current_user)):
 @api_router.post("/customers", response_model=Customer)
 async def create_customer(customer_data: CustomerCreate, current_user: User = Depends(require_permission(Permission.CREATE_CUSTOMER))):
     customer_number = await generate_customer_number()
-    customer = Customer(**customer_data.dict(), customer_number=customer_number)
-    await db.customers.insert_one(customer.dict())
-    await create_audit_log("CREATE", "customer", current_user, customer.id, customer.company_name or customer.contact_name, {"new": customer.dict()})
+    customer = Customer(**customer_data.model_dump(), customer_number=customer_number)
+    await db.customers.insert_one(customer.model_dump())
+    await create_audit_log("CREATE", "customer", current_user, customer.id, customer.company_name or customer.contact_name, {"new": customer.model_dump()})
     return customer
 
 @api_router.get("/customers", response_model=List[Customer])
@@ -2438,7 +2393,7 @@ async def update_customer(
     # Get old customer for audit log
     old_customer = await db.customers.find_one({"id": customer_id})
 
-    customer_dict = customer_data.dict()
+    customer_dict = customer_data.model_dump()
     customer_dict["updated_at"] = datetime.now(timezone.utc)
 
     result = await db.customers.update_one(
@@ -2486,8 +2441,8 @@ async def create_event(event_data: EventCreate, current_user: User = Depends(req
         raise HTTPException(status_code=400, detail="End date must be after start date")
     
     event_number = await generate_event_number()
-    event = Event(**event_data.dict(), event_number=event_number, created_by=current_user.id)
-    await db.events.insert_one(event.dict())
+    event = Event(**event_data.model_dump(), event_number=event_number, created_by=current_user.id)
+    await db.events.insert_one(event.model_dump())
     await manager.broadcast(json.dumps({"type": "event_created", "id": str(event.id)}))
     return event
 
@@ -2528,7 +2483,7 @@ async def update_event(
     event_data: EventCreate,
     current_user: User = Depends(require_permission(Permission.EDIT_EVENT))
 ):
-    event_dict = event_data.dict()
+    event_dict = event_data.model_dump()
     event_dict["updated_at"] = datetime.now(timezone.utc)
     
     result = await db.events.update_one(
@@ -2624,7 +2579,7 @@ async def generate_invoice_from_event(
         due_date=datetime.now(timezone.utc) + timedelta(days=due_days),
         created_by=current_user.id,
     )
-    await db.invoices.insert_one(invoice.dict())
+    await db.invoices.insert_one(invoice.model_dump())
     return {"invoice_id": invoice.id, "invoice_number": invoice_number, "total_amount": total_amount}
 
 
@@ -2734,14 +2689,14 @@ async def create_booking(booking_data: BookingCreate, current_user: User = Depen
         raise HTTPException(status_code=409, detail="Article is already booked for this time period")
 
     # Phase 2: insert immediately, then post-validate while our booking is in DB
-    booking_dict = booking_data.dict()
+    booking_dict = booking_data.model_dump()
     booking_dict.update({
         "booked_by": current_user.id,
         "pickup_date": pickup_date,
         "return_date": return_date
     })
     booking = Booking(**booking_dict)
-    await db.bookings.insert_one(booking.dict())
+    await db.bookings.insert_one(booking.model_dump())
 
     # Re-check conflicts now that our record is persisted (catches concurrent inserts)
     post_conflicts = await db.bookings.count_documents({
@@ -2945,13 +2900,13 @@ async def create_time_entry(entry_data: TimeEntryCreate, current_user: User = De
     hourly_rate = crew_member.get("hourly_rate", 0) if crew_member else 0
 
     entry = TimeEntry(
-        **entry_data.dict(),
+        **entry_data.model_dump(),
         hours_worked=round(hours_worked, 2),
         hourly_rate=hourly_rate,
         total_pay=round(hours_worked * hourly_rate, 2),
     )
-    await db.time_entries.insert_one(entry.dict())
-    return entry.dict()
+    await db.time_entries.insert_one(entry.model_dump())
+    return entry.model_dump()
 
 @api_router.get("/time-entries")
 async def get_time_entries(
@@ -2993,7 +2948,7 @@ async def update_time_entry(entry_id: str, update_data: TimeEntryCreate, current
         hours_worked = 0
     crew_member = await db.crew.find_one({"id": update_data.crew_member_id})
     hourly_rate = crew_member.get("hourly_rate", 0) if crew_member else 0
-    update_dict = update_data.dict()
+    update_dict = update_data.model_dump()
     update_dict.update({
         "hours_worked": round(hours_worked, 2),
         "hourly_rate": hourly_rate,
@@ -3050,14 +3005,14 @@ async def create_quote(quote_data: QuoteCreate, current_user: User = Depends(req
     if quote_data.discount_percent > 0:
         total_net = total_net * (1 - quote_data.discount_percent / 100)
     quote = Quote(
-        **quote_data.dict(),
+        **quote_data.model_dump(),
         quote_number=quote_number,
         total_net=round(total_net, 2),
         created_by=getattr(current_user, "id", str(current_user)),
     )
-    await db.quotes.insert_one(quote.dict())
+    await db.quotes.insert_one(quote.model_dump())
     await create_audit_log("CREATE", "quote", current_user, quote.id, quote_number, {"customer_id": quote_data.customer_id, "total_net": round(total_net, 2)})
-    return quote.dict()
+    return quote.model_dump()
 
 @api_router.get("/quotes")
 async def get_quotes(
@@ -3088,7 +3043,7 @@ async def update_quote(quote_id: str, update_data: QuoteCreate, current_user: Us
     total_net = sum(item.unit_price * item.quantity * item.days for item in update_data.items)
     if update_data.discount_percent > 0:
         total_net = total_net * (1 - update_data.discount_percent / 100)
-    update_dict = update_data.dict()
+    update_dict = update_data.model_dump()
     update_dict["total_net"] = round(total_net, 2)
     update_dict["updated_at"] = datetime.now(timezone.utc)
     result = await db.quotes.update_one({"id": quote_id}, {"$set": update_dict})
@@ -3225,7 +3180,7 @@ async def create_invoice(invoice_data: InvoiceCreate, current_user: User = Depen
         created_by=current_user.id
     )
 
-    await db.invoices.insert_one(invoice.dict())
+    await db.invoices.insert_one(invoice.model_dump())
     await create_audit_log("CREATE", "invoice", current_user, invoice.id, invoice.invoice_number, {"customer_id": customer_id, "total_amount": total_amount, "event_id": invoice_data.event_id})
     return invoice
 
@@ -3709,9 +3664,9 @@ async def get_recent_changes(
         return {
             "server_time": datetime.now(timezone.utc).isoformat(),
             "changes": {
-                "articles": [Article(**article).dict() for article in articles_changes],
-                "movements": [InventoryMovement(**movement).dict() for movement in movements_changes], 
-                "maintenance_tasks": [MaintenanceTask(**task).dict() for task in maintenance_changes]
+                "articles": [Article(**article).model_dump() for article in articles_changes],
+                "movements": [InventoryMovement(**movement).model_dump() for movement in movements_changes], 
+                "maintenance_tasks": [MaintenanceTask(**task).model_dump() for task in maintenance_changes]
             },
             "total_changes": len(articles_changes) + len(movements_changes) + len(maintenance_changes)
         }
@@ -3730,8 +3685,8 @@ async def create_bom(bom_data: BOMCreate, current_user: User = Depends(get_curre
         if not article:
             raise HTTPException(status_code=404, detail=f"Article {item.article_id} not found")
     
-    bom = BillOfMaterials(**bom_data.dict(), created_by=current_user.id)
-    await db.bom.insert_one(bom.dict())
+    bom = BillOfMaterials(**bom_data.model_dump(), created_by=current_user.id)
+    await db.bom.insert_one(bom.model_dump())
     return bom
 
 @api_router.get("/bom", response_model=List[BillOfMaterials])
@@ -3806,7 +3761,7 @@ async def update_bom(
     current_user: User = Depends(get_current_user)
 ):
     """Update BOM"""
-    bom_dict = bom_data.dict()
+    bom_dict = bom_data.model_dump()
     bom_dict["updated_at"] = datetime.now(timezone.utc)
     
     result = await db.bom.update_one(
@@ -3911,7 +3866,7 @@ async def book_bom_to_event(
             notes=f"Gebucht als Teil von Paket: {bom['name']}"
         )
         
-        await db.bookings.insert_one(booking.dict())
+        await db.bookings.insert_one(booking.model_dump())
 
         # Atomic stock deduction — prevents race condition if booked concurrently
         stock_result = await db.articles.update_one(
@@ -3946,13 +3901,13 @@ async def get_project_templates(current_user: User = Depends(get_current_user)):
 
 @api_router.post("/project-templates", response_model=ProjectTemplate)
 async def create_project_template(data: ProjectTemplateCreate, current_user: User = Depends(get_current_user)):
-    template = ProjectTemplate(**data.dict(), created_by=current_user.id)
-    await db.project_templates.insert_one(template.dict())
+    template = ProjectTemplate(**data.model_dump(), created_by=current_user.id)
+    await db.project_templates.insert_one(template.model_dump())
     return template
 
 @api_router.put("/project-templates/{template_id}", response_model=ProjectTemplate)
 async def update_project_template(template_id: str, data: ProjectTemplateCreate, current_user: User = Depends(get_current_user)):
-    update = {**data.dict(), "updated_at": datetime.now(timezone.utc)}
+    update = {**data.model_dump(), "updated_at": datetime.now(timezone.utc)}
     result = await db.project_templates.update_one({"id": template_id}, {"$set": update})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Vorlage nicht gefunden")
@@ -3975,13 +3930,13 @@ async def get_custom_fields(entity_type: Optional[str] = None, current_user: Use
 
 @api_router.post("/custom-fields", response_model=CustomFieldDef)
 async def create_custom_field(data: CustomFieldDefCreate, current_user: User = Depends(get_current_user)):
-    field = CustomFieldDef(**data.dict())
-    await db.custom_fields.insert_one(field.dict())
+    field = CustomFieldDef(**data.model_dump())
+    await db.custom_fields.insert_one(field.model_dump())
     return field
 
 @api_router.put("/custom-fields/{field_id}", response_model=CustomFieldDef)
 async def update_custom_field(field_id: str, data: CustomFieldDefCreate, current_user: User = Depends(get_current_user)):
-    result = await db.custom_fields.update_one({"id": field_id}, {"$set": data.dict()})
+    result = await db.custom_fields.update_one({"id": field_id}, {"$set": data.model_dump()})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Feld nicht gefunden")
     updated = await db.custom_fields.find_one({"id": field_id})
@@ -4002,8 +3957,8 @@ async def get_event_invitations(event_id: str, current_user: User = Depends(get_
 
 @api_router.post("/events/{event_id}/invitations", response_model=EventInvitation)
 async def create_event_invitation(event_id: str, data: EventInvitationCreate, current_user: User = Depends(get_current_user)):
-    inv = EventInvitation(**{**data.dict(), "event_id": event_id})
-    await db.event_invitations.insert_one(inv.dict())
+    inv = EventInvitation(**{**data.model_dump(), "event_id": event_id})
+    await db.event_invitations.insert_one(inv.model_dump())
     return inv
 
 @api_router.delete("/invitations/{invitation_id}")
@@ -4019,7 +3974,7 @@ async def get_all_invitations(current_user: User = Depends(get_current_user)):
     result = []
     for inv in invitations:
         event = await db.events.find_one({"id": inv.get("event_id")})
-        item = EventInvitation(**inv).dict()
+        item = EventInvitation(**inv).model_dump()
         item["event_name"] = event.get("title", event.get("name", "")) if event else ""
         result.append(item)
     return result
@@ -4044,13 +3999,13 @@ async def get_webhooks(current_user: User = Depends(get_current_user)):
 
 @api_router.post("/webhooks", response_model=Webhook)
 async def create_webhook(data: WebhookCreate, current_user: User = Depends(get_current_user)):
-    hook = Webhook(**data.dict())
-    await db.webhooks.insert_one(hook.dict())
+    hook = Webhook(**data.model_dump())
+    await db.webhooks.insert_one(hook.model_dump())
     return hook
 
 @api_router.put("/webhooks/{hook_id}", response_model=Webhook)
 async def update_webhook(hook_id: str, data: WebhookCreate, current_user: User = Depends(get_current_user)):
-    update = {**data.dict(), "updated_at": datetime.now(timezone.utc)}
+    update = {**data.model_dump(), "updated_at": datetime.now(timezone.utc)}
     result = await db.webhooks.update_one({"id": hook_id}, {"$set": update})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Webhook nicht gefunden")
@@ -6893,7 +6848,7 @@ async def create_rental_contract(
             created_by=current_user.id
         )
         
-        await db.rental_contracts.insert_one(contract.dict())
+        await db.rental_contracts.insert_one(contract.model_dump())
         
         return contract
         
@@ -7383,8 +7338,8 @@ async def create_crew_member(
 ):
     """Create a new crew member"""
     try:
-        member = CrewMember(**member_data.dict())
-        await db.crew.insert_one(member.dict())
+        member = CrewMember(**member_data.model_dump())
+        await db.crew.insert_one(member.model_dump())
         return member
     except Exception as e:
         raise HTTPException(status_code=500, detail="Interner Serverfehler. Details wurden protokolliert.")
@@ -7446,8 +7401,8 @@ async def create_crew_assignment(
 ):
     """Create a new crew assignment"""
     try:
-        assignment = CrewAssignment(**assignment_data.dict())
-        await db.crew_assignments.insert_one(assignment.dict())
+        assignment = CrewAssignment(**assignment_data.model_dump())
+        await db.crew_assignments.insert_one(assignment.model_dump())
         return assignment
     except Exception as e:
         raise HTTPException(status_code=500, detail="Interner Serverfehler. Details wurden protokolliert.")
@@ -7475,7 +7430,7 @@ async def assign_crew_to_event(
                 crew_ids=crew_ids,
                 vehicle_id=vehicle_id
             )
-            await db.crew_assignments.insert_one(assignment.dict())
+            await db.crew_assignments.insert_one(assignment.model_dump())
         
         return {"status": "success"}
     except Exception as e:
@@ -7625,11 +7580,11 @@ async def create_bundle(
             raise HTTPException(status_code=400, detail="Bundle-Code existiert bereits")
         
         # Calculate totals
-        items_dict = [item.dict() for item in bundle_data.items]
+        items_dict = [item.model_dump() for item in bundle_data.items]
         totals = await calculate_bundle_totals(items_dict)
         
         # Create bundle data dict and override bundle_code
-        bundle_dict = bundle_data.dict()
+        bundle_dict = bundle_data.model_dump()
         bundle_dict['bundle_code'] = bundle_code  # Use generated/validated code
         
         bundle = Bundle(
@@ -7638,7 +7593,7 @@ async def create_bundle(
             created_by=current_user.id
         )
         
-        await db.bundles.insert_one(bundle.dict())
+        await db.bundles.insert_one(bundle.model_dump())
         
         return bundle
         
@@ -7659,12 +7614,12 @@ async def update_bundle(
     if not bundle:
         raise HTTPException(status_code=404, detail="Bundle nicht gefunden")
     
-    update_data = {k: v for k, v in bundle_data.dict().items() if v is not None}
+    update_data = {k: v for k, v in bundle_data.model_dump().items() if v is not None}
     update_data["updated_at"] = datetime.now(timezone.utc)
     
     # Recalculate totals if items changed
     if "items" in update_data:
-        items_dict = [item.dict() if hasattr(item, 'dict') else item for item in update_data["items"]]
+        items_dict = [item.model_dump() if hasattr(item, 'model_dump') else item for item in update_data["items"]]
         totals = await calculate_bundle_totals(items_dict)
         update_data.update(totals)
     
@@ -7749,7 +7704,7 @@ async def book_bundle(
                 created_by=current_user.id
             )
             
-            await db.bookings.insert_one(booking.dict())
+            await db.bookings.insert_one(booking.model_dump())
             bookings_created.append({
                 "booking_id": booking.id,
                 "article_name": article.get("name"),
@@ -7845,6 +7800,9 @@ api_router.include_router(_vehicles_router)
 
 from app.routes.messages import router as _messages_router
 api_router.include_router(_messages_router)
+
+from app.routes.suppliers import router as _suppliers_router
+api_router.include_router(_suppliers_router)
 
 app.include_router(api_router)
 
@@ -8093,8 +8051,8 @@ async def get_app_settings(current_user: User = Depends(get_current_user)):
     doc = await db.app_settings.find_one({"_id": "main"})
     if not doc:
         defaults = AppSettings()
-        await db.app_settings.insert_one({"_id": "main", **defaults.dict()})
-        return defaults.dict()
+        await db.app_settings.insert_one({"_id": "main", **defaults.model_dump()})
+        return defaults.model_dump()
     doc.pop("_id", None)
     return doc
 
@@ -8108,7 +8066,7 @@ async def update_app_settings(settings: AppSettings, current_user: User = Depend
 
     # Find what changed
     changes = {}
-    for field, new_value in settings.dict().items():
+    for field, new_value in settings.model_dump().items():
         if field in ['settings_version', 'version_history']:
             continue
         old_value = getattr(old_settings, field, None)
@@ -8133,10 +8091,10 @@ async def update_app_settings(settings: AppSettings, current_user: User = Depend
 
     await db.app_settings.update_one(
         {"_id": "main"},
-        {"$set": settings.dict()},
+        {"$set": settings.model_dump()},
         upsert=True
     )
-    return settings.dict()
+    return settings.model_dump()
 
 @app.get("/api/settings/versions")
 async def get_settings_versions(current_user: User = Depends(get_current_user)):
@@ -8161,7 +8119,7 @@ async def restore_settings_version(version: int, current_user: User = Depends(ge
     current_settings = AppSettings(**{k: v for k, v in current_doc.items() if k != "_id"}) if current_doc else AppSettings()
 
     # Restore the old values
-    restored_settings = current_settings.dict()
+    restored_settings = current_settings.model_dump()
     for field, values in version_entry["changes"].items():
         restored_settings[field] = values["old"]
 
@@ -8317,7 +8275,7 @@ async def create_task(task: TaskCreate, current_user: User = Depends(get_current
             "id": task_id,
             "created_at": _dt.utcnow().isoformat(),
             "created_by": getattr(current_user, "username", str(current_user)),
-            **task.dict(),
+            **task.model_dump(),
         }
         await db.tasks.insert_one(doc)
         doc.pop("_id", None)
@@ -8327,8 +8285,8 @@ async def create_task(task: TaskCreate, current_user: User = Depends(get_current
 
 @app.put("/api/tasks/{task_id}")
 async def update_task(task_id: str, task: TaskCreate, current_user: dict = Depends(get_current_user)):
-    await db.tasks.update_one({"_id": task_id}, {"$set": task.dict()})
-    return {"id": task_id, **task.dict()}
+    await db.tasks.update_one({"_id": task_id}, {"$set": task.model_dump()})
+    return {"id": task_id, **task.model_dump()}
 
 @app.delete("/api/tasks/{task_id}")
 async def delete_task(task_id: str, current_user: dict = Depends(get_current_user)):
@@ -8352,7 +8310,7 @@ async def get_serial_numbers(article_id: Optional[str] = None, current_user: dic
 
 @app.post("/api/serial-numbers")
 async def create_serial_number(sn: SerialNumber, current_user: dict = Depends(get_current_user)):
-    doc = sn.dict()
+    doc = sn.model_dump()
     doc["_id"] = doc["id"]
     await db.serial_numbers.insert_one(doc)
     doc.pop("_id", None)
@@ -8360,8 +8318,8 @@ async def create_serial_number(sn: SerialNumber, current_user: dict = Depends(ge
 
 @app.put("/api/serial-numbers/{sn_id}")
 async def update_serial_number(sn_id: str, sn: SerialNumberCreate, current_user: dict = Depends(get_current_user)):
-    await db.serial_numbers.update_one({"_id": sn_id}, {"$set": sn.dict()})
-    return {"id": sn_id, **sn.dict()}
+    await db.serial_numbers.update_one({"_id": sn_id}, {"$set": sn.model_dump()})
+    return {"id": sn_id, **sn.model_dump()}
 
 @app.delete("/api/serial-numbers/{sn_id}")
 async def delete_serial_number(sn_id: str, current_user: dict = Depends(get_current_user)):
@@ -8382,7 +8340,7 @@ async def get_absence_requests(current_user: dict = Depends(get_current_user)):
 
 @app.post("/api/absence-requests")
 async def create_absence_request(req: AbsenceRequest, current_user: dict = Depends(get_current_user)):
-    doc = req.dict()
+    doc = req.model_dump()
     doc["_id"] = doc["id"]
     await db.absence_requests.insert_one(doc)
     return doc
@@ -8412,8 +8370,8 @@ async def sign_absence_request(req_id: str, body: dict, current_user: dict = Dep
 
 @app.put("/api/absence-requests/{req_id}")
 async def update_absence_request(req_id: str, req: AbsenceRequestCreate, current_user: dict = Depends(get_current_user)):
-    await db.absence_requests.update_one({"_id": req_id}, {"$set": req.dict()})
-    return {"id": req_id, **req.dict()}
+    await db.absence_requests.update_one({"_id": req_id}, {"$set": req.model_dump()})
+    return {"id": req_id, **req.model_dump()}
 
 @app.delete("/api/absence-requests/{req_id}")
 async def delete_absence_request(req_id: str, current_user: dict = Depends(get_current_user)):
@@ -8463,7 +8421,7 @@ async def start_stock_count(current_user: dict = Depends(get_current_user)):
 
 @app.post("/api/stock-counts")
 async def create_stock_count(sc: StockCount, current_user: User = Depends(get_current_user)):
-    doc = sc.dict()
+    doc = sc.model_dump()
     doc["_id"] = doc["id"]
     doc["created_by"] = current_user.username
     await db.stock_counts.insert_one(doc)
@@ -8480,8 +8438,8 @@ async def get_stock_count(sc_id: str, current_user: dict = Depends(get_current_u
 
 @app.put("/api/stock-counts/{sc_id}")
 async def update_stock_count(sc_id: str, sc: StockCountCreate, current_user: dict = Depends(get_current_user)):
-    await db.stock_counts.update_one({"_id": sc_id}, {"$set": sc.dict()})
-    return {"id": sc_id, **sc.dict()}
+    await db.stock_counts.update_one({"_id": sc_id}, {"$set": sc.model_dump()})
+    return {"id": sc_id, **sc.model_dump()}
 
 @app.delete("/api/stock-counts/{sc_id}")
 async def delete_stock_count(sc_id: str, current_user: dict = Depends(get_current_user)):
@@ -8502,15 +8460,15 @@ async def get_inspections(current_user: dict = Depends(get_current_user)):
 
 @app.post("/api/inspections")
 async def create_inspection(insp: Inspection, current_user: dict = Depends(get_current_user)):
-    doc = insp.dict()
+    doc = insp.model_dump()
     doc["_id"] = doc["id"]
     await db.inspections.insert_one(doc)
     return doc
 
 @app.put("/api/inspections/{insp_id}")
 async def update_inspection(insp_id: str, insp: InspectionCreate, current_user: dict = Depends(get_current_user)):
-    await db.inspections.update_one({"_id": insp_id}, {"$set": insp.dict()})
-    return {"id": insp_id, **insp.dict()}
+    await db.inspections.update_one({"_id": insp_id}, {"$set": insp.model_dump()})
+    return {"id": insp_id, **insp.model_dump()}
 
 @app.delete("/api/inspections/{insp_id}")
 async def delete_inspection(insp_id: str, current_user: dict = Depends(get_current_user)):
@@ -8584,7 +8542,7 @@ async def create_purchase_order(po: PurchaseOrderCreate, current_user: User = De
         "created_at": _dt.utcnow().isoformat(),
         "created_by": current_user.username,
         "order_number": f"PO-{year}-{count + 1:04d}",
-        **po.dict(),
+        **po.model_dump(),
     }
     await db.purchase_orders.insert_one(doc)
     doc.pop("_id", None)
@@ -8601,8 +8559,8 @@ async def get_purchase_order(po_id: str, current_user: User = Depends(get_curren
 
 @app.put("/api/purchase-orders/{po_id}")
 async def update_purchase_order(po_id: str, po: PurchaseOrderCreate, current_user: User = Depends(get_current_user)):
-    await db.purchase_orders.update_one({"_id": po_id}, {"$set": po.dict()})
-    return {"id": po_id, **po.dict()}
+    await db.purchase_orders.update_one({"_id": po_id}, {"$set": po.model_dump()})
+    return {"id": po_id, **po.model_dump()}
 
 @app.delete("/api/purchase-orders/{po_id}")
 async def delete_purchase_order(po_id: str, current_user: User = Depends(get_current_user)):
@@ -8640,7 +8598,7 @@ async def get_activities(
 
 @app.post("/api/activities")
 async def create_activity(activity: Activity, current_user: User = Depends(get_current_user)):
-    doc = activity.dict()
+    doc = activity.model_dump()
     doc["_id"] = doc["id"]
     await db.activities.insert_one(doc)
     doc.pop("_id", None)
@@ -8648,8 +8606,8 @@ async def create_activity(activity: Activity, current_user: User = Depends(get_c
 
 @app.put("/api/activities/{activity_id}")
 async def update_activity(activity_id: str, activity: ActivityCreate, current_user: User = Depends(get_current_user)):
-    await db.activities.update_one({"_id": activity_id}, {"$set": activity.dict()})
-    return {"id": activity_id, **activity.dict()}
+    await db.activities.update_one({"_id": activity_id}, {"$set": activity.model_dump()})
+    return {"id": activity_id, **activity.model_dump()}
 
 @app.delete("/api/activities/{activity_id}")
 async def delete_activity(activity_id: str, current_user: User = Depends(get_current_user)):
@@ -8672,7 +8630,7 @@ async def get_cross_docking(current_user: User = Depends(get_current_user)):
 
 @app.post("/api/cross-docking")
 async def create_cross_docking(cd: CrossDocking, current_user: User = Depends(get_current_user)):
-    doc = cd.dict()
+    doc = cd.model_dump()
     doc["_id"] = doc["id"]
     await db.cross_docking.insert_one(doc)
     doc.pop("_id", None)
@@ -8680,8 +8638,8 @@ async def create_cross_docking(cd: CrossDocking, current_user: User = Depends(ge
 
 @app.put("/api/cross-docking/{cd_id}")
 async def update_cross_docking(cd_id: str, cd: CrossDockingCreate, current_user: User = Depends(get_current_user)):
-    await db.cross_docking.update_one({"_id": cd_id}, {"$set": cd.dict()})
-    return {"id": cd_id, **cd.dict()}
+    await db.cross_docking.update_one({"_id": cd_id}, {"$set": cd.model_dump()})
+    return {"id": cd_id, **cd.model_dump()}
 
 @app.delete("/api/cross-docking/{cd_id}")
 async def delete_cross_docking(cd_id: str, current_user: User = Depends(get_current_user)):
@@ -8718,7 +8676,7 @@ async def get_job_board(
 
 @app.post("/api/job-board")
 async def create_job_board_entry(entry: JobBoardEntry, current_user: User = Depends(get_current_user)):
-    doc = entry.dict()
+    doc = entry.model_dump()
     doc["_id"] = doc["id"]
     await db.job_board.insert_one(doc)
     doc.pop("_id", None)
@@ -8732,8 +8690,8 @@ async def update_job_board_entry(entry_id: str, entry: JobBoardEntryCreate, curr
         raise HTTPException(status_code=404, detail="Job Board Eintrag nicht gefunden")
     if existing.get("created_by") and existing["created_by"] != current_user.username and current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Keine Berechtigung diesen Eintrag zu bearbeiten")
-    await db.job_board.update_one({"_id": entry_id}, {"$set": entry.dict()})
-    return {"id": entry_id, **entry.dict()}
+    await db.job_board.update_one({"_id": entry_id}, {"$set": entry.model_dump()})
+    return {"id": entry_id, **entry.model_dump()}
 
 @app.delete("/api/job-board/{entry_id}")
 async def delete_job_board_entry(entry_id: str, current_user: User = Depends(get_current_user)):
@@ -8783,7 +8741,7 @@ async def create_communication_log(log: CommunicationLogCreate, current_user: Us
         "id": log_id,
         "created_at": _dt.utcnow().isoformat(),
         "created_by": current_user.username,
-        **log.dict(),
+        **log.model_dump(),
     }
     await db.communication_log.insert_one(doc)
     doc.pop("_id", None)
@@ -8797,8 +8755,8 @@ async def update_communication_log(log_id: str, log: CommunicationLogCreate, cur
         raise HTTPException(status_code=404, detail="Kommunikationseintrag nicht gefunden")
     if existing.get("created_by") and existing["created_by"] != current_user.username and current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Keine Berechtigung diesen Eintrag zu bearbeiten")
-    await db.communication_log.update_one({"_id": log_id}, {"$set": log.dict()})
-    return {"id": log_id, **log.dict()}
+    await db.communication_log.update_one({"_id": log_id}, {"$set": log.model_dump()})
+    return {"id": log_id, **log.model_dump()}
 
 @app.delete("/api/communication-log/{log_id}")
 async def delete_communication_log(log_id: str, current_user: User = Depends(get_current_user)):
@@ -8914,8 +8872,8 @@ async def get_rental_requests(status: Optional[str] = None, current_user: User =
 
 @app.post("/api/rental-requests")
 async def create_rental_request(data: RentalRequestCreate, current_user: User = Depends(get_current_user)):
-    item = RentalRequest(**data.dict(), created_by=current_user.username)
-    doc = item.dict()
+    item = RentalRequest(**data.model_dump(), created_by=current_user.username)
+    doc = item.model_dump()
     doc["_id"] = doc["id"]
     await db.rental_requests.insert_one(doc)
     doc.pop("_id", None)
@@ -8923,7 +8881,7 @@ async def create_rental_request(data: RentalRequestCreate, current_user: User = 
 
 @app.put("/api/rental-requests/{item_id}")
 async def update_rental_request(item_id: str, data: RentalRequestCreate, current_user: User = Depends(get_current_user)):
-    result = await db.rental_requests.update_one({"id": item_id}, {"$set": data.dict()})
+    result = await db.rental_requests.update_one({"id": item_id}, {"$set": data.model_dump()})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Rental request not found")
     updated = await db.rental_requests.find_one({"id": item_id})
