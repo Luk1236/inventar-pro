@@ -41,7 +41,7 @@ export default function EventsPage() {
   useFocusEffect(useCallback(() => { loadEvents(); }, []));
 
   useWebSocket((msg) => {
-    if (msg.type === 'event_created' || msg.type === 'event_updated') {
+    if (msg.type === 'event_created' || msg.type === 'event_updated' || msg.type === 'event_deleted') {
       loadEvents();
     }
   });

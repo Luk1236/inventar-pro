@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     MAX_EXPORT_ROWS: int = 5000
     MAX_BACKUP_SIZE_MB: int = 500
     MAX_IMPORT_ROWS: int = 1000
-    DASHBOARD_CACHE_TTL: int = 30
+    DASHBOARD_CACHE_TTL: int = 300
 
     @property
     def allowed_origins_list(self) -> List[str]:

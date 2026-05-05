@@ -85,10 +85,10 @@ export function useWebSocket(onMessage: (msg: WsMessage) => void): void {
     };
 
     ws.onclose = () => {
-      if (mountedRef.current && attemptsRef.current < 5) {
-        const delay = Math.pow(2, attemptsRef.current) * 1000;
+      if (mountedRef.current) {
+        // Exponential backoff, capped at 30s — reconnects indefinitely
+        const delay = Math.min(Math.pow(2, attemptsRef.current) * 1000, 30000);
         attemptsRef.current += 1;
-        // Store timer ref so it can be cleared on unmount
         reconnectTimerRef.current = setTimeout(connect, delay);
       }
     };

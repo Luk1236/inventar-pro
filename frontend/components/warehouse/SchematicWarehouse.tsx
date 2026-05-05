@@ -460,29 +460,42 @@ export default function SchematicWarehouse({ zones, locations, articles, selecte
               onClick={() => { setEditMode(v => !v); if (editMode) setEditSelectedId(null); }}
               title={editMode ? 'Bearbeitung verlassen' : 'Layout bearbeiten — Regal anklicken, dann Pfeiltasten ←→↑↓ zum 90°-Drehen'}
               style={{
-                padding: '9px 16px', borderRadius: 12,
-                border: `1px solid ${editMode ? '#FF9500' : 'rgba(255,255,255,0.2)'}`,
-                background: editMode ? 'rgba(255,149,0,0.28)' : 'rgba(255,255,255,0.10)',
-                backdropFilter: 'blur(12px)', color: editMode ? '#FF9500' : 'white',
-                fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                padding: '8px 14px', borderRadius: 10,
+                border: `1px solid ${editMode ? 'rgba(255,149,0,0.5)' : 'rgba(255,255,255,0.12)'}`,
+                background: editMode
+                  ? 'linear-gradient(135deg,rgba(255,149,0,0.22),rgba(255,149,0,0.12))'
+                  : 'rgba(255,255,255,0.07)',
+                backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+                color: editMode ? '#FF9500' : 'rgba(255,255,255,0.85)',
+                fontSize: 12, fontWeight: 700, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 7,
+                boxShadow: editMode ? '0 4px 16px rgba(255,149,0,0.2)' : '0 2px 12px rgba(0,0,0,0.5)',
+                transition: 'all 0.18s',
               }}>
-              <span style={{ fontSize: 15 }}>{editMode ? '✓' : '✏'}</span>
+              <span style={{ fontSize: 14 }}>{editMode ? '✓' : '✏️'}</span>
               {editMode ? 'Bearbeiten aktiv' : 'Layout bearbeiten'}
             </button>
             {!editMode && (
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', padding: '0 4px', maxWidth: 200, lineHeight: 1.4 }}>
+              <div style={{
+                fontSize: 10, color: 'rgba(255,255,255,0.35)',
+                padding: '4px 6px', lineHeight: 1.5,
+                background: 'rgba(0,0,0,0.3)', borderRadius: 7,
+                border: '1px solid rgba(255,255,255,0.06)',
+              }}>
                 Klick + ← → = Regal drehen
               </div>
             )}
             {editMode && editSelectedId && (
               <div style={{
-                background: 'rgba(5,12,28,0.9)', borderRadius: 10, padding: '8px 12px',
-                border: '1px solid rgba(255,149,0,0.25)', color: '#FFD700',
-                fontSize: 11, fontWeight: 700,
+                background: 'rgba(4,10,24,0.95)',
+                backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+                borderRadius: 10, padding: '9px 13px',
+                border: '1px solid rgba(255,149,0,0.3)',
+                color: '#FFD700', fontSize: 11, fontWeight: 700,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
               }}>
                 ▶ {locations.find(l => l.id === editSelectedId)?.name ?? editSelectedId}
-                <div style={{ color: 'rgba(255,255,255,0.55)', fontWeight: 400, marginTop: 4 }}>
+                <div style={{ color: 'rgba(255,255,255,0.45)', fontWeight: 400, marginTop: 5, fontSize: 10 }}>
                   ← → ↑ ↓ = 90° drehen
                 </div>
               </div>
@@ -491,73 +504,159 @@ export default function SchematicWarehouse({ zones, locations, articles, selecte
         )}
 
         {/* Zoom controls + Heatmap toggle */}
-        <div style={{ position: 'absolute', top: 16, right: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{
+          position: 'absolute', top: 16, right: 16,
+          display: 'flex', flexDirection: 'column', gap: 6,
+          alignItems: 'center',
+        }}>
+          {/* Heatmap toggle */}
           <button
             onClick={() => setHeatmapMode(v => !v)}
-            title={heatmapMode
-              ? 'Heatmap aus — Standard-Füllstand-Farben'
-              : 'Heatmap an — Regale nach Stock-vs-Mindestbestand einfärben'}
+            title={heatmapMode ? 'Heatmap aus' : 'Heatmap an — Regale nach Bestand einfärben'}
             style={{
-              width: 38, height: 38, borderRadius: 10,
-              background: heatmapMode ? 'rgba(255,200,0,0.28)' : 'rgba(255,255,255,0.10)',
-              border: `1px solid ${heatmapMode ? 'rgba(255,200,0,0.7)' : 'rgba(255,255,255,0.2)'}`,
-              backdropFilter: 'blur(8px)',
-              color: heatmapMode ? '#FFC800' : 'white',
-              fontSize: 18, cursor: 'pointer',
+              width: 36, height: 36, borderRadius: 9,
+              background: heatmapMode
+                ? 'linear-gradient(135deg,rgba(255,200,0,0.3),rgba(255,150,0,0.2))'
+                : 'rgba(255,255,255,0.07)',
+              border: `1px solid ${heatmapMode ? 'rgba(255,200,0,0.55)' : 'rgba(255,255,255,0.12)'}`,
+              backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+              color: heatmapMode ? '#FFC800' : 'rgba(255,255,255,0.7)',
+              fontSize: 17, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: heatmapMode ? '0 0 10px rgba(255,200,0,0.3)' : '0 2px 10px rgba(0,0,0,0.4)',
+              boxShadow: heatmapMode ? '0 4px 14px rgba(255,200,0,0.25)' : '0 2px 10px rgba(0,0,0,0.45)',
+              transition: 'all 0.18s',
             }}>
             🌡
           </button>
-          {[['＋', () => setScale(s => Math.min(4, s * 1.25))], ['－', () => setScale(s => Math.max(0.2, s * 0.8))], ['○', () => { setScale(1); setOffset({ x: 0, y: 0 }); }]].map(([label, fn]: any) => (
-            <button key={label} onClick={fn} style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(255,255,255,0.10)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', fontSize: label === '○' ? 18 : 22, fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(0,0,0,0.4)' }}>
-              {label}
-            </button>
-          ))}
-          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, textAlign: 'center' }}>{Math.round(scale * 100)}%</div>
+
+          {/* Divider */}
+          <div style={{ width: 1, height: 6, background: 'rgba(255,255,255,0.1)' }} />
+
+          {/* Zoom group */}
+          <div style={{
+            display: 'flex', flexDirection: 'column',
+            background: 'rgba(4,10,24,0.88)',
+            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 10, overflow: 'hidden',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+          }}>
+            {[
+              ['＋', () => setScale((s: number) => Math.min(4, s * 1.25)), '22px'],
+              ['－', () => setScale((s: number) => Math.max(0.2, s * 0.8)), '22px'],
+              ['⊙', () => { setScale(1); setOffset({ x: 0, y: 0 }); }, '18px'],
+            ].map(([label, fn, sz]: any, i) => (
+              <button key={label} onClick={fn} style={{
+                width: 36, height: 34,
+                background: 'transparent',
+                border: 'none',
+                borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.07)' : 'none',
+                color: 'rgba(255,255,255,0.75)', fontSize: sz,
+                fontWeight: 'bold', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'background 0.1s',
+              }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div style={{
+            color: 'rgba(255,255,255,0.35)', fontSize: 9,
+            fontFamily: 'ui-monospace,monospace', fontWeight: 600,
+          }}>
+            {Math.round(scale * 100)}%
+          </div>
         </div>
 
         {/* Legend */}
-        <div style={{ position: 'absolute', bottom: 14, left: 14, background: 'rgba(8,16,32,0.88)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '12px 16px', minWidth: 190 }}>
-          <div style={{ color: '#B0C4DE', fontSize: 10, fontWeight: 700, letterSpacing: 1.5, marginBottom: 10, textTransform: 'uppercase' }}>Legende</div>
-          {[['#4CAF50', 'Verfügbar (< 70%)'], ['#FF9800', 'Auslastung (70–92%)'], ['#EF5350', 'Kritisch (> 92%)'], ['#0A1828', 'Leer']].map(([c, l]) => (
-            <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 7 }}>
-              <div style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: c, border: '1px solid rgba(255,255,255,0.2)', boxShadow: c !== '#0A1828' ? `0 0 5px ${c}88` : 'none' }} />
-              <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>{l}</span>
+        <div style={{
+          position: 'absolute', bottom: 14, left: 14,
+          background: 'rgba(4,10,24,0.92)',
+          backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+          border: '1px solid rgba(255,255,255,0.09)',
+          borderRadius: 11, padding: '11px 14px', minWidth: 186,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+        }}>
+          <div style={{
+            color: 'rgba(255,255,255,0.4)', fontSize: 9,
+            fontWeight: 700, letterSpacing: '0.12em',
+            marginBottom: 10, textTransform: 'uppercase',
+          }}>
+            Füllstand
+          </div>
+          {[
+            ['#4CAF50', 'Verfügbar', '< 70%'],
+            ['#FF9800', 'Auslastung', '70–92%'],
+            ['#EF5350', 'Kritisch', '> 92%'],
+            ['#1a2840', 'Leer', '—'],
+          ].map(([c, label, pct]) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
+              <div style={{
+                width: 12, height: 12, borderRadius: 3, flexShrink: 0,
+                backgroundColor: c,
+                boxShadow: c !== '#1a2840' ? `0 0 6px ${c}66` : 'inset 0 0 0 1px rgba(255,255,255,0.1)',
+              }} />
+              <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, flex: 1 }}>{label}</span>
+              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, fontFamily: 'ui-monospace,monospace' }}>{pct}</span>
             </div>
           ))}
         </div>
 
         {/* Hint */}
-        <div style={{ position: 'absolute', bottom: 14, right: 16, color: 'rgba(255,255,255,0.28)', fontSize: 10, pointerEvents: 'none', textAlign: 'right' }}>
+        <div style={{
+          position: 'absolute', bottom: 14, right: 16,
+          color: 'rgba(255,255,255,0.22)', fontSize: 10,
+          pointerEvents: 'none', textAlign: 'right', lineHeight: 1.6,
+          fontFamily: 'system-ui,sans-serif',
+        }}>
           Ziehen = Verschieben<br />Ctrl+Scroll = Zoomen
         </div>
 
         {/* Hover Tooltip */}
         {tooltip && (
           <div style={{
-            position: 'fixed', left: tooltip.x + 14, top: tooltip.y - 10,
-            background: 'rgba(5,12,28,0.97)', border: '1px solid rgba(100,160,255,0.3)',
-            borderRadius: 10, padding: '10px 14px', maxWidth: 220,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.6)', pointerEvents: 'none', zIndex: 9999,
+            position: 'fixed', left: tooltip.x + 16, top: tooltip.y - 12,
+            background: 'rgba(4,10,26,0.97)',
+            backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
+            border: '1px solid rgba(100,160,255,0.22)',
+            borderRadius: 11, padding: '11px 14px', maxWidth: 230,
+            boxShadow: '0 12px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.03)',
+            pointerEvents: 'none', zIndex: 9999,
           }}>
-            <div style={{ color: '#64B5F6', fontWeight: 700, fontSize: 12, marginBottom: 5 }}>
+            <div style={{
+              color: '#60a5fa', fontWeight: 700, fontSize: 12, marginBottom: 7,
+              display: 'flex', alignItems: 'center', gap: 5,
+            }}>
+              <span style={{ fontSize: 9, opacity: 0.5 }}>▪</span>
               {tooltip.loc.name}
             </div>
+            <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.07)', marginBottom: 7 }} />
             {tooltip.arts.length === 0 ? (
-              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>Keine Artikel</div>
+              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>Keine Artikel</div>
             ) : (
               tooltip.arts.slice(0, 8).map(a => (
-                <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 3 }}>
-                  <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11 }}>{a.name}</span>
-                  <span style={{ color: a.current_stock < a.min_stock_level ? '#EF5350' : a.current_stock <= a.min_stock_level * 1.3 ? '#FF9800' : '#4CAF50', fontSize: 11, fontWeight: 700 }}>
+                <div key={a.id} style={{
+                  display: 'flex', justifyContent: 'space-between',
+                  gap: 12, marginBottom: 4, alignItems: 'center',
+                }}>
+                  <span style={{ color: 'rgba(255,255,255,0.78)', fontSize: 11 }}>{a.name}</span>
+                  <span style={{
+                    color: a.current_stock < a.min_stock_level ? '#EF5350'
+                      : a.current_stock <= a.min_stock_level * 1.3 ? '#FF9800' : '#4CAF50',
+                    fontSize: 11, fontWeight: 700,
+                    fontFamily: 'ui-monospace,monospace',
+                  }}>
                     {a.current_stock}
                   </span>
                 </div>
               ))
             )}
             {tooltip.arts.length > 8 && (
-              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, marginTop: 4 }}>
+              <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, marginTop: 5 }}>
                 +{tooltip.arts.length - 8} weitere
               </div>
             )}

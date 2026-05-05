@@ -189,16 +189,16 @@ class Article(BaseModel):
 
 
 class ArticleCreate(BaseModel):
-    name: str = Field(..., max_length=255)
+    name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = Field(None, max_length=5000)
     category_id: Optional[str] = None  # Made optional
     supplier_id: Optional[str] = None
     serial_number: Optional[str] = Field(None, max_length=100)
-    inventory_code: Optional[str] = None
+    inventory_code: Optional[str] = Field(None, max_length=100)
     base_unit: str = Field("Stück", max_length=50)
-    current_stock: int = 0
-    min_stock_level: int = 0
-    price_per_unit: float = 0.0
+    current_stock: int = Field(default=0, ge=0)
+    min_stock_level: int = Field(default=0, ge=0)
+    price_per_unit: float = Field(default=0.0, ge=0)
     rental_price: Optional[float] = None
     # NEW: Gestaffelte Mietpreise
     rental_price_day: Optional[float] = None

@@ -1,0 +1,19 @@
+[Unit]
+Description=Inventar Pro Frontend (Expo Web)
+After=network.target inventar-backend.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/inventar/Final-main/frontend
+ExecStart=/usr/bin/npx expo start --web --port 8081 --no-dev
+Restart=always
+RestartSec=10
+Environment=NODE_ENV=production
+Environment=CI=1
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=inventar-frontend
+
+[Install]
+WantedBy=multi-user.target

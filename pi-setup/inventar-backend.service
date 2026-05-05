@@ -1,0 +1,19 @@
+[Unit]
+Description=Inventar Pro Backend (FastAPI)
+After=network.target mongod.service
+Requires=mongod.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/inventar/Final-main/backend
+Environment=PATH=/home/pi/inventar/Final-main/backend/.venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/pi/inventar/Final-main/backend/.venv/bin/python3 server.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=inventar-backend
+
+[Install]
+WantedBy=multi-user.target

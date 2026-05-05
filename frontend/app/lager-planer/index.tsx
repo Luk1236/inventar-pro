@@ -17,7 +17,7 @@ const WarehouseVisualizer3D = React.lazy(() =>
 
 const ThreeDFallback = () => (
   <View style={styles.center}>
-    <ActivityIndicator size="large" color="#488fe0" />
+    <ActivityIndicator size="large" color="#3b82f6" />
     <Text style={styles.hint}>3D-Engine wird geladen…</Text>
   </View>
 )
@@ -64,7 +64,7 @@ export default function Warehouse3DScreen() {
               onPress={() => setMode(m)}
             >
               <Text style={[styles.tabText, mode === m && styles.tabTextActive]}>
-                {m === 'planer' ? '🧊 Planer' : '📦 Live'}
+                {m === 'planer' ? '⬡ Planer' : '◈ Live'}
               </Text>
             </TouchableOpacity>
           ))}
@@ -112,24 +112,50 @@ export default function Warehouse3DScreen() {
 }
 
 const styles = StyleSheet.create({
-  root:          { flex: 1, backgroundColor: '#0d1720' },
-  header:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
-                   paddingTop: 50, paddingBottom: 12, backgroundColor: '#111b2a',
-                   borderBottomWidth: 1, borderBottomColor: '#1d3a5c' },
-  backBtn:       { paddingRight: 12 },
-  backText:      { color: '#3b82f6', fontSize: 15, fontWeight: '600' },
-  title:         { flex: 1, color: '#e2e8f0', fontSize: 17, fontWeight: '700' },
-  tabs:          { flexDirection: 'row', gap: 4 },
-  tab:           { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
-                   backgroundColor: '#08121e' },
-  tabActive:     { backgroundColor: '#3b82f6' },
-  tabText:       { color: '#64748b', fontSize: 12, fontWeight: '600' },
-  tabTextActive: { color: '#fff' },
+  root:          { flex: 1, backgroundColor: '#080f1c' },
+  header:        {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingTop: 50, paddingBottom: 14,
+    backgroundColor: '#0c1929',
+    borderBottomWidth: 1, borderBottomColor: 'rgba(30,64,148,0.4)',
+  },
+  backBtn:       {
+    paddingRight: 14, paddingVertical: 4,
+  },
+  backText:      { color: '#60a5fa', fontSize: 15, fontWeight: '600' },
+  title:         {
+    flex: 1, color: '#e8edf5', fontSize: 17, fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  tabs:          {
+    flexDirection: 'row', gap: 3,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 10, padding: 3,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
+  },
+  tab:           {
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 8,
+  },
+  tabActive:     {
+    backgroundColor: '#2563eb',
+    shadowColor: '#3b82f6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  tabText:       { color: '#4e6a85', fontSize: 12, fontWeight: '600' },
+  tabTextActive: { color: '#fff', fontSize: 12, fontWeight: '700' },
   canvas:        { flex: 1 },
   center:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  hint:          { color: '#64748b', fontSize: 14 },
+  hint:          { color: '#4e6a85', fontSize: 14 },
   errorText:     { color: '#FF453A', fontSize: 14 },
-  retryBtn:      { backgroundColor: '#1d3a5c', paddingHorizontal: 20, paddingVertical: 10,
-                   borderRadius: 8 },
-  retryText:     { color: '#e2e8f0', fontSize: 13, fontWeight: '600' },
+  retryBtn:      {
+    backgroundColor: 'rgba(29,58,92,0.8)',
+    borderWidth: 1, borderColor: 'rgba(59,130,246,0.3)',
+    paddingHorizontal: 20, paddingVertical: 10,
+    borderRadius: 9,
+  },
+  retryText:     { color: '#e8edf5', fontSize: 13, fontWeight: '600' },
 })

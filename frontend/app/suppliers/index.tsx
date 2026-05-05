@@ -20,6 +20,7 @@ import { router } from 'expo-router';
 import apiService, { getToken } from '../../services/apiService';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useWebSocket } from '../../hooks/useWebSocket';
 
 interface Supplier {
   id: string;
@@ -52,6 +53,12 @@ export default function SuppliersPage() {
   useEffect(() => {
     loadSuppliers();
   }, []);
+
+  useWebSocket((msg) => {
+    if (msg.type === 'supplier_created' || msg.type === 'supplier_updated' || msg.type === 'supplier_deleted') {
+      loadSuppliers();
+    }
+  });
 
   const loadSuppliers = async () => {
     try {

@@ -146,11 +146,7 @@ export default function PackingListPage() {
 
   // 🔴 Live-WebSocket: Bildschirm sofort aktualisieren wenn ein anderer Nutzer etwas scannt
   useWebSocket((msg) => {
-    if (
-      msg.type === 'packing_list_updated' ||
-      msg.type === 'item_checked_out' ||
-      msg.type === 'item_checked_in'
-    ) {
+    if (msg.type === 'packing_list_updated') {
       if (selectedEventId) loadPackingList();
     }
   });

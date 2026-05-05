@@ -94,9 +94,15 @@ MAX_IMPORT_ROWS = settings.MAX_IMPORT_ROWS       # F10: bulk import cap
 DASHBOARD_CACHE_TTL = settings.DASHBOARD_CACHE_TTL  # F9: dashboard cache TTL (s)
 _ISO_DT_RE = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}')  # Strict ISO-8601 prefix
 
-# F9: In-memory dashboard cache — avoids 17 count_documents() calls on every page load
+# F9: In-memory dashboard cache — avoids 15 count_documents() calls on every page load
 _dashboard_cache: dict = {}
 _dashboard_cache_ts: float = 0.0
+
+def _invalidate_dashboard_cache() -> None:
+    """Cache leeren wenn sich dashboard-relevante Daten ändern."""
+    global _dashboard_cache, _dashboard_cache_ts
+    _dashboard_cache = {}
+    _dashboard_cache_ts = 0.0
 
 # Scheduler for daily backups
 scheduler = AsyncIOScheduler()
@@ -842,7 +848,8 @@ async def sync_now(current_user: User = Depends(get_current_user)):
 
 # Articles
 @api_router.post("/articles", response_model=Article)
-async def create_article(article_data: ArticleCreate, current_user: User = Depends(require_permission(Permission.CREATE_ARTICLE))):
+@limiter.limit("60/minute")
+async def create_article(request: Request, article_data: ArticleCreate, current_user: User = Depends(require_permission(Permission.CREATE_ARTICLE))):
     # Auto-generate inventory_code if not provided
     if not article_data.inventory_code:
         short_id = str(uuid.uuid4())[:6].upper()
@@ -858,6 +865,7 @@ async def create_article(article_data: ArticleCreate, current_user: User = Depen
 
     article = Article(**article_data.model_dump(), qr_code=qr_code)
     await db.articles.insert_one(article.model_dump())
+    _invalidate_dashboard_cache()
     await manager.broadcast(json.dumps({"type": "article_created", "id": str(article.id)}))
     return article
 
@@ -1009,6 +1017,15 @@ async def import_articles(
     current_user: User = Depends(get_current_user)
 ):
     """Import articles from CSV or Excel. Returns { imported: int, errors: List[str] }"""
+    # A6: Dateigrößen-Limit (50 MB dekodiert)
+    _MAX_IMPORT_BYTES = 50 * 1024 * 1024
+    _content = import_request.file_content or import_request.csv_content or ""
+    if len(_content) > _MAX_IMPORT_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Datei zu groß (max 50 MB). Bitte kleinere Datei verwenden."
+        )
+
     def _csv_safe(value: str) -> str:
         """H3: Prevent CSV/Excel formula injection by prefixing dangerous chars."""
         v = (value or "").strip()
@@ -1126,7 +1143,9 @@ async def get_article(article_id: UUID, current_user: User = Depends(get_current
     return Article(**article)
 
 @api_router.put("/articles/{article_id}", response_model=Article)
+@limiter.limit("120/minute")
 async def update_article(
+    request: Request,
     article_id: UUID,
     article_data: ArticleCreate,
     current_user: User = Depends(require_permission(Permission.EDIT_ARTICLE))
@@ -1146,7 +1165,8 @@ async def update_article(
     return Article(**updated_article)
 
 @api_router.delete("/articles/{article_id}")
-async def delete_article(article_id: UUID, current_user: User = Depends(require_permission(Permission.DELETE_ARTICLE))):
+@limiter.limit("30/minute")
+async def delete_article(request: Request, article_id: UUID, current_user: User = Depends(require_permission(Permission.DELETE_ARTICLE))):
     # V7: Soft-delete — preserves history and allows recovery
     result = await db.articles.update_one(
         {"id": str(article_id), "deleted": {"$ne": True}},
@@ -1158,6 +1178,7 @@ async def delete_article(article_id: UUID, current_user: User = Depends(require_
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Article not found")
+    _invalidate_dashboard_cache()
     await manager.broadcast(json.dumps({"type": "article_deleted", "id": str(article_id)}))
     return {"message": "Article deleted successfully"}
 
@@ -2041,51 +2062,14 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
     if _dashboard_cache and (time.monotonic() - _dashboard_cache_ts) < DASHBOARD_CACHE_TTL:
         return _dashboard_cache
 
-    total_articles = await db.articles.count_documents({"deleted": {"$ne": True}})
-    low_stock_articles = await db.articles.count_documents({
-        "$expr": {
-            "$and": [
-                {"$gt": ["$min_stock_level", 0]},
-                {"$lt": ["$current_stock", "$min_stock_level"]}
-            ]
-        }
-    })
-    
-    # Get articles needing maintenance
-    maintenance_due = await db.maintenance_tasks.count_documents({
-        "due_date": {"$lte": datetime.now(timezone.utc) + timedelta(days=7)},
-        "status": {"$ne": "completed"}
-    })
-    
-    # Overdue maintenance
-    overdue_maintenance = await db.maintenance_tasks.count_documents({
-        "due_date": {"$lt": datetime.now(timezone.utc)},
-        "status": {"$ne": "completed"}
-    })
-    
-    total_movements_today = await db.movements.count_documents({
-        "created_at": {"$gte": datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)}
-    })
-    
-    # Articles by status
-    defective_articles = await db.articles.count_documents({"status": "defekt"})
-    blocked_articles = await db.articles.count_documents({"status": "gesperrt"})
-    
-    # New statistics
-    total_customers = await db.customers.count_documents({"is_active": True})
-    total_events = await db.events.count_documents({})
-    active_events = await db.events.count_documents({
-        "status": {"$in": ["confirmed", "ongoing"]}
-    })
-    
-    # Events this month
+    # A1: Alle unabhängigen Queries parallel ausführen (asyncio.gather)
+    # statt ~10 sequenzieller count_documents-Calls.
     now = datetime.now(timezone.utc)
     start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    events_this_month = await db.events.count_documents({
-        "start_date": {"$gte": start_of_month}
-    })
-    
-    # Total inventory value — computed server-side via aggregation, no full collection load
+    start_of_day   = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    seven_days_ago = now - timedelta(days=7)
+    in_7_days      = now + timedelta(days=7)
+
     _value_pipeline = [
         {"$project": {"value": {"$multiply": [
             {"$ifNull": ["$price_per_unit", 0]},
@@ -2093,16 +2077,6 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
         ]}}},
         {"$group": {"_id": None, "total": {"$sum": "$value"}}}
     ]
-    _value_result = await db.articles.aggregate(_value_pipeline).to_list(1)
-    total_inventory_value = _value_result[0]["total"] if _value_result else 0
-    
-    # Movements statistics (last 7 days)
-    seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
-    movements_last_7_days = await db.movements.count_documents({
-        "created_at": {"$gte": seven_days_ago}
-    })
-
-    # Top 10 most-booked articles
     _top_pipeline = [
         {"$group": {"_id": "$article_id", "booking_count": {"$sum": 1}}},
         {"$sort": {"booking_count": -1}},
@@ -2120,18 +2094,54 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
             "booking_count": 1
         }}
     ]
-    _top_results = await db.bookings.aggregate(_top_pipeline).to_list(10)
-    top_rented = [
-        {"id": r["id"], "name": r["name"], "booking_count": r["booking_count"]}
-        for r in _top_results
-    ]
-
-    # Pending invoices
     _inv_pipeline = [
         {"$match": {"payment_status": {"$nin": ["paid", "bezahlt"]}}},
         {"$group": {"_id": None, "total": {"$sum": "$total_amount"}, "count": {"$sum": 1}}},
     ]
-    _inv_result = await db.invoices.aggregate(_inv_pipeline).to_list(1)
+
+    # Alle 13 Queries parallel starten (asyncio.gather → 1 Roundtrip-Batch)
+    (
+        total_articles,
+        low_stock_articles,
+        defective_articles,
+        blocked_articles,
+        maintenance_due,
+        overdue_maintenance,
+        total_movements_today,
+        movements_last_7_days,
+        total_customers,
+        total_events,
+        active_events,
+        events_this_month,
+        _value_result,
+        _top_results,
+        _inv_result,
+    ) = await asyncio.gather(
+        db.articles.count_documents({"deleted": {"$ne": True}}),
+        db.articles.count_documents({"$expr": {"$and": [
+            {"$gt": ["$min_stock_level", 0]},
+            {"$lt": ["$current_stock", "$min_stock_level"]}
+        ]}}),
+        db.articles.count_documents({"status": "defekt"}),
+        db.articles.count_documents({"status": "gesperrt"}),
+        db.maintenance_tasks.count_documents({"due_date": {"$lte": in_7_days}, "status": {"$ne": "completed"}}),
+        db.maintenance_tasks.count_documents({"due_date": {"$lt": now}, "status": {"$ne": "completed"}}),
+        db.movements.count_documents({"created_at": {"$gte": start_of_day}}),
+        db.movements.count_documents({"created_at": {"$gte": seven_days_ago}}),
+        db.customers.count_documents({"is_active": True}),
+        db.events.count_documents({}),
+        db.events.count_documents({"status": {"$in": ["confirmed", "ongoing"]}}),
+        db.events.count_documents({"start_date": {"$gte": start_of_month}}),
+        db.articles.aggregate(_value_pipeline).to_list(1),
+        db.bookings.aggregate(_top_pipeline).to_list(10),
+        db.invoices.aggregate(_inv_pipeline).to_list(1),
+    )
+
+    total_inventory_value = _value_result[0]["total"] if _value_result else 0
+    top_rented = [
+        {"id": r["id"], "name": r["name"], "booking_count": r["booking_count"]}
+        for r in _top_results
+    ]
     pending_invoices_total = round(float(_inv_result[0]["total"]), 2) if _inv_result else 0.0
     pending_invoices_count = _inv_result[0]["count"] if _inv_result else 0
 
@@ -2309,6 +2319,7 @@ async def delete_event(event_id: str, current_user: User = Depends(require_permi
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Event not found")
+    await manager.broadcast(json.dumps({"type": "event_deleted", "id": event_id}))
     return {"message": "Event deleted successfully"}
 
 # F1 — Generate invoice directly from an event's booked items
@@ -4291,170 +4302,8 @@ async def get_packing_list_items(event_id: str, current_user: User = Depends(get
         }
     }
 
-@api_router.post("/packing-list/checkout")
-async def checkout_items(checkout: PackingListCheckout, current_user: User = Depends(get_current_user)):
-    """Check out multiple items from the packing list"""
-    now = datetime.now(timezone.utc)
-    
-    updated_count = 0
-    for item_id in checkout.item_ids:
-        result = await db.packing_list_items.update_one(
-            {"id": item_id},
-            {"$set": {
-                "checked_out": True,
-                "checked_out_by": current_user.username,
-                "checked_out_at": now,
-                "checkout_condition": checkout.condition,
-                "checkout_notes": checkout.notes
-            }}
-        )
-        if result.modified_count > 0:
-            updated_count += 1
-    
-    if updated_count > 0:
-        from websocket_handler import manager
-        await manager.broadcast('{"type": "packing_list_updated"}')
-    return {"success": True, "updated": updated_count}
-
-@api_router.post("/packing-list/checkout-all/{event_id}")
-async def checkout_all_items(event_id: str, current_user: User = Depends(get_current_user)):
-    """Check out all items for an event"""
-    now = datetime.now(timezone.utc)
-    
-    result = await db.packing_list_items.update_many(
-        {"event_id": event_id, "checked_out": False},
-        {"$set": {
-            "checked_out": True,
-            "checked_out_by": current_user.username,
-            "checked_out_at": now,
-            "checkout_condition": "OK"
-        }}
-    )
-    
-    if result.modified_count > 0:
-        from websocket_handler import manager
-        await manager.broadcast('{"type": "packing_list_updated"}')
-    return {"success": True, "updated": result.modified_count}
-
-@api_router.post("/packing-list/checkin")
-async def checkin_item(checkin: PackingListCheckin, current_user: User = Depends(get_current_user)):
-    """Check in a single item with condition assessment"""
-    now = datetime.now(timezone.utc)
-    
-    # Get the item first
-    item = await db.packing_list_items.find_one({"id": checkin.item_id})
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    
-    # Update the item
-    update_data = {
-        "checked_in": True,
-        "checked_in_by": current_user.username,
-        "checked_in_at": now,
-        "checkin_condition": checkin.condition,
-        "checkin_notes": checkin.notes,
-        "checkin_photos": checkin.photos
-    }
-    
-    await db.packing_list_items.update_one(
-        {"id": checkin.item_id},
-        {"$set": update_data}
-    )
-    
-    # F3: Release serial numbers assigned to the booking back to "verfügbar"
-    booking_id = item.get("booking_id")
-    if booking_id:
-        booking = await db.bookings.find_one({"id": booking_id})
-        if booking and booking.get("serial_number_ids"):
-            await db.serial_numbers.update_many(
-                {"id": {"$in": booking["serial_number_ids"]}},
-                {"$set": {"status": "verfügbar", "updated_at": datetime.now(timezone.utc).isoformat()}}
-            )
-
-    # If defect, create a maintenance task
-    if checkin.condition == "DEFECT":
-        article = await db.articles.find_one({"id": item.get("article_id")})
-        maintenance_task = MaintenanceTask(
-            article_id=item.get("article_id"),
-            title=f"Defekt gemeldet: {article.get('name', 'Unbekannt') if article else 'Unbekannt'}",
-            description=f"Bei Rückgabe als defekt markiert. Notiz: {checkin.notes or 'Keine'}",
-            task_type="Reparatur",
-            priority="high",
-            status="pending",
-            created_by=current_user.username
-        )
-        await db.maintenance_tasks.insert_one(maintenance_task.model_dump())
-
-    from websocket_handler import manager
-    await manager.broadcast('{"type": "packing_list_updated"}')
-    return {"success": True, "condition": checkin.condition}
-
-@api_router.post("/packing-list/checkin-all/{event_id}")
-async def checkin_all_items(event_id: str, condition: str = "OK", current_user: User = Depends(get_current_user)):
-    """Check in all checked-out items as OK"""
-    now = datetime.now(timezone.utc)
-    
-    result = await db.packing_list_items.update_many(
-        {"event_id": event_id, "checked_out": True, "checked_in": False},
-        {"$set": {
-            "checked_in": True,
-            "checked_in_by": current_user.username,
-            "checked_in_at": now,
-            "checkin_condition": condition
-        }}
-    )
-    
-    if result.modified_count > 0:
-        from websocket_handler import manager
-        await manager.broadcast('{"type": "packing_list_updated"}')
-        
-    return {"success": True, "updated": result.modified_count}
-
-@api_router.get("/packing-list/missing/{event_id}")
-async def get_missing_items(event_id: str, current_user: User = Depends(get_current_user)):
-    """Get all items that are checked out but not checked in (potentially missing)"""
-    items = await db.packing_list_items.find({
-        "event_id": event_id,
-        "checked_out": True,
-        "checked_in": False
-    }).to_list(1000)
-    
-    # Also get items marked as MISSING
-    missing_items = await db.packing_list_items.find({
-        "event_id": event_id,
-        "checkin_condition": "MISSING"
-    }).to_list(1000)
-    
-    # Combine and deduplicate
-    all_missing_ids = set(i["id"] for i in items) | set(i["id"] for i in missing_items)
-    
-    # Enrich with article info
-    articles = await db.articles.find().to_list(10000)
-    article_map = {a["id"]: a for a in articles}
-    
-    result = []
-    for item in items + missing_items:
-        if item["id"] in all_missing_ids:
-            all_missing_ids.discard(item["id"])  # Avoid duplicates
-            article = article_map.get(item.get("article_id"), {})
-            result.append({
-                **item,
-                "article_name": article.get("name", "Unbekannt"),
-                "inventory_code": article.get("inventory_code", ""),
-            })
-    
-    return {
-        "event_id": event_id,
-        "missing_count": len(result),
-        "items": result
-    }
-
-@api_router.delete("/packing-list/reset/{event_id}")
-async def reset_packing_list(event_id: str, current_user: User = Depends(require_permission(Permission.ADMIN_ACCESS))):
-    """Reset packing list for an event (admin only)"""
-    
-    result = await db.packing_list_items.delete_many({"event_id": event_id})
-    return {"success": True, "deleted": result.deleted_count}
+# Packing-list endpoints extracted to app/routes/packing_list.py (Phase 4 refactor).
+# /events/{event_id}/packing-list/sign stays here (events flow).
 
 @api_router.post("/events/{event_id}/packing-list/sign")
 
@@ -7589,8 +7438,6 @@ async def check_bundle_availability(
         "items": availability
     }
 
-# Include router AFTER all endpoints are defined
-app.add_api_websocket_route("/ws", websocket_endpoint)
 
 # Phase 4 refactor — domain routers extracted to app/routes/.
 # Registered on api_router so they inherit the "/api" prefix.
@@ -7645,7 +7492,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; "
             "font-src 'self'; "
-            "connect-src 'self'; "
+            "connect-src 'self' ws: wss: http://localhost:8002 ws://localhost:8002; "
             "frame-ancestors 'none';"
         )
         return response
@@ -8855,17 +8702,40 @@ async def startup_event():
     scheduler.add_job(
         scheduled_backup_job,
         'cron',
-        hour=2,  # Run daily at 2 AM
+        hour=2,
         minute=0,
         id='daily_backup',
         replace_existing=True,
         misfire_grace_time=600,
         coalesce=True
     )
+
+    # Täglich abgelaufene Tokens löschen (refresh_tokens + ws_tokens)
+    async def _cleanup_expired_tokens():
+        now = datetime.now(timezone.utc)
+        rr = await db.refresh_tokens.delete_many({"expires_at": {"$lt": now}})
+        wr = await db.ws_tokens.delete_many({"expires_at": {"$lt": now}})
+        if rr.deleted_count or wr.deleted_count:
+            logging.info(
+                "Token-Cleanup: %d refresh_tokens, %d ws_tokens gelöscht",
+                rr.deleted_count, wr.deleted_count
+            )
+
+    scheduler.add_job(
+        _cleanup_expired_tokens,
+        'cron',
+        hour=2,
+        minute=15,
+        id='token_cleanup',
+        replace_existing=True,
+        misfire_grace_time=600,
+        coalesce=True
+    )
     scheduler.start()
-    
+
     logging.info("Application startup complete - Admin user initialized")
     logging.info("Daily backup scheduler started (runs at 2:00 AM)")
+    logging.info("Token-Cleanup scheduler started (runs at 2:15 AM)")
     logging.info("Rate limiting enabled: 10 requests/minute for login")
 
 # Sync service initialization removed for now
@@ -8929,6 +8799,10 @@ for _route in list(app.routes):
             )
 
 app.include_router(_api_router_v1)
+
+# WebSocket-Route nach allen include_router-Aufrufen registrieren,
+# damit sie nicht durch nachfolgende Router-Rebuilds verloren geht.
+app.add_api_websocket_route("/ws", websocket_endpoint)
 
 if __name__ == "__main__":
     import uvicorn

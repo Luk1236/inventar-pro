@@ -59,6 +59,7 @@ export default function ArticlesPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastFetch, setLastFetch] = useState<number>(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
@@ -404,9 +405,12 @@ export default function ArticlesPage() {
     loadData();
   }, []);
 
+  // B1: Nur neu laden wenn Screen-Focus UND Daten > 5 Min alt
   useFocusEffect(useCallback(() => {
-    loadData();
-  }, []));
+    if (Date.now() - lastFetch > 5 * 60 * 1000) {
+      loadData();
+    }
+  }, [lastFetch]));
 
   useWebSocket((msg) => {
     if (msg.type === 'article_created' || msg.type === 'article_updated' || msg.type === 'article_deleted') {
@@ -434,6 +438,7 @@ export default function ArticlesPage() {
       setCategories(categoriesData);
       setSuppliers(suppliersData);
       setConsumableAlertCount(Array.isArray(consumableAlerts) ? consumableAlerts.length : 0);
+      setLastFetch(Date.now());
     } catch (error: any) {
       console.error('Error loading data:', error);
       if (error.message !== 'Authentication failed') {

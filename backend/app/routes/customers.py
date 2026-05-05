@@ -10,6 +10,7 @@ Soft-delete behavior preserved: DELETE sets `is_active=False` rather
 than removing the document, with deleted_at/deleted_by/updated_at
 timestamps for the audit trail (V7 contract).
 """
+import json
 import re
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -18,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.deps.auth import Permission, get_current_user, require_permission
 from app.models import Customer, CustomerCreate, User
+from websocket_handler import manager
 
 
 router = APIRouter(tags=["customers"])
@@ -50,6 +52,7 @@ async def create_customer(
         customer.company_name or customer.contact_name,
         {"new": customer.model_dump()},
     )
+    await manager.broadcast(json.dumps({"type": "customer_created", "id": customer.id}))
     return customer
 
 
@@ -110,6 +113,7 @@ async def update_customer(
         updated_customer.get("company_name") or updated_customer.get("contact_name"),
         {"old": old_customer, "new": customer_dict},
     )
+    await manager.broadcast(json.dumps({"type": "customer_updated", "id": customer_id}))
     return Customer(**updated_customer)
 
 
@@ -139,4 +143,5 @@ async def delete_customer(
         "DELETE", "customer", current_user, customer_id, customer_name,
         {"deleted": True},
     )
+    await manager.broadcast(json.dumps({"type": "customer_deleted", "id": customer_id}))
     return {"message": "Customer deleted successfully"}

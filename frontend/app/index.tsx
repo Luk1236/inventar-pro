@@ -762,7 +762,8 @@ export default function Index() {
     if ([
       'article_created', 'article_updated', 'article_deleted',
       'booking_created', 'booking_cancelled',
-      'event_created', 'event_updated',
+      'event_created', 'event_updated', 'event_deleted',
+      'maintenance_created', 'maintenance_updated',
     ].includes(msg.type)) {
       loadDashboardStats();
     }

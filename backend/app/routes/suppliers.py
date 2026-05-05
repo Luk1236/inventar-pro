@@ -5,12 +5,14 @@ Endpoints kept verbatim from server.py lines 800-845. Only changes:
   lets tests swap `server.db` via conftest.py)
 - Pydantic v2: `.model_dump()` (already migrated in server.py prior to extract)
 """
+import json
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.deps.auth import get_current_user
 from app.models import Supplier, SupplierCreate, User
+from websocket_handler import manager
 
 
 router = APIRouter(tags=["suppliers"])
@@ -35,6 +37,7 @@ async def create_supplier(
     db = _get_db()
     supplier = Supplier(**supplier_data.model_dump())
     await db.suppliers.insert_one(supplier.model_dump())
+    await manager.broadcast(json.dumps({"type": "supplier_created", "id": supplier.id}))
     return supplier
 
 
@@ -72,6 +75,7 @@ async def update_supplier(
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Supplier not found")
     updated_supplier = await db.suppliers.find_one({"id": supplier_id})
+    await manager.broadcast(json.dumps({"type": "supplier_updated", "id": supplier_id}))
     return Supplier(**updated_supplier)
 
 
@@ -89,4 +93,5 @@ async def delete_supplier(
     result = await db.suppliers.delete_one({"id": supplier_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Supplier not found")
+    await manager.broadcast(json.dumps({"type": "supplier_deleted", "id": supplier_id}))
     return {"message": "Supplier deleted successfully"}
