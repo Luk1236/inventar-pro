@@ -149,19 +149,34 @@ fi
 
 # ── Schritt 5: Projekt klonen (nur wenn nicht vorhanden) ─────
 step "Schritt 5 — Projekt"
+DEFAULT_REPO="https://github.com/Luk1236/inventar-pro.git"
+
 if [[ "${EXISTING_PROJECT}" == "false" ]]; then
   if [[ -z "${REPO_URL:-}" ]]; then
-    echo -e "\n${YELLOW}GitHub-Repository-URL eingeben (Enter für 'scp later'):${NC}"
+    echo -e "\n${YELLOW}GitHub-Repository-URL [Enter = ${DEFAULT_REPO}]:${NC}"
     read -r REPO_URL
+    REPO_URL="${REPO_URL:-${DEFAULT_REPO}}"
   fi
-  if [[ -n "${REPO_URL}" ]]; then
-    git clone "${REPO_URL}" "${INSTALL_DIR}"
-    ok "Projekt geklont nach ${INSTALL_DIR}"
+
+  # Privates Repo: GitHub Personal Access Token abfragen (optional)
+  if [[ "${REPO_URL}" == *"github.com"* ]]; then
+    echo -e "${YELLOW}GitHub-Token (PAT) für privates Repo eingeben (Enter überspringen):${NC}"
+    read -rs GH_TOKEN
+    if [[ -n "${GH_TOKEN}" ]]; then
+      # Token in URL einbetten: https://TOKEN@github.com/...
+      CLONE_URL="${REPO_URL/https:\/\//https://${GH_TOKEN}@}"
+    else
+      CLONE_URL="${REPO_URL}"
+    fi
   else
-    warn "Kein Repo angegeben. Bitte Projekt manuell nach ${INSTALL_DIR}/Final-main kopieren."
-    echo "Danach: ./pi-install.sh erneut ausführen."
-    exit 0
+    CLONE_URL="${REPO_URL}"
   fi
+
+  info "Klone ${REPO_URL} ..."
+  git clone "${CLONE_URL}" "${INSTALL_DIR}"
+  # Remote-URL ohne Token speichern (kein Token im .git/config)
+  git -C "${INSTALL_DIR}" remote set-url origin "${REPO_URL}"
+  ok "Projekt geklont nach ${INSTALL_DIR}"
 else
   ok "Projekt bereits vorhanden: ${INSTALL_DIR}/Final-main"
 fi
