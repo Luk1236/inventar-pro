@@ -54,10 +54,16 @@ fi
 # Projekt-Verzeichnis prüfen
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -d "${SCRIPT_DIR}/Final-main" ]]; then
-  info "Projekt gefunden neben dem Skript — verwende ${SCRIPT_DIR}"
+  info "Projekt gefunden (Final-main Layout)"
   INSTALL_DIR="${SCRIPT_DIR}"
   BACKEND_DIR="${INSTALL_DIR}/Final-main/backend"
   FRONTEND_DIR="${INSTALL_DIR}/Final-main/frontend"
+  EXISTING_PROJECT=true
+elif [[ -d "${SCRIPT_DIR}/backend" ]]; then
+  info "Projekt gefunden (Repo-Root Layout) — verwende ${SCRIPT_DIR}"
+  INSTALL_DIR="${SCRIPT_DIR}"
+  BACKEND_DIR="${INSTALL_DIR}/backend"
+  FRONTEND_DIR="${INSTALL_DIR}/frontend"
   EXISTING_PROJECT=true
 else
   EXISTING_PROJECT=false
@@ -117,17 +123,17 @@ else
   if ! command -v mongod &>/dev/null; then
     info "MongoDB wird installiert..."
 
-    # GPG Key
+    # GPG Key (--batch verhindert interaktive Prompts)
     curl -fsSL "https://www.mongodb.org/static/pgp/server-${MONGO_VERSION}.asc" \
-      | sudo gpg -o /usr/share/keyrings/mongodb-server-${MONGO_VERSION}.gpg --dearmor
+      | sudo gpg --batch --yes -o /usr/share/keyrings/mongodb-server-${MONGO_VERSION}.gpg --dearmor
 
-    # Repo (Ubuntu Jammy kompatibel auf Pi OS Bookworm)
-    echo "deb [ arch=arm64 signed-by=/usr/share/keyrings/mongodb-server-${MONGO_VERSION}.gpg ] \
+    # Repo — trusted=yes umgeht SHA1-Signaturproblem auf modernem Debian/Pi OS
+    echo "deb [ arch=arm64 signed-by=/usr/share/keyrings/mongodb-server-${MONGO_VERSION}.gpg trusted=yes ] \
 https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/${MONGO_VERSION} multiverse" \
       | sudo tee /etc/apt/sources.list.d/mongodb-org-${MONGO_VERSION}.list
 
-    sudo apt-get update -qq
-    sudo apt-get install -y -qq mongodb-org
+    sudo apt-get update -qq 2>/dev/null || true
+    sudo apt-get install -y mongodb-org
     ok "MongoDB ${MONGO_VERSION} installiert"
   else
     ok "mongod binary bereits vorhanden"
@@ -176,9 +182,12 @@ if [[ "${EXISTING_PROJECT}" == "false" ]]; then
   git clone "${CLONE_URL}" "${INSTALL_DIR}"
   # Remote-URL ohne Token speichern (kein Token im .git/config)
   git -C "${INSTALL_DIR}" remote set-url origin "${REPO_URL}"
+  # Pfade nach Clone setzen (Repo-Root = ehemals Final-main)
+  BACKEND_DIR="${INSTALL_DIR}/backend"
+  FRONTEND_DIR="${INSTALL_DIR}/frontend"
   ok "Projekt geklont nach ${INSTALL_DIR}"
 else
-  ok "Projekt bereits vorhanden: ${INSTALL_DIR}/Final-main"
+  ok "Projekt bereits vorhanden: ${INSTALL_DIR}"
 fi
 
 [[ -d "${BACKEND_DIR}" ]]  || err "Backend-Verzeichnis nicht gefunden: ${BACKEND_DIR}"
