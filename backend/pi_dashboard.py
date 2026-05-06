@@ -395,7 +395,7 @@ body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;min-heigh
 
 <!-- Expo QR-Code -->
 <div class="card">
-  <h2>📱 App öffnen (QR-Code)</h2>
+  <h2>📱 App öffnen (Handy QR)</h2>
   <div style="text-align:center;padding:10px 0">
     <canvas id="qr-canvas" style="border-radius:8px;background:#fff;padding:12px"></canvas>
     <div style="margin-top:8px;font-size:12px;color:#8b949e" id="qr-url">Lädt...</div>
@@ -622,9 +622,9 @@ async function refreshAll(){
 
 function renderQR(){
   fetch('/api/network').then(r=>r.json()).then(d=>{
-    const expoUrl='exp://'+d.local_ip+':8081';
+    const url='http://'+d.local_ip+':8081';
     const qr=qrcode(0,'M');
-    qr.addData(expoUrl);
+    qr.addData(url);
     qr.make();
     const canvas=document.getElementById('qr-canvas');
     const size=180, modules=qr.getModuleCount(), cell=size/modules;
@@ -633,7 +633,7 @@ function renderQR(){
     ctx.fillStyle='#fff'; ctx.fillRect(0,0,size,size);
     ctx.fillStyle='#000';
     for(let r=0;r<modules;r++)for(let c=0;c<modules;c++)if(qr.isDark(r,c))ctx.fillRect(c*cell,r*cell,cell+0.5,cell+0.5);
-    document.getElementById('qr-url').textContent=expoUrl;
+    document.getElementById('qr-url').textContent=url;
   }).catch(()=>{document.getElementById('qr-url').textContent='QR-Code nicht verfügbar';});
 }
 

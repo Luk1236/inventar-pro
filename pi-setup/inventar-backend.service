@@ -5,10 +5,10 @@ Requires=mongod.service
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/inventar/Final-main/backend
-Environment=PATH=/home/pi/inventar/Final-main/backend/.venv/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/home/pi/inventar/Final-main/backend/.venv/bin/python3 server.py
+User=admin
+WorkingDirectory=/home/admin/inventar/backend
+Environment=PATH=/home/admin/inventar/backend/.venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/admin/inventar/backend/.venv/bin/python3 server.py
 Restart=always
 RestartSec=5
 StandardOutput=journal

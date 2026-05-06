@@ -4,8 +4,8 @@ After=network.target inventar-backend.service
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/inventar/Final-main/frontend
+User=admin
+WorkingDirectory=/home/admin/inventar/frontend
 ExecStart=/usr/bin/npx expo start --web --port 8081 --no-dev
 Restart=always
 RestartSec=10
