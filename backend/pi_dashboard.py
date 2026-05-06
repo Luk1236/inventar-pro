@@ -5,7 +5,7 @@ Port: 8080  |  http://PI-IP:8080
 """
 import subprocess, os, time
 from fastapi import FastAPI, BackgroundTasks
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn, psutil
 
@@ -15,13 +15,14 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 SERVICES   = ["inventar-backend", "inventar-frontend", "mongod"]
 INSTALL    = os.path.expanduser("~/inventar")
 UPDATE_SH  = os.path.join(INSTALL, "pi-setup", "update.sh")
+BACKUP_SH  = os.path.join(INSTALL, "pi-setup", "backup.sh")
 _update_log: list[str] = []
 _updating   = False
 
 # ── Helpers ────────────────────────────────────────────────────
 
-def _run(cmd: list) -> tuple[int, str]:
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+def _run(cmd: list, timeout: int = 30) -> tuple[int, str]:
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     return r.returncode, (r.stdout + r.stderr).strip()
 
 def _svc_status(svc: str) -> str:
@@ -76,6 +77,31 @@ def sysinfo():
         "uptime":     f"{h}h {m}min",
     }
 
+@app.get("/api/network")
+def network():
+    rc, out = _run(["hostname", "-I"])
+    ip = out.split()[0] if out else "–"
+    rc2, ts = _run(["tailscale", "ip", "-4"])
+    tailscale_ip = ts.strip() if rc2 == 0 else "–"
+    rc3, ts_status = _run(["tailscale", "status", "--json"])
+    ts_online = "verbunden" if rc3 == 0 else "getrennt"
+    return {"local_ip": ip, "tailscale_ip": tailscale_ip, "tailscale_status": ts_online}
+
+@app.post("/api/backup")
+def backup(bg: BackgroundTasks):
+    global _updating, _update_log
+    if _updating:
+        return {"ok": False, "msg": "Bereits eine Aufgabe läuft"}
+    _update_log = []
+    _updating = True
+    bg.add_task(_do_backup)
+    return {"ok": True, "msg": "Backup gestartet"}
+
+@app.post("/api/expo-clear")
+def expo_clear():
+    rc, out = _run(["sudo", "systemctl", "restart", "inventar-frontend"])
+    return {"ok": rc == 0, "msg": "Frontend-Cache geleert und neu gestartet" if rc == 0 else out}
+
 @app.post("/api/update")
 def update(bg: BackgroundTasks):
     global _updating, _update_log
@@ -99,6 +125,25 @@ def reboot():
 def shutdown():
     subprocess.Popen(["sudo", "shutdown", "-h", "+0"])
     return {"ok": True}
+
+def _do_backup():
+    global _updating, _update_log
+    try:
+        _update_log.append("=== Backup gestartet ===")
+        if os.path.exists(BACKUP_SH):
+            cmd = ["bash", BACKUP_SH]
+        else:
+            cmd = ["bash", "-c", f"cd {INSTALL} && mongodump --out ~/inventar-backup/$(date +%Y%m%d_%H%M%S)"]
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                 text=True, cwd=INSTALL)
+        for line in proc.stdout:
+            _update_log.append(line.rstrip())
+        proc.wait()
+        _update_log.append(f"=== Fertig (Code {proc.returncode}) ===")
+    except Exception as e:
+        _update_log.append(f"FEHLER: {e}")
+    finally:
+        _updating = False
 
 def _do_update():
     global _updating, _update_log
@@ -139,7 +184,6 @@ body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;min-heigh
 .body{padding:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
 .card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:18px}
 .card h2{font-size:13px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px}
-/* Status */
 .svc{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #21262d}
 .svc:last-child{border:none}
 .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
@@ -148,30 +192,37 @@ body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;min-heigh
 .dot.unknown{background:#e3b341}
 .svc-name{flex:1;font-size:13px}
 .svc-btns{display:flex;gap:5px}
-/* Buttons */
-btn,.btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-weight:600;transition:.15s}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-weight:600;transition:.15s}
 .btn-green{background:#238636;color:#fff} .btn-green:hover{background:#2ea043}
 .btn-red  {background:#da3633;color:#fff} .btn-red:hover{background:#f85149}
 .btn-blue {background:#1f6feb;color:#fff} .btn-blue:hover{background:#388bfd}
 .btn-gray {background:#21262d;color:#e6edf3;border:1px solid #30363d} .btn-gray:hover{background:#30363d}
 .btn-warn {background:#9e6a03;color:#fff} .btn-warn:hover{background:#d29922}
+.btn-purple{background:#6e40c9;color:#fff} .btn-purple:hover{background:#8957e5}
+.btn-teal {background:#0f7b6c;color:#fff} .btn-teal:hover{background:#12a589}
 .btn-full {width:100%;justify-content:center;padding:8px;font-size:12px;margin-top:6px}
-/* Sysinfo */
+.btn-row  {display:flex;gap:6px;margin-top:6px}
+.btn-row .btn{flex:1;justify-content:center}
 .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .info-item{background:#0d1117;border-radius:8px;padding:12px;text-align:center}
 .info-val{font-size:22px;font-weight:700;color:#58a6ff}
 .info-lbl{font-size:10px;color:#8b949e;margin-top:2px}
 .bar{height:4px;background:#21262d;border-radius:2px;margin-top:8px;overflow:hidden}
 .bar-fill{height:100%;border-radius:2px;transition:width .5s}
-/* Logs */
 .log-box{background:#0d1117;border-radius:6px;padding:10px;font-family:monospace;font-size:10.5px;line-height:1.55;max-height:280px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:#c9d1d9}
 .log-tabs{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}
 .tab{padding:4px 10px;border-radius:5px;background:#21262d;border:none;color:#8b949e;cursor:pointer;font-size:11px}
 .tab.active{background:#1f6feb;color:#fff}
-/* Update log */
 .upd-log{background:#0d1117;border-radius:6px;padding:10px;font-family:monospace;font-size:10.5px;max-height:200px;overflow-y:auto;white-space:pre-wrap;color:#c9d1d9;margin-top:10px;display:none}
 .spinner{display:inline-block;width:12px;height:12px;border:2px solid #58a6ff;border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+.net-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #21262d;font-size:12px}
+.net-row:last-child{border:none}
+.net-lbl{color:#8b949e}
+.net-val{color:#58a6ff;font-weight:600}
+.toast{position:fixed;bottom:20px;right:20px;background:#238636;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
+.toast.show{opacity:1}
+.toast.err{background:#da3633}
 </style>
 </head>
 <body>
@@ -195,6 +246,12 @@ btn,.btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-
   <div class="info-grid" id="sys-grid">Lädt...</div>
 </div>
 
+<!-- Netzwerk -->
+<div class="card">
+  <h2>Netzwerk</h2>
+  <div id="net-info">Lädt...</div>
+</div>
+
 <!-- Logs -->
 <div class="card" style="grid-column:1/-1">
   <h2>Live-Log</h2>
@@ -202,32 +259,56 @@ btn,.btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-
     <button class="tab active" onclick="setLogSvc('inventar-backend',this)">Backend</button>
     <button class="tab" onclick="setLogSvc('inventar-frontend',this)">Frontend</button>
     <button class="tab" onclick="setLogSvc('mongod',this)">MongoDB</button>
+    <button class="tab" onclick="setLogSvc('system',this)">System-Warnungen</button>
   </div>
   <div class="log-box" id="log-box">Lädt...</div>
 </div>
 
-<!-- Update -->
+<!-- Update & Backup -->
 <div class="card">
-  <h2>Update &amp; Wartung</h2>
+  <h2>Update &amp; Backup</h2>
   <button class="btn btn-blue btn-full" onclick="doUpdate()" id="upd-btn">⬇ Update von GitHub</button>
+  <button class="btn btn-teal btn-full" onclick="doBackup()" id="bak-btn" style="margin-top:6px">💾 Backup erstellen</button>
   <div class="upd-log" id="upd-log"></div>
+</div>
+
+<!-- Werkzeuge -->
+<div class="card">
+  <h2>Werkzeuge</h2>
+  <button class="btn btn-purple btn-full" onclick="expoCache()">🔄 Frontend-Cache leeren</button>
+  <div class="btn-row" style="margin-top:6px">
+    <button class="btn btn-gray" onclick="openUrl('http://'+location.hostname+':8002/docs')">📄 API Docs</button>
+    <button class="btn btn-gray" onclick="openUrl('http://'+location.hostname+':8081')">🌐 App öffnen</button>
+  </div>
 </div>
 
 <!-- System -->
 <div class="card">
   <h2>System</h2>
-  <button class="btn btn-warn btn-full" onclick="if(confirm('Pi wirklich neu starten?'))apiPost('/api/reboot')" style="margin-bottom:8px">↺ Pi neu starten</button>
-  <button class="btn btn-red  btn-full" onclick="if(confirm('Pi wirklich herunterfahren?'))apiPost('/api/shutdown')">⏻ Pi herunterfahren</button>
+  <button class="btn btn-warn btn-full" onclick="if(confirm('Pi wirklich neu starten?'))doPost('/api/reboot','Pi wird neu gestartet...')" style="margin-bottom:8px">↺ Pi neu starten</button>
+  <button class="btn btn-red  btn-full" onclick="if(confirm('Pi wirklich herunterfahren?'))doPost('/api/shutdown','Pi wird heruntergefahren...')">⏻ Pi herunterfahren</button>
 </div>
 
 </div>
+<div class="toast" id="toast"></div>
 <script>
 let logSvc='inventar-backend';
-
 const SVC_LABELS={'inventar-backend':'Backend','inventar-frontend':'Frontend','mongod':'MongoDB'};
+
+function toast(msg,err=false){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast'+(err?' err':'');
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
 
 async function api(url){const r=await fetch(url);return r.json()}
 async function apiPost(url){const r=await fetch(url,{method:'POST'});return r.json()}
+
+async function doPost(url,msg){
+  const d=await apiPost(url);
+  toast(d.ok!==false ? msg : (d.msg||'Fehler'), d.ok===false);
+}
 
 async function refreshStatus(){
   const d=await api('/api/status');
@@ -237,15 +318,16 @@ async function refreshStatus(){
       <div class="dot ${st}"></div>
       <div class="svc-name">${SVC_LABELS[s]||s}<br><span style="font-size:10px;color:#8b949e">${st}</span></div>
       <div class="svc-btns">
-        <button class="btn btn-green" onclick="svcAct('${s}','start')">▶</button>
-        <button class="btn btn-red"   onclick="svcAct('${s}','stop')">■</button>
-        <button class="btn btn-blue"  onclick="svcAct('${s}','restart')">↺</button>
+        <button class="btn btn-green" title="Starten"  onclick="svcAct('${s}','start')">▶</button>
+        <button class="btn btn-red"   title="Stoppen"  onclick="svcAct('${s}','stop')">■</button>
+        <button class="btn btn-blue"  title="Neustart" onclick="svcAct('${s}','restart')">↺</button>
       </div>
     </div>`).join('');
 }
 
 async function svcAct(svc,action){
   const r=await apiPost(`/api/service/${svc}/${action}`);
+  toast(r.ok ? `${SVC_LABELS[svc]||svc}: ${action}` : r.msg, !r.ok);
   setTimeout(refreshStatus,1500);
 }
 
@@ -257,6 +339,14 @@ async function refreshSys(){
     <div class="info-item"><div class="info-val">${d.ram_used}GB</div><div class="info-lbl">RAM / ${d.ram_total}GB</div><div class="bar"><div class="bar-fill" style="width:${d.ram_pct}%;background:${d.ram_pct>85?'#f85149':'#58a6ff'}"></div></div></div>
     <div class="info-item"><div class="info-val">${d.disk_used}GB</div><div class="info-lbl">Disk / ${d.disk_total}GB</div><div class="bar"><div class="bar-fill" style="width:${d.disk_pct}%;background:${d.disk_pct>85?'#f85149':'#e3b341'}"></div></div></div>
     <div class="info-item"><div class="info-val">${d.temp||'–'}</div><div class="info-lbl">Temperatur</div></div>`;
+}
+
+async function refreshNet(){
+  const d=await api('/api/network');
+  document.getElementById('net-info').innerHTML=`
+    <div class="net-row"><span class="net-lbl">Lokale IP</span><span class="net-val">${d.local_ip}</span></div>
+    <div class="net-row"><span class="net-lbl">Tailscale IP</span><span class="net-val">${d.tailscale_ip}</span></div>
+    <div class="net-row"><span class="net-lbl">Tailscale</span><span class="net-val">${d.tailscale_status}</span></div>`;
 }
 
 async function refreshLog(){
@@ -274,11 +364,24 @@ function setLogSvc(svc,btn){
   refreshLog();
 }
 
+function openUrl(url){window.open(url,'_blank')}
+
+async function expoCache(){
+  const r=await apiPost('/api/expo-clear');
+  toast(r.ok ? r.msg : r.msg, !r.ok);
+  setTimeout(refreshStatus,2000);
+}
+
+function _startTask(btn,label){
+  btn.disabled=true; btn.innerHTML=`<span class="spinner"></span> ${label}`;
+  const log=document.getElementById('upd-log');
+  log.style.display='block'; log.textContent='';
+  return log;
+}
+
 async function doUpdate(){
   const btn=document.getElementById('upd-btn');
-  const log=document.getElementById('upd-log');
-  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Update läuft...';
-  log.style.display='block'; log.textContent='';
+  const log=_startTask(btn,'Update läuft...');
   await apiPost('/api/update');
   const iv=setInterval(async()=>{
     const d=await api('/api/update/log');
@@ -288,14 +391,31 @@ async function doUpdate(){
       clearInterval(iv);
       btn.disabled=false; btn.innerHTML='⬇ Update von GitHub';
       setTimeout(refreshStatus,2000);
+      toast('Update abgeschlossen!');
     }
   },1500);
 }
 
-// Init + Polling
-refreshStatus(); refreshSys(); refreshLog();
+async function doBackup(){
+  const btn=document.getElementById('bak-btn');
+  const log=_startTask(btn,'Backup läuft...');
+  await apiPost('/api/backup');
+  const iv=setInterval(async()=>{
+    const d=await api('/api/update/log');
+    log.textContent=d.lines.join('\\n');
+    log.scrollTop=log.scrollHeight;
+    if(!d.running){
+      clearInterval(iv);
+      btn.disabled=false; btn.innerHTML='💾 Backup erstellen';
+      toast('Backup abgeschlossen!');
+    }
+  },1500);
+}
+
+refreshStatus(); refreshSys(); refreshNet(); refreshLog();
 setInterval(refreshStatus,5000);
 setInterval(refreshSys,10000);
+setInterval(refreshNet,30000);
 setInterval(refreshLog,8000);
 </script>
 </body>
