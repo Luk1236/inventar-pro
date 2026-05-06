@@ -622,9 +622,9 @@ async function refreshAll(){
 
 function renderQR(){
   fetch('/api/network').then(r=>r.json()).then(d=>{
-    const url='http://'+d.local_ip+':8081';
+    const expoUrl='exp://'+d.local_ip+':8081';
     const qr=qrcode(0,'M');
-    qr.addData(url);
+    qr.addData(expoUrl);
     qr.make();
     const canvas=document.getElementById('qr-canvas');
     const size=180, modules=qr.getModuleCount(), cell=size/modules;
@@ -633,7 +633,7 @@ function renderQR(){
     ctx.fillStyle='#fff'; ctx.fillRect(0,0,size,size);
     ctx.fillStyle='#000';
     for(let r=0;r<modules;r++)for(let c=0;c<modules;c++)if(qr.isDark(r,c))ctx.fillRect(c*cell,r*cell,cell+0.5,cell+0.5);
-    document.getElementById('qr-url').textContent=url;
+    document.getElementById('qr-url').textContent=expoUrl;
   }).catch(()=>{document.getElementById('qr-url').textContent='QR-Code nicht verfügbar';});
 }
 
