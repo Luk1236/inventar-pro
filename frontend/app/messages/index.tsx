@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
+  FlatList,
   SafeAreaView,
   ActivityIndicator,
   RefreshControl,
@@ -87,9 +87,8 @@ export default function MessagesPage() {
     return date.toLocaleDateString('de-DE', { day: '2-digit', month: 'short' });
   };
 
-  const renderConversationCard = (conversation: Conversation) => (
+  const renderConversationCard = useCallback(({ item: conversation }: { item: Conversation }) => (
     <TouchableOpacity
-      key={conversation.user_id}
       style={[styles.conversationCard, { backgroundColor: colors.card, borderBottomColor: colors.border }]}
       onPress={() => router.push(`/messages/chat/${conversation.user_id}?username=${conversation.username}`)}
     >
@@ -120,7 +119,7 @@ export default function MessagesPage() {
       
       <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
     </TouchableOpacity>
-  );
+  ), [colors, isDark, formatTime]);
 
   if (loading) {
     return (
@@ -154,13 +153,17 @@ export default function MessagesPage() {
         </View>
       )}
 
-      <ScrollView
+      <FlatList
         style={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-      >
-        {conversations.length === 0 ? (
+        data={conversations}
+        keyExtractor={(item) => item.user_id}
+        renderItem={renderConversationCard}
+        removeClippedSubviews
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={8}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="chatbubbles-outline" size={64} color={colors.textSecondary} />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>Keine Unterhaltungen</Text>
@@ -174,12 +177,8 @@ export default function MessagesPage() {
               <Text style={styles.startChatButtonText}>Neue Nachricht</Text>
             </TouchableOpacity>
           </View>
-        ) : (
-          <View style={styles.conversationsList}>
-            {conversations.map(renderConversationCard)}
-          </View>
-        )}
-      </ScrollView>
+        }
+      />
     </SafeAreaView>
   );
 }

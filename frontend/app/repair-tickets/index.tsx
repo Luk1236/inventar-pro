@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  FlatList,
   SafeAreaView,
   ActivityIndicator,
   Alert,
@@ -245,18 +246,16 @@ export default function RepairTicketsPage() {
     });
   };
 
-  // Filter tickets by tab
-  const filteredTickets = tickets.filter(t => {
+  const filteredTickets = useMemo(() => tickets.filter(t => {
     if (activeTab === 'open') return t.status === 'open';
     if (activeTab === 'in_progress') return ['in_progress', 'waiting_parts'].includes(t.status);
     if (activeTab === 'closed') return ['repaired', 'closed', 'unrepairable'].includes(t.status);
     return true;
-  });
+  }), [tickets, activeTab]);
 
-  // Stats
-  const openCount = tickets.filter(t => t.status === 'open').length;
-  const inProgressCount = tickets.filter(t => ['in_progress', 'waiting_parts'].includes(t.status)).length;
-  const criticalCount = tickets.filter(t => t.severity === 'critical' && t.status === 'open').length;
+  const openCount = useMemo(() => tickets.filter(t => t.status === 'open').length, [tickets]);
+  const inProgressCount = useMemo(() => tickets.filter(t => ['in_progress', 'waiting_parts'].includes(t.status)).length, [tickets]);
+  const criticalCount = useMemo(() => tickets.filter(t => t.severity === 'critical' && t.status === 'open').length, [tickets]);
 
   if (loading) {
     return (
@@ -335,24 +334,28 @@ export default function RepairTicketsPage() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView
+      <FlatList
         style={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />
-        }
-      >
-        {filteredTickets.length === 0 ? (
+        data={filteredTickets}
+        keyExtractor={(item) => item.id}
+        removeClippedSubviews
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={6}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
+        ListFooterComponent={<View style={{ height: 40 }} />}
+        ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="checkmark-circle-outline" size={64} color={colors.textSecondary} />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
-              {activeTab === 'open' ? 'Keine offenen Tickets' : 
-               activeTab === 'in_progress' ? 'Keine Tickets in Bearbeitung' : 
+              {activeTab === 'open' ? 'Keine offenen Tickets' :
+               activeTab === 'in_progress' ? 'Keine Tickets in Bearbeitung' :
                'Keine erledigten Tickets'}
             </Text>
           </View>
-        ) : (
-          filteredTickets.map(ticket => (
-            <View key={ticket.id} style={[styles.ticketCard, { backgroundColor: colors.card }]}>
+        }
+        renderItem={({ item: ticket }) => (
+            <View style={[styles.ticketCard, { backgroundColor: colors.card }]}>
               <View style={styles.ticketHeader}>
                 <View style={styles.ticketInfo}>
                   <View style={styles.ticketNumberRow}>
@@ -469,11 +472,8 @@ export default function RepairTicketsPage() {
                 )}
               </View>
             </View>
-          ))
         )}
-
-        <View style={{ height: 40 }} />
-      </ScrollView>
+      />
 
       {/* Create Ticket Modal */}
       <Modal
