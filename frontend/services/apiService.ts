@@ -22,8 +22,10 @@ export function getBackendUrl(): string {
   return _runtimeBackendUrl ?? DEFAULT_BACKEND_URL;
 }
 
-// On startup: reset any stored server URL so the default (localhost:8002) is always used
-AsyncStorage.removeItem('server_url').catch(() => {});
+// On startup: load saved server URL (if user set one in settings)
+AsyncStorage.getItem('server_url').then((saved) => {
+  if (saved) _runtimeBackendUrl = saved.replace(/\/$/, '');
+}).catch(() => {});
 
 // Electron bridge: load from Electron settings if running in desktop
 if (typeof window !== 'undefined' && (window as any).__electronBridge) {
