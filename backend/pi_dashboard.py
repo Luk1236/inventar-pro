@@ -4,7 +4,7 @@ Inventar Pro — Pi Web-Dashboard
 Port: 8080  |  http://PI-IP:8080
 """
 import subprocess, os, time, threading
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks, Body
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn, psutil
@@ -181,6 +181,23 @@ def update(bg: BackgroundTasks):
 def update_log():
     return {"running": _updating, "lines": _update_log[-200:], "last": _last_update}
 
+@app.post("/api/shell")
+async def shell(request: dict = Body(...)):
+    cmd = request.get("cmd", "").strip()
+    if not cmd:
+        return {"ok": False, "output": "Kein Befehl angegeben"}
+    try:
+        proc = subprocess.run(
+            ["bash", "-c", cmd],
+            capture_output=True, text=True, timeout=30, cwd=INSTALL
+        )
+        output = (proc.stdout + proc.stderr).strip()
+        return {"ok": proc.returncode == 0, "output": output or "(keine Ausgabe)", "code": proc.returncode}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "output": "Timeout nach 30 Sekunden", "code": -1}
+    except Exception as e:
+        return {"ok": False, "output": str(e), "code": -1}
+
 @app.post("/api/reboot")
 def reboot():
     subprocess.Popen(["sudo", "shutdown", "-r", "+0"])
@@ -311,6 +328,16 @@ body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;min-heigh
 .toast.show{opacity:1}
 .toast.err{background:#da3633}
 .status-line{font-size:10px;color:#8b949e;margin-top:8px;text-align:center;font-style:italic}
+.shell-wrap{display:flex;gap:6px;margin-bottom:10px}
+.shell-input{flex:1;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:8px 10px;color:#e6edf3;font-family:monospace;font-size:12px;outline:none}
+.shell-input:focus{border-color:#58a6ff}
+.shell-output{background:#0d1117;border-radius:6px;padding:10px;font-family:monospace;font-size:11px;line-height:1.5;max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:#c9d1d9}
+.shell-output .cmd-line{color:#58a6ff;font-weight:600}
+.shell-output .cmd-err{color:#f85149}
+.shell-output .cmd-ok{color:#3fb950}
+.shell-history{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap}
+.shell-history button{padding:3px 8px;border-radius:4px;background:#21262d;border:1px solid #30363d;color:#8b949e;cursor:pointer;font-size:10px;font-family:monospace}
+.shell-history button:hover{background:#30363d;color:#e6edf3}
 </style>
 </head>
 <body>
@@ -383,6 +410,31 @@ body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;min-heigh
     <button class="btn btn-gray" onclick="openUrl('http://'+location.hostname+':8002/docs')">📄 API Docs</button>
     <button class="btn btn-gray" onclick="openUrl('http://'+location.hostname+':8081')">🌐 App öffnen</button>
   </div>
+</div>
+
+<!-- Remote Shell -->
+<div class="card" style="grid-column:1/-1">
+  <h2>🖥 Remote Shell</h2>
+  <div class="shell-history" id="shell-shortcuts">
+    <button onclick="shellRun('htop -n1 | head -20')">htop</button>
+    <button onclick="shellRun('df -h')">Disk</button>
+    <button onclick="shellRun('free -h')">RAM</button>
+    <button onclick="shellRun('uptime')">Uptime</button>
+    <button onclick="shellRun('ls -la ~/inventar/')">ls inventar</button>
+    <button onclick="shellRun('git -C ~/inventar log --oneline -10')">Git Log</button>
+    <button onclick="shellRun('cat ~/inventar/VERSION')">Version</button>
+    <button onclick="shellRun('systemctl list-units --type=service --state=running --no-pager')">Services</button>
+    <button onclick="shellRun('tail -20 /var/log/syslog')">Syslog</button>
+    <button onclick="shellRun('ip addr show')">IP Addr</button>
+    <button onclick="shellRun('docker ps 2>/dev/null || echo Docker nicht installiert')">Docker</button>
+    <button onclick="shellRun('cat ~/inventar/backend/.env')">Backend .env</button>
+  </div>
+  <div class="shell-wrap">
+    <input class="shell-input" id="shell-cmd" placeholder="Befehl eingeben... (Enter zum Ausführen)" autocomplete="off" spellcheck="false">
+    <button class="btn btn-green" onclick="shellExec()" id="shell-run-btn">▶ Run</button>
+    <button class="btn btn-gray" onclick="shellClear()">✕</button>
+  </div>
+  <div class="shell-output" id="shell-out">admin@raspberrypi:~/inventar$ <span class="cmd-ok">Bereit.</span></div>
 </div>
 
 <!-- System -->
@@ -584,6 +636,44 @@ function renderQR(){
     document.getElementById('qr-url').textContent=url;
   }).catch(()=>{document.getElementById('qr-url').textContent='QR-Code nicht verfügbar';});
 }
+
+// ── Remote Shell ──
+const shellOut=document.getElementById('shell-out');
+const shellCmd=document.getElementById('shell-cmd');
+let shellHistory=[], shellHistIdx=-1;
+
+async function shellExec(){
+  const cmd=shellCmd.value.trim();
+  if(!cmd)return;
+  shellHistory.unshift(cmd); shellHistIdx=-1;
+  shellCmd.value='';
+  shellOut.innerHTML+=`\\n<span class="cmd-line">$ ${cmd}</span>\\n<span style="color:#8b949e">Ausführen...</span>`;
+  shellOut.scrollTop=shellOut.scrollHeight;
+  const btn=document.getElementById('shell-run-btn');
+  btn.disabled=true;
+  try{
+    const r=await fetch('/api/shell',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cmd})});
+    const d=await r.json();
+    const last=shellOut.querySelector('span:last-child');
+    if(last&&last.textContent==='Ausführen...')last.remove();
+    const cls=d.ok?'cmd-ok':'cmd-err';
+    shellOut.innerHTML+=`<span class="${cls}">${escHtml(d.output)}</span>`;
+  }catch(e){
+    shellOut.innerHTML+=`<span class="cmd-err">Verbindungsfehler: ${e.message}</span>`;
+  }
+  btn.disabled=false;
+  shellOut.scrollTop=shellOut.scrollHeight;
+}
+
+function shellRun(cmd){shellCmd.value=cmd;shellExec()}
+function shellClear(){shellOut.innerHTML='<span class="cmd-ok">Terminal geleert.</span>'}
+function escHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+shellCmd.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();shellExec()}
+  if(e.key==='ArrowUp'&&shellHistory.length){e.preventDefault();shellHistIdx=Math.min(shellHistIdx+1,shellHistory.length-1);shellCmd.value=shellHistory[shellHistIdx]}
+  if(e.key==='ArrowDown'){e.preventDefault();shellHistIdx=Math.max(shellHistIdx-1,-1);shellCmd.value=shellHistIdx>=0?shellHistory[shellHistIdx]:''}
+});
 
 refreshAll();
 loadVersion();
