@@ -280,6 +280,15 @@ body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;min-heigh
   <div class="upd-log" id="upd-log"></div>
 </div>
 
+<!-- Expo QR-Code -->
+<div class="card">
+  <h2>📱 App öffnen (QR-Code)</h2>
+  <div style="text-align:center;padding:10px 0">
+    <canvas id="qr-canvas" style="border-radius:8px;background:#fff;padding:12px"></canvas>
+    <div style="margin-top:8px;font-size:12px;color:#8b949e" id="qr-url">Lädt...</div>
+  </div>
+</div>
+
 <!-- Werkzeuge -->
 <div class="card">
   <h2>Werkzeuge</h2>
@@ -299,6 +308,7 @@ body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;min-heigh
 
 </div>
 <div class="toast" id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script>
 let logSvc='inventar-backend';
 const SVC_LABELS={'inventar-backend':'Backend','inventar-frontend':'Frontend','mongod':'MongoDB'};
@@ -430,7 +440,25 @@ async function refreshAll(){
   updateTimestamp();
 }
 
+function renderQR(){
+  fetch('/api/network').then(r=>r.json()).then(d=>{
+    const url='http://'+d.local_ip+':8081';
+    const qr=qrcode(0,'M');
+    qr.addData(url);
+    qr.make();
+    const canvas=document.getElementById('qr-canvas');
+    const size=180, modules=qr.getModuleCount(), cell=size/modules;
+    canvas.width=size; canvas.height=size;
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,size,size);
+    ctx.fillStyle='#000';
+    for(let r=0;r<modules;r++)for(let c=0;c<modules;c++)if(qr.isDark(r,c))ctx.fillRect(c*cell,r*cell,cell+0.5,cell+0.5);
+    document.getElementById('qr-url').textContent=url;
+  }).catch(()=>{document.getElementById('qr-url').textContent='QR-Code nicht verfügbar';});
+}
+
 refreshAll();
+renderQR();
 setInterval(refreshStatus, 3000);
 setInterval(refreshSys,    3000);
 setInterval(refreshNet,   15000);
