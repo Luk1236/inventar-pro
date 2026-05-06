@@ -4,7 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
+  FlatList,
   SafeAreaView,
   ActivityIndicator,
   RefreshControl,
@@ -76,8 +76,8 @@ export default function EventsPage() {
     return date.toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
-  const renderEventCard = (event: Event) => (
-    <TouchableOpacity key={event.id} style={[styles.eventCard, { backgroundColor: colors.card }]} onPress={() => router.push(`/events/detail/${event.id}`)}>
+  const renderEventCard = useCallback(({ item: event }: { item: Event }) => (
+    <TouchableOpacity style={[styles.eventCard, { backgroundColor: colors.card }]} onPress={() => router.push(`/events/detail/${event.id}`)}>
       <View style={styles.eventHeader}>
         <View style={[styles.eventIcon, { backgroundColor: isDark ? '#1a3a5c' : '#f0f6ff' }]}>
           <Ionicons name="calendar" size={24} color={colors.primary} />
@@ -105,7 +105,7 @@ export default function EventsPage() {
         </View>
       </View>
     </TouchableOpacity>
-  );
+  ), [colors, isDark, getStatusColor, formatDate]);
 
   if (loading) {
     return (
@@ -131,20 +131,31 @@ export default function EventsPage() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}>
-        {events.length === 0 ? (
+      <FlatList
+        style={styles.content}
+        data={events}
+        keyExtractor={(item) => item.id}
+        renderItem={renderEventCard}
+        removeClippedSubviews
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={8}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        ListHeaderComponent={
+          events.length > 0 ? (
+            <Text style={[styles.countText, { color: colors.textSecondary }]}>
+              {events.length} Veranstaltung{events.length !== 1 ? 'en' : ''}
+            </Text>
+          ) : null
+        }
+        ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="calendar-outline" size={64} color={colors.textSecondary} />
             <Text style={[styles.emptyTitle, { color: colors.text }]}>Keine Veranstaltungen</Text>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Erstellen Sie Ihre erste Veranstaltung</Text>
           </View>
-        ) : (
-          <View style={styles.eventsList}>
-            <Text style={[styles.countText, { color: colors.textSecondary }]}>{events.length} Veranstaltung{events.length !== 1 ? 'en' : ''}</Text>
-            {events.map(renderEventCard)}
-          </View>
-        )}
-      </ScrollView>
+        }
+      />
     </SafeAreaView>
   );
 }

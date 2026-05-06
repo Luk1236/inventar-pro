@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  ScrollView,
+  FlatList,
   ActivityIndicator,
   Alert,
   Image,
@@ -484,7 +484,7 @@ export default function ArticlesPage() {
     return 'Verfügbar';
   };
 
-  const filteredArticles = articles.filter(article => {
+  const filteredArticles = useMemo(() => articles.filter(article => {
     const matchesSearch = searchTerm === '' ||
       article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       article.inventory_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -493,9 +493,9 @@ export default function ArticlesPage() {
     const matchesCategory = selectedCategory === '' || article.category_id === selectedCategory;
 
     return matchesSearch && matchesCategory;
-  });
+  }), [articles, searchTerm, selectedCategory]);
 
-  const renderArticleCard = (article: Article) => (
+  const renderArticleCard = useCallback(({ item: article }: { item: Article }) => (
     <View
       key={article.id}
       style={[styles.articleCard, viewMode === 'grid' && styles.gridCard]}
@@ -573,7 +573,7 @@ export default function ArticlesPage() {
         </TouchableOpacity>
       </View>
     </View>
-  );
+  ), [viewMode, handleDeleteArticle, getCategoryName, getStockStatusColor, getStockStatusText, colors, isDark]);
 
   if (loading) {
     return (
@@ -697,54 +697,52 @@ export default function ArticlesPage() {
       </Modal>
 
       {/* Articles List */}
-      <ScrollView
+      <FlatList
+        key={viewMode}
         style={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-      >
-        {/* Consumable Alert Banner */}
-        {consumableAlertCount > 0 && (
-          <View style={styles.consumableAlertBanner}>
-            <Text style={styles.consumableAlertText}>
-              ⚠️ {consumableAlertCount} Verbrauchsmaterial nachbestellen
-            </Text>
-          </View>
-        )}
-
-        {/* Stats Bar */}
-        <View style={styles.statsBar}>
-          <Text style={styles.statsText}>
-            {filteredArticles.length} von {articles.length} Artikel
-          </Text>
-          <TouchableOpacity onPress={() => router.push('/categories')}>
-            <Text style={styles.manageText}>Kategorien verwalten</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Articles */}
-        <View style={[styles.articlesContainer, viewMode === 'grid' && styles.gridContainer]}>
-          {filteredArticles.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="cube-outline" size={64} color="#ccc" />
-              <Text style={styles.emptyTitle}>Keine Artikel gefunden</Text>
-              <Text style={styles.emptyText}>
-                {searchTerm || selectedCategory
-                  ? 'Versuchen Sie andere Suchbegriffe'
-                  : 'Fügen Sie Ihren ersten Artikel hinzu'}
+        data={filteredArticles}
+        keyExtractor={(item) => item.id}
+        renderItem={renderArticleCard}
+        numColumns={viewMode === 'grid' ? 2 : 1}
+        removeClippedSubviews
+        initialNumToRender={12}
+        maxToRenderPerBatch={10}
+        windowSize={8}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        ListHeaderComponent={
+          <>
+            {consumableAlertCount > 0 && (
+              <View style={styles.consumableAlertBanner}>
+                <Text style={styles.consumableAlertText}>
+                  ⚠️ {consumableAlertCount} Verbrauchsmaterial nachbestellen
+                </Text>
+              </View>
+            )}
+            <View style={styles.statsBar}>
+              <Text style={styles.statsText}>
+                {filteredArticles.length} von {articles.length} Artikel
               </Text>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => router.push('/articles/add')}
-              >
-                <Text style={styles.addButtonText}>Artikel hinzufügen</Text>
+              <TouchableOpacity onPress={() => router.push('/categories')}>
+                <Text style={styles.manageText}>Kategorien verwalten</Text>
               </TouchableOpacity>
             </View>
-          ) : (
-            filteredArticles.map(renderArticleCard)
-          )}
-        </View>
-      </ScrollView>
+          </>
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="cube-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyTitle}>Keine Artikel gefunden</Text>
+            <Text style={styles.emptyText}>
+              {searchTerm || selectedCategory
+                ? 'Versuchen Sie andere Suchbegriffe'
+                : 'Fügen Sie Ihren ersten Artikel hinzu'}
+            </Text>
+            <TouchableOpacity style={styles.addButton} onPress={() => router.push('/articles/add')}>
+              <Text style={styles.addButtonText}>Artikel hinzufügen</Text>
+            </TouchableOpacity>
+          </View>
+        }
+      />
     </SafeAreaView>
   );
 }
