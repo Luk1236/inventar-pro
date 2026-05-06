@@ -12,10 +12,18 @@ import uvicorn, psutil
 app = FastAPI(title="Pi Dashboard")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-SERVICES   = ["inventar-backend", "inventar-frontend", "mongod"]
-INSTALL    = os.path.expanduser("~/inventar")
-UPDATE_SH  = os.path.join(INSTALL, "pi-setup", "update.sh")
-BACKUP_SH  = os.path.join(INSTALL, "pi-setup", "backup.sh")
+SERVICES    = ["inventar-backend", "inventar-frontend", "mongod"]
+INSTALL     = os.path.expanduser("~/inventar")
+VERSION_FILE = os.path.join(INSTALL, "VERSION")
+UPDATE_SH   = os.path.join(INSTALL, "pi-setup", "update.sh")
+BACKUP_SH   = os.path.join(INSTALL, "pi-setup", "backup.sh")
+
+def _read_version() -> str:
+    try:
+        with open(VERSION_FILE) as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return "?"
 _update_log: list[str] = []
 _updating   = False
 
@@ -30,6 +38,10 @@ def _svc_status(svc: str) -> str:
     return "running" if rc == 0 else "stopped"
 
 # ── API ────────────────────────────────────────────────────────
+
+@app.get("/api/version")
+def version():
+    return {"version": _read_version()}
 
 @app.get("/api/status")
 def status():
@@ -238,7 +250,7 @@ body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;min-heigh
 <body>
 <div class="hdr">
   <div>
-    <h1>🍓 Inventar Pro — Pi Dashboard</h1>
+    <h1>🍓 Inventar Pro — Pi Dashboard <span id="app-ver" style="font-size:14px;font-weight:400;color:#8b949e;margin-left:8px"></span></h1>
     <div class="sub" id="hostname">Lädt...</div>
   </div>
   <div style="text-align:right">
@@ -445,6 +457,11 @@ function updateTimestamp(){
   document.getElementById('last-upd').textContent='Aktualisiert: '+now.toLocaleTimeString('de-DE');
 }
 
+async function loadVersion(){
+  const d=await api('/api/version');
+  document.getElementById('app-ver').textContent='v'+d.version;
+}
+
 async function refreshAll(){
   await Promise.all([refreshStatus(), refreshSys(), refreshNet(), refreshLog()]);
   updateTimestamp();
@@ -468,6 +485,7 @@ function renderQR(){
 }
 
 refreshAll();
+loadVersion();
 renderQR();
 setInterval(refreshStatus, 3000);
 setInterval(refreshSys,    3000);
