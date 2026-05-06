@@ -34,7 +34,7 @@ ok "Code aktuell"
 info "pip install -r requirements.txt ..."
 cd "${BACKEND_DIR}"
 source .venv/bin/activate
-pip install --quiet -r requirements.txt
+pip install --quiet --prefer-binary -r requirements.txt
 deactivate
 ok "Python-Pakete aktuell"
 

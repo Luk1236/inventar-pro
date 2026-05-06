@@ -205,7 +205,7 @@ fi
 source .venv/bin/activate
 pip install --quiet --upgrade pip
 info "Installiere Python-Pakete (kann ~5 Min dauern)..."
-pip install --quiet -r requirements.txt
+pip install --quiet --prefer-binary -r requirements.txt
 ok "Python-Pakete installiert"
 deactivate
 
