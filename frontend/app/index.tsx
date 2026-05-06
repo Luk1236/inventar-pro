@@ -22,7 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import apiService, { getToken } from '../services/apiService';
+import apiService, { getToken, setBackendUrl, getBackendUrl } from '../services/apiService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import GlobalSearch from '../components/GlobalSearch';
 import { useTheme } from '../contexts/ThemeContext';
@@ -101,6 +101,8 @@ export default function Index() {
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authSuccess, setAuthSuccess] = useState<string | null>(null);
+  const [showServerConfig, setShowServerConfig] = useState(false);
+  const [serverUrlInput, setServerUrlInput] = useState(getBackendUrl());
 
   const [financialStats, setFinancialStats] = useState<any>(null);
 
@@ -939,7 +941,8 @@ export default function Index() {
     } catch (error: any) {
       const msg = error.message || 'Anmeldung fehlgeschlagen';
       if (msg === 'NO_INTERNET' || msg === 'TIMEOUT') {
-        setAuthError('Backend nicht erreichbar. Läuft der Server auf Port 8002?');
+        setAuthError('Backend nicht erreichbar (' + getBackendUrl() + ')');
+        setShowServerConfig(true);
       } else {
         setAuthError(msg);
       }
@@ -1104,6 +1107,86 @@ export default function Index() {
                 </Text>
               )}
             </TouchableOpacity>
+
+            {/* Server-Konfiguration */}
+            <TouchableOpacity
+              onPress={() => setShowServerConfig(!showServerConfig)}
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12, gap: 4 }}
+            >
+              <Ionicons name="server-outline" size={14} color={colors.textSecondary} />
+              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+                Server: {getBackendUrl() || '(nicht gesetzt)'}
+              </Text>
+              <Ionicons name={showServerConfig ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textSecondary} />
+            </TouchableOpacity>
+
+            {showServerConfig && (
+              <View style={{ marginTop: 8, padding: 12, backgroundColor: isDark ? '#1c2333' : '#f5f5f5', borderRadius: 8 }}>
+                <Text style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 6 }}>Backend-Server URL</Text>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      padding: 8,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      backgroundColor: colors.background,
+                      color: colors.text,
+                      fontSize: 13,
+                      fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+                    }}
+                    value={serverUrlInput}
+                    onChangeText={setServerUrlInput}
+                    placeholder="http://192.168.0.229:8002"
+                    placeholderTextColor={colors.textSecondary}
+                    autoCapitalize="none"
+                    keyboardType="url"
+                  />
+                  <TouchableOpacity
+                    onPress={async () => {
+                      const url = serverUrlInput.trim().replace(/\/$/, '');
+                      if (!url) return;
+                      setBackendUrl(url);
+                      await AsyncStorage.setItem('server_url', url);
+                      setAuthError(null);
+                      setAuthSuccess(null);
+                      Alert.alert('Gespeichert', `Server: ${url}`);
+                    }}
+                    style={{ backgroundColor: colors.primary, padding: 8, borderRadius: 6, justifyContent: 'center' }}
+                  >
+                    <Ionicons name="save-outline" size={18} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'Lokal (PC)', url: 'http://localhost:8002' },
+                    { label: 'Raspberry Pi', url: 'http://192.168.0.229:8002' },
+                  ].map((preset) => (
+                    <TouchableOpacity
+                      key={preset.url}
+                      onPress={async () => {
+                        setServerUrlInput(preset.url);
+                        setBackendUrl(preset.url);
+                        await AsyncStorage.setItem('server_url', preset.url);
+                        setAuthError(null);
+                        Alert.alert('Server gewechselt', preset.label + '\n' + preset.url);
+                      }}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: 6,
+                        backgroundColor: getBackendUrl() === preset.url ? colors.primary : (isDark ? '#21262d' : '#e0e0e0'),
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: getBackendUrl() === preset.url ? '#fff' : colors.text }}>
+                        {preset.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
           </View>
         </ScrollView>
         <Modal visible={forgotPasswordVisible} transparent animationType="fade" onRequestClose={() => setForgotPasswordVisible(false)}>
