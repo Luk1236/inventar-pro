@@ -162,6 +162,12 @@ def _do_update():
             _update_log.append(line.rstrip())
         proc.wait()
         _update_log.append(f"=== Fertig (Code {proc.returncode}) ===")
+        if proc.returncode == 0:
+            _update_log.append("Dashboard wird in 3s neu gestartet...")
+            subprocess.Popen(
+                ["bash", "-c", "sleep 3 && sudo systemctl restart inventar-dashboard"],
+                start_new_session=True,
+            )
     except Exception as e:
         _update_log.append(f"FEHLER: {e}")
     finally:
@@ -408,8 +414,12 @@ async function doUpdate(){
     if(!d.running){
       clearInterval(iv);
       btn.disabled=false; btn.innerHTML='⬇ Update von GitHub';
-      setTimeout(refreshStatus,2000);
-      toast('Update abgeschlossen!');
+      toast('Update abgeschlossen! Dashboard startet neu...');
+      setTimeout(()=>{
+        const tryReload=setInterval(()=>{
+          fetch('/api/status').then(()=>{clearInterval(tryReload);location.reload()}).catch(()=>{});
+        },2000);
+      },4000);
     }
   },1500);
 }
