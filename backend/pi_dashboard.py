@@ -178,9 +178,13 @@ HTML = """<!DOCTYPE html>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;min-height:100vh}
-.hdr{background:#161b22;border-bottom:1px solid #30363d;padding:14px 24px;display:flex;align-items:center;gap:12px}
+.hdr{background:#161b22;border-bottom:1px solid #30363d;padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
 .hdr h1{font-size:17px;font-weight:700;color:#58a6ff}
 .hdr .sub{font-size:12px;color:#8b949e}
+.live-badge{display:flex;align-items:center;gap:6px;font-size:11px;color:#3fb950;font-weight:600}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#3fb950;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(0.8)}}
+.last-upd{font-size:10px;color:#8b949e;margin-top:2px}
 .body{padding:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
 .card{background:#161b22;border:1px solid #30363d;border-radius:10px;padding:18px}
 .card h2{font-size:13px;font-weight:700;color:#8b949e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px}
@@ -230,6 +234,10 @@ body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif;min-heigh
   <div>
     <h1>🍓 Inventar Pro — Pi Dashboard</h1>
     <div class="sub" id="hostname">Lädt...</div>
+  </div>
+  <div style="text-align:right">
+    <div class="live-badge"><div class="live-dot"></div> LIVE</div>
+    <div class="last-upd" id="last-upd">–</div>
   </div>
 </div>
 <div class="body">
@@ -412,11 +420,22 @@ async function doBackup(){
   },1500);
 }
 
-refreshStatus(); refreshSys(); refreshNet(); refreshLog();
-setInterval(refreshStatus,5000);
-setInterval(refreshSys,10000);
-setInterval(refreshNet,30000);
-setInterval(refreshLog,8000);
+function updateTimestamp(){
+  const now=new Date();
+  document.getElementById('last-upd').textContent='Aktualisiert: '+now.toLocaleTimeString('de-DE');
+}
+
+async function refreshAll(){
+  await Promise.all([refreshStatus(), refreshSys(), refreshNet(), refreshLog()]);
+  updateTimestamp();
+}
+
+refreshAll();
+setInterval(refreshStatus, 3000);
+setInterval(refreshSys,    3000);
+setInterval(refreshNet,   15000);
+setInterval(refreshLog,    3000);
+setInterval(updateTimestamp, 1000);
 </script>
 </body>
 </html>"""
