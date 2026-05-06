@@ -282,7 +282,7 @@ async function doUpdate(){
   await apiPost('/api/update');
   const iv=setInterval(async()=>{
     const d=await api('/api/update/log');
-    log.textContent=d.lines.join('\n');
+    log.textContent=d.lines.join('\\n');
     log.scrollTop=log.scrollHeight;
     if(!d.running){
       clearInterval(iv);
