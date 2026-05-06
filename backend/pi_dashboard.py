@@ -218,8 +218,7 @@ def _do_update():
     global _updating, _update_log, _last_update
     try:
         _update_log.append("=== Update gestartet ===")
-        cmd = ["bash", UPDATE_SH] if os.path.exists(UPDATE_SH) else \
-              ["bash", "-c",
+        cmd = ["bash", "-c",
                f"cd {INSTALL} && git pull && "
                f"source backend/.venv/bin/activate && "
                f"pip install --quiet --prefer-binary -r backend/requirements.txt && "

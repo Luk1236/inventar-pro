@@ -9,9 +9,9 @@ ok()   { echo -e "${GREEN}  ✓${NC} $1"; }
 info() { echo -e "${CYAN}  ▸${NC} $1"; }
 
 INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BACKEND_DIR="${INSTALL_DIR}/Final-main/backend"
-FRONTEND_DIR="${INSTALL_DIR}/Final-main/frontend"
-GIT_DIR="${INSTALL_DIR}/Final-main"
+BACKEND_DIR="${INSTALL_DIR}/backend"
+FRONTEND_DIR="${INSTALL_DIR}/frontend"
+GIT_DIR="${INSTALL_DIR}"
 
 echo -e "\n${CYAN}━━ Inventar Pro — Update von GitHub${NC}"
 
