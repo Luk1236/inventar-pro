@@ -89,12 +89,24 @@ def _get_stored_hash() -> str:
         new_hash = _pwd_ctx.hash(stored)
         _write_password_file(new_hash)
         return new_hash
-    new_hash = _pwd_ctx.hash("admin")
-    _write_password_file(new_hash)
-    return new_hash
+    return None  # Kein Passwort gesetzt → Setup erforderlich
+
+def _needs_setup() -> bool:
+    """Prüft ob First-Time-Setup nötig ist (kein Passwort gesetzt)"""
+    return not os.path.exists(DASH_PASSWORD_FILE)
+
+def _set_initial_password(pw: str) -> bool:
+    """Setzt das erste Passwort beim First-Time-Setup"""
+    if len(pw) < 4:
+        return False
+    _write_password_file(_pwd_ctx.hash(pw))
+    logger.info("First-Time-Setup: Passwort gesetzt")
+    return True
 
 def _verify_password(pw: str) -> bool:
     stored = _get_stored_hash()
+    if not stored:
+        return False  # Kein Passwort gesetzt
     if stored.startswith("$2b$") or stored.startswith("$2a$"):
         return _pwd_ctx.verify(pw, stored)
     # Legacy SHA-256 check + auto-migrate
@@ -271,6 +283,24 @@ async def auth_check(request: Request):
     if _check_auth(request):
         return {"ok": True}
     return JSONResponse({"ok": False}, status_code=401)
+
+@app.get("/api/setup-status")
+async def setup_status():
+    """Gibt zurück ob First-Time-Setup nötig ist"""
+    return {"needs_setup": _needs_setup()}
+
+@app.post("/api/setup-password")
+async def setup_password(body: dict = Body(...)):
+    """Setzt das initiale Passwort beim First-Time-Setup"""
+    if not _needs_setup():
+        return JSONResponse({"ok": False, "msg": "Setup bereits durchgeführt"}, status_code=400)
+    pw = body.get("password", "").strip()
+    if len(pw) < 4:
+        return JSONResponse({"ok": False, "msg": "Passwort muss mindestens 4 Zeichen haben"}, status_code=400)
+    if _set_initial_password(pw):
+        logger.info("First-Time-Setup abgeschlossen")
+        return {"ok": True, "msg": "Passwort gesetzt. Bitte anmelden."}
+    return JSONResponse({"ok": False, "msg": "Fehler beim Speichern"}, status_code=500)
 
 @app.get("/api/totp-status")
 async def totp_status(request: Request):
@@ -868,6 +898,17 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min
     <div id="login-err" style="color:#f85149;font-size:12px;margin-top:8px"></div>
   </div>
 </div>
+<div id="setup-screen" style="display:none;align-items:center;justify-content:center;min-height:100vh">
+  <div class="card" style="max-width:380px;width:100%;text-align:center">
+    <h2 style="color:#3fb950;font-size:18px;text-transform:none;letter-spacing:0;margin-bottom:8px">🎉 Willkommen!</h2>
+    <p style="color:#8b949e;font-size:13px;margin-bottom:20px">Erste Inbetriebnahme — Bitte Passwort setzen</p>
+    <input type="password" id="setup-pw1" class="shell-input" placeholder="Neues Passwort (min. 4 Zeichen)" style="margin-bottom:10px;width:100%">
+    <input type="password" id="setup-pw2" class="shell-input" placeholder="Passwort wiederholen" style="margin-bottom:10px;width:100%">
+    <button class="btn btn-green btn-full" onclick="doSetup()" id="setup-btn">Passwort speichern</button>
+    <div id="setup-err" style="color:#f85149;font-size:12px;margin-top:8px"></div>
+    <div id="setup-ok" style="color:#3fb950;font-size:12px;margin-top:8px;display:none">✓ Passwort gespeichert! Bitte anmelden...</div>
+  </div>
+</div>
 <div id="dashboard-content" style="display:none">
 <div class="hdr">
   <div>
@@ -1028,6 +1069,49 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min
 let logSvc='inventar-backend';
 const SVC_LABELS={'inventar-backend':'Backend','frontend-build':'Frontend (Build)','mongod':'MongoDB'};
 
+// First-Time-Setup Check
+async function checkSetupStatus(){
+  try{
+    const r=await fetch('/api/setup-status');
+    const d=await r.json();
+    if(d.needs_setup){
+      document.getElementById('login-screen').style.display='none';
+      document.getElementById('setup-screen').style.display='flex';
+    }
+  }catch(e){console.error('Setup-Check fehlgeschlagen',e)}
+}
+
+async function doSetup(){
+  const pw1=document.getElementById('setup-pw1').value;
+  const pw2=document.getElementById('setup-pw2').value;
+  const btn=document.getElementById('setup-btn');
+  const errEl=document.getElementById('setup-err');
+  const okEl=document.getElementById('setup-ok');
+
+  errEl.textContent='';
+  okEl.style.display='none';
+
+  if(pw1.length<4){errEl.textContent='Passwort muss mindestens 4 Zeichen haben';return}
+  if(pw1!==pw2){errEl.textContent='Passwörter stimmen nicht überein';return}
+
+  btn.disabled=true;
+  try{
+    const r=await fetch('/api/setup-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw1})});
+    const d=await r.json();
+    if(d.ok){
+      okEl.style.display='block';
+      setTimeout(()=>{
+        document.getElementById('setup-screen').style.display='none';
+        document.getElementById('login-screen').style.display='flex';
+      },1500);
+    }else{errEl.textContent=d.msg||'Fehler beim Speichern'}
+  }catch(e){errEl.textContent='Verbindungsfehler'}
+  btn.disabled=false;
+}
+
+// Page init
+checkSetupStatus();
+
 async function doLogin(){
   const pw=document.getElementById('login-pw').value;
   const totp=document.getElementById('login-totp').value.trim();
@@ -1063,6 +1147,8 @@ function showDashboard(){
 
 document.getElementById('login-pw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
 document.getElementById('login-totp').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+document.getElementById('setup-pw1').addEventListener('keydown',e=>{if(e.key==='Enter')doSetup()});
+document.getElementById('setup-pw2').addEventListener('keydown',e=>{if(e.key==='Enter')doSetup()});
 
 // Keyboard-Shortcuts (nur wenn nicht in Input)
 document.addEventListener('keydown',e=>{
