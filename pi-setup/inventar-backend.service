@@ -2,6 +2,8 @@
 Description=Inventar Pro Backend (FastAPI)
 After=network.target mongod.service
 Requires=mongod.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -9,11 +11,16 @@ User=admin
 WorkingDirectory=/home/admin/inventar/backend
 Environment=PATH=/home/admin/inventar/backend/.venv/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=/home/admin/inventar/backend/.venv/bin/python3 server.py
-Restart=always
-RestartSec=5
+Restart=on-failure
+RestartSec=10
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=inventar-backend
+ProtectSystem=full
+ProtectHome=read-only
+NoNewPrivileges=yes
+PrivateTmp=yes
+RestrictRealtime=yes
 
 [Install]
 WantedBy=multi-user.target

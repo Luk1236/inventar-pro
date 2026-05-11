@@ -20,7 +20,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { compressImageToBase64 } from '../../services/imageService';
 
 import Constants from 'expo-constants';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
 import { getToken } from '../../services/apiService';
@@ -45,12 +45,20 @@ interface StorageLocation {
   type: string;
 }
 
+interface Warehouse {
+  id: string;
+  name: string;
+  city?: string;
+  is_default?: boolean;
+}
+
 interface ArticleFormData {
   name: string;
   description: string;
   category_id: string;
   supplier_id: string;
   storage_location_id: string;
+  warehouse_id: string;
   inventory_code: string;
   base_unit: string;
   min_stock_level: string;
@@ -76,6 +84,7 @@ interface ArticleFormData {
 
 export default function AddArticlePage() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams();
   const { colors, isDark } = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -117,13 +126,16 @@ export default function AddArticlePage() {
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showSubRentalSupplierModal, setShowSubRentalSupplierModal] = useState(false);
   const [showStorageModal, setShowStorageModal] = useState(false);
+  const [showWarehouseModal, setShowWarehouseModal] = useState(false);
   const [showUnitModal, setShowUnitModal] = useState(false);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [formData, setFormData] = useState<ArticleFormData>({
     name: '',
     description: '',
     category_id: '',
     supplier_id: '',
     storage_location_id: '',
+    warehouse_id: '',
     inventory_code: '',
     base_unit: 'Stück',
     min_stock_level: '0',
@@ -340,6 +352,17 @@ export default function AddArticlePage() {
   useEffect(() => {
     loadData();
     generateInventoryCode();
+    // AI-Scan Prefill: wenn Params vom AI-Scanner kommen, übernehmen
+    if (params.name || params.description || params.serial_number || params.prefill_image) {
+      setFormData(prev => ({
+        ...prev,
+        name: typeof params.name === 'string' ? params.name : prev.name,
+        description: typeof params.description === 'string' ? params.description : prev.description,
+        image_base64: typeof params.prefill_image === 'string' && params.prefill_image
+          ? `data:image/jpeg;base64,${params.prefill_image}`
+          : prev.image_base64,
+      }));
+    }
   }, []);
 
   const loadData = async () => {
@@ -355,10 +378,11 @@ export default function AddArticlePage() {
         'Content-Type': 'application/json',
       };
 
-      const [categoriesRes, suppliersRes, locationsRes] = await Promise.all([
+      const [categoriesRes, suppliersRes, locationsRes, warehousesRes] = await Promise.all([
         fetch(`${BACKEND_URL}/api/categories`, { headers }),
         fetch(`${BACKEND_URL}/api/suppliers`, { headers }),
         fetch(`${BACKEND_URL}/api/storage-locations`, { headers }),
+        fetch(`${BACKEND_URL}/api/warehouses`, { headers }),
       ]);
 
       if (categoriesRes.ok && suppliersRes.ok && locationsRes.ok) {
@@ -371,6 +395,14 @@ export default function AddArticlePage() {
         setCategories(categoriesData);
         setSuppliers(suppliersData);
         setStorageLocations(locationsData);
+
+        if (warehousesRes.ok) {
+          const wData: Warehouse[] = await warehousesRes.json();
+          setWarehouses(wData);
+          // Default-Lager voreinstellen
+          const def = wData.find(w => w.is_default);
+          if (def) setFormData(prev => ({ ...prev, warehouse_id: prev.warehouse_id || def.id }));
+        }
       } else {
         Alert.alert('Fehler', 'Daten konnten nicht geladen werden');
       }
@@ -486,6 +518,7 @@ export default function AddArticlePage() {
         rental_price_month: toFloat(formData.rental_price_month),
         supplier_id: formData.supplier_id || null,
         storage_location_id: formData.storage_location_id || null,
+        warehouse_id: formData.warehouse_id || null,
         power_type: formData.power_type || null,
         sub_rental_supplier_id: formData.sub_rental_supplier_id || null,
         weight_kg: toFloat(formData.weight_kg),
@@ -669,6 +702,19 @@ export default function AddArticlePage() {
             >
               <Text style={[styles.selectorText, !formData.supplier_id && styles.placeholderText]}>
                 {getSupplierName(formData.supplier_id)}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Lager / Standort</Text>
+            <TouchableOpacity
+              style={styles.selector}
+              onPress={() => setShowWarehouseModal(true)}
+            >
+              <Text style={[styles.selectorText, !formData.warehouse_id && styles.placeholderText]}>
+                {warehouses.find(w => w.id === formData.warehouse_id)?.name || 'Lager auswählen'}
               </Text>
               <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
@@ -1007,6 +1053,58 @@ export default function AddArticlePage() {
                   {supplier.contact_email && (
                     <Text style={styles.modalItemSubtext}>{supplier.contact_email}</Text>
                   )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Warehouse Modal */}
+      <Modal
+        visible={showWarehouseModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowWarehouseModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Lager / Standort auswählen</Text>
+              <TouchableOpacity onPress={() => setShowWarehouseModal(false)}>
+                <Ionicons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              <TouchableOpacity
+                style={styles.modalItem}
+                onPress={() => {
+                  setFormData(prev => ({ ...prev, warehouse_id: '' }));
+                  setShowWarehouseModal(false);
+                }}
+              >
+                <Text style={styles.modalItemText}>Kein Lager</Text>
+              </TouchableOpacity>
+              {warehouses.length === 0 && (
+                <View style={styles.modalItem}>
+                  <Text style={styles.modalItemSubtext}>
+                    Noch keine Lager angelegt. Unter "Lager / Standorte" anlegen.
+                  </Text>
+                </View>
+              )}
+              {warehouses.map(w => (
+                <TouchableOpacity
+                  key={w.id}
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setFormData(prev => ({ ...prev, warehouse_id: w.id }));
+                    setShowWarehouseModal(false);
+                  }}
+                >
+                  <Text style={styles.modalItemText}>
+                    {w.name}{w.is_default ? ' ⭐' : ''}
+                  </Text>
+                  {w.city && <Text style={styles.modalItemSubtext}>{w.city}</Text>}
                 </TouchableOpacity>
               ))}
             </ScrollView>

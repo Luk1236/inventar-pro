@@ -1,6 +1,8 @@
 [Unit]
 Description=Inventar Pro Pi-Dashboard (Web-Admin)
 After=network.target inventar-backend.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -8,11 +10,16 @@ User=admin
 WorkingDirectory=/home/admin/inventar/backend
 Environment=PATH=/home/admin/inventar/backend/.venv/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=/home/admin/inventar/backend/.venv/bin/python3 pi_dashboard.py
-Restart=always
-RestartSec=5
+Restart=on-failure
+RestartSec=10
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=inventar-dashboard
+ProtectSystem=full
+ProtectHome=read-only
+NoNewPrivileges=yes
+PrivateTmp=yes
+RestrictRealtime=yes
 
 [Install]
 WantedBy=multi-user.target

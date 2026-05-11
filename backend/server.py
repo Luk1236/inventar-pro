@@ -8011,6 +8011,15 @@ api_router.include_router(_teams_router)
 from app.routes.customers import router as _customers_router
 api_router.include_router(_customers_router)
 
+from app.routes.ai_inventory import router as _ai_router
+api_router.include_router(_ai_router)
+
+from app.routes.labels import router as _labels_router
+api_router.include_router(_labels_router)
+
+from app.routes.warehouses import router as _warehouses_router
+api_router.include_router(_warehouses_router)
+
 app.include_router(api_router)
 
 # v1 router aliases are registered at the END of this file (after all @app routes)

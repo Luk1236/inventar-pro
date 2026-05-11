@@ -40,6 +40,9 @@ export default function RootLayout() {
               <Stack.Screen name="scanner/index" />
               <Stack.Screen name="qr-generator/index" />
               <Stack.Screen name="reports/index" />
+              <Stack.Screen name="reports/charts" />
+              <Stack.Screen name="ai-scan/index" />
+              <Stack.Screen name="warehouses/index" />
               <Stack.Screen name="settings/index" />
               <Stack.Screen name="profile/index" />
               <Stack.Screen name="teams/index" />

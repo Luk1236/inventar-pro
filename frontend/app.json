@@ -2,7 +2,7 @@
   "expo": {
     "name": "Inventar Pro",
     "slug": "inventarpro",
-    "version": "1.0.68",
+    "version": "1.0.69",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "inventarpro",
@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.inventarpro.app",
-      "versionCode": 10068,
+      "versionCode": 10069,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#007AFF"
@@ -30,7 +30,16 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "name": "Inventar Pro",
+      "shortName": "InventarPro",
+      "lang": "de",
+      "scope": "/",
+      "themeColor": "#0d1117",
+      "backgroundColor": "#0d1117",
+      "display": "standalone",
+      "orientation": "any",
+      "startUrl": "/"
     },
     "plugins": [
       "expo-router",

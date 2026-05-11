@@ -178,6 +178,7 @@ class Article(BaseModel):
     # Standard fields
     status: str = "OK"  # OK, defekt, gesperrt
     storage_location_id: Optional[str] = None  # Link to storage location
+    warehouse_id: Optional[str] = None  # Link to warehouse (Multi-Lager)
     last_maintenance: Optional[datetime] = None
     next_maintenance: Optional[datetime] = None
     maintenance_interval_days: Optional[int] = None
@@ -232,6 +233,35 @@ class ArticleCreate(BaseModel):
     @classmethod
     def validate_images(cls, v):
         return _validate_images_list(v)
+
+
+class Warehouse(BaseModel):
+    """Standort/Lager — z.B. Hauptlager, Filiale Berlin, etc."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    address: Optional[str] = None
+    city: Optional[str] = None
+    postal_code: Optional[str] = None
+    country: Optional[str] = "DE"
+    contact_person: Optional[str] = None
+    phone: Optional[str] = None
+    notes: Optional[str] = None
+    is_default: bool = False
+    archived: bool = False
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+class WarehouseCreate(BaseModel):
+    name: str
+    address: Optional[str] = None
+    city: Optional[str] = None
+    postal_code: Optional[str] = None
+    country: Optional[str] = "DE"
+    contact_person: Optional[str] = None
+    phone: Optional[str] = None
+    notes: Optional[str] = None
+    is_default: bool = False
 
 
 class StorageZone(BaseModel):
