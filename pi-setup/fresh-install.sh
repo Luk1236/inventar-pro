@@ -12,7 +12,7 @@
 set -euo pipefail
 
 # === Konfiguration ===
-REPO_URL="${INVENTAR_REPO:-https://github.com/dbootz111/inventar-pro.git}"
+REPO_URL="${INVENTAR_REPO:-https://github.com/Luk1236/inventar-pro.git}"
 INSTALL_DIR="${HOME}/inventar"
 PI_USER="$(whoami)"
 NODE_MAJOR=20
@@ -29,15 +29,42 @@ echo
 read -p "Fortfahren? (y/N): " CONFIRM
 [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]] && { echo "Abgebrochen."; exit 0; }
 
+# === Optionale Features VORAB abfragen (damit Skript dann durchläuft) ===
+echo
+echo "── Externer Zugriff (optional, aber empfohlen) ──"
+echo "1) Tailscale = privates VPN (sicherer Zugang nur für deine Geräte)"
+echo "2) Cloudflare Tunnel = öffentliche HTTPS-URL (Kunden/Externe)"
+echo
+
+read -p "Tailscale aktivieren? (Y/n): " ENABLE_TAILSCALE
+ENABLE_TAILSCALE="${ENABLE_TAILSCALE:-Y}"
+
+read -p "Cloudflare Tunnel aktivieren? (Y/n): " ENABLE_CLOUDFLARE
+ENABLE_CLOUDFLARE="${ENABLE_CLOUDFLARE:-Y}"
+
+if [[ "$ENABLE_CLOUDFLARE" =~ ^[Yy]$ ]]; then
+    echo
+    echo "ℹ️  Cloudflare braucht einen kostenlosen Account auf https://cloudflare.com"
+    echo "    Falls du noch keinen hast: jetzt im Browser anmelden, dauert 1 Minute."
+    read -p "    Account vorhanden? (Y/n): " CF_ACCOUNT
+    CF_ACCOUNT="${CF_ACCOUNT:-Y}"
+    if ! [[ "$CF_ACCOUNT" =~ ^[Yy]$ ]]; then
+        echo "    OK — Cloudflare-Schritt wird übersprungen. Später nachholen mit:"
+        echo "    sudo ~/inventar/setup-cloudflare-tunnel.sh"
+        ENABLE_CLOUDFLARE="n"
+    fi
+fi
+echo
+
 # === 1. System aktualisieren ===
-echo "[1/12] System aktualisieren..."
+echo "[1/14] System aktualisieren..."
 sudo apt-get update -qq
 sudo apt-get upgrade -y -qq
 sudo apt-get install -y -qq curl wget gnupg lsb-release ca-certificates git build-essential \
     python3 python3-venv python3-pip python3-dev libffi-dev libssl-dev
 
 # === 2. Node.js LTS via NodeSource ===
-echo "[2/12] Node.js ${NODE_MAJOR} installieren..."
+echo "[2/14] Node.js ${NODE_MAJOR} installieren..."
 if ! command -v node >/dev/null 2>&1 || [[ $(node -v | cut -d. -f1 | tr -d 'v') -lt $NODE_MAJOR ]]; then
     curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | sudo -E bash -
     sudo apt-get install -y -qq nodejs
@@ -46,7 +73,7 @@ echo "  Node:  $(node --version)"
 echo "  npm:   $(npm --version)"
 
 # === 3. MongoDB 8.0 installieren ===
-echo "[3/12] MongoDB 8.0 installieren..."
+echo "[3/14] MongoDB 8.0 installieren..."
 if ! command -v mongod >/dev/null 2>&1; then
     ARCH=$(dpkg --print-architecture)
     if [[ "$ARCH" == "arm64" ]]; then
@@ -86,7 +113,7 @@ sudo systemctl enable mongod 2>/dev/null || sudo systemctl enable mongodb 2>/dev
 sudo systemctl start mongod 2>/dev/null || sudo systemctl start mongodb 2>/dev/null || true
 
 # === 4. Repo klonen ===
-echo "[4/12] Repo klonen..."
+echo "[4/14] Repo klonen..."
 if [[ -d "$INSTALL_DIR" ]]; then
     echo "  Verzeichnis existiert bereits — pull statt clone"
     cd "$INSTALL_DIR" && git pull
@@ -96,7 +123,7 @@ else
 fi
 
 # === 5. Backend (Python venv + Dependencies) ===
-echo "[5/12] Backend Python-venv..."
+echo "[5/14] Backend Python-venv..."
 cd "$INSTALL_DIR/backend"
 if [[ ! -d .venv ]]; then
     python3 -m venv .venv
@@ -110,7 +137,7 @@ deactivate
 echo "  ✓ Backend-Dependencies installiert"
 
 # === 6. Backend .env erstellen ===
-echo "[6/12] Backend .env..."
+echo "[6/14] Backend .env..."
 if [[ ! -f "$INSTALL_DIR/backend/.env" ]]; then
     SECRET_KEY=$(python3 -c "import secrets;print(secrets.token_urlsafe(32))")
     cat > "$INSTALL_DIR/backend/.env" <<EOF
@@ -143,7 +170,7 @@ else
 fi
 
 # === 7. Frontend (npm install + static build) ===
-echo "[7/12] Frontend installieren + bauen..."
+echo "[7/14] Frontend installieren + bauen..."
 cd "$INSTALL_DIR/frontend"
 
 # Backend-URL für den Build ermitteln und in app.json einsetzen
@@ -184,7 +211,7 @@ NODE_OPTIONS="--max-old-space-size=2048" EXPO_PUBLIC_BACKEND_URL="$BACKEND_URL" 
 echo "  ✓ Frontend gebaut nach frontend/dist/"
 
 # === 8. systemd Service-Files installieren ===
-echo "[8/12] systemd Services installieren..."
+echo "[8/14] systemd Services installieren..."
 SETUP_DIR="$INSTALL_DIR/pi-setup"
 # Falls Service-Files den User 'admin' hart-codiert haben, durch aktuellen User ersetzen
 for unit in inventar-backend.service inventar-dashboard.service inventar-backup.service inventar-backup.timer inventar-weekly-reboot.service inventar-weekly-reboot.timer; do
@@ -197,13 +224,13 @@ sudo systemctl daemon-reload
 echo "  ✓ Service-Files installiert"
 
 # === 9. Sudoers (NOPASSWD für systemctl, shutdown, mongodump) ===
-echo "[9/12] Sudoers konfigurieren..."
+echo "[9/14] Sudoers konfigurieren..."
 echo "$PI_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl, /sbin/shutdown, /usr/bin/mongodump, /usr/bin/apt-get" | sudo tee /etc/sudoers.d/inventar > /dev/null
 sudo chmod 440 /etc/sudoers.d/inventar
 sudo visudo -c -q -f /etc/sudoers.d/inventar && echo "  ✓ Sudoers OK" || { echo "  ✗ Sudoers ungültig — rolle zurück"; sudo rm /etc/sudoers.d/inventar; exit 1; }
 
 # === 10. Dashboard-Passwort setzen ===
-echo "[10/12] Dashboard-Passwort..."
+echo "[10/14] Dashboard-Passwort..."
 if [[ ! -f ~/.dashboard_password ]]; then
     while true; do
         read -srp "  Neues Dashboard-Passwort (min. 4 Zeichen): " DASH_PW
@@ -221,7 +248,7 @@ else
 fi
 
 # === 11. Initialer Git-Tag (für Rollback-System) ===
-echo "[11/12] Initialer Git-Tag..."
+echo "[11/14] Initialer Git-Tag..."
 cd "$INSTALL_DIR"
 VERSION=$(cat VERSION | tr -d '[:space:]')
 TAG="v$VERSION"
@@ -231,7 +258,7 @@ fi
 echo "  ✓ Tag: $TAG"
 
 # === 12. Services starten ===
-echo "[12/12] Services starten..."
+echo "[12/14] Services starten..."
 sudo systemctl enable --now inventar-backend
 sleep 2
 sudo systemctl enable --now inventar-dashboard
@@ -240,28 +267,103 @@ sudo systemctl enable --now inventar-weekly-reboot.timer 2>/dev/null || true
 
 chmod +x "$SETUP_DIR/"*.sh 2>/dev/null || true
 
+# === 13. Tailscale (optional) ===
+TAILSCALE_IP=""
+if [[ "$ENABLE_TAILSCALE" =~ ^[Yy]$ ]]; then
+    echo "[13/14] Tailscale installieren..."
+    if ! command -v tailscale >/dev/null 2>&1; then
+        curl -fsSL https://tailscale.com/install.sh | sh || {
+            echo "  ⚠ Tailscale-Install fehlgeschlagen — überspringe"
+            ENABLE_TAILSCALE="n"
+        }
+    fi
+    if [[ "$ENABLE_TAILSCALE" =~ ^[Yy]$ ]]; then
+        echo "  → Tailscale verbinden — folge der Browser-URL die gleich erscheint:"
+        echo "    (im Browser mit Google/GitHub anmelden, dann zurück zum Terminal)"
+        echo
+        sudo tailscale up || {
+            echo "  ⚠ Tailscale-Login abgebrochen — überspringe"
+            ENABLE_TAILSCALE="n"
+        }
+        if [[ "$ENABLE_TAILSCALE" =~ ^[Yy]$ ]]; then
+            sleep 2
+            TAILSCALE_IP=$(tailscale ip -4 2>/dev/null | head -n1 || echo "")
+            echo "  ✓ Tailscale läuft — IP: ${TAILSCALE_IP:-?}"
+        fi
+    fi
+else
+    echo "[13/14] Tailscale übersprungen"
+fi
+
+# === 14. Cloudflare Tunnel (optional) ===
+CLOUDFLARE_URL=""
+if [[ "$ENABLE_CLOUDFLARE" =~ ^[Yy]$ ]]; then
+    echo "[14/14] Cloudflare Tunnel einrichten..."
+    if [[ -x "$INSTALL_DIR/setup-cloudflare-tunnel.sh" ]]; then
+        # Skript läuft interaktiv (Cloudflare-Login im Browser)
+        sudo "$INSTALL_DIR/setup-cloudflare-tunnel.sh" || {
+            echo "  ⚠ Cloudflare-Setup abgebrochen oder fehlgeschlagen"
+            ENABLE_CLOUDFLARE="n"
+        }
+        if [[ "$ENABLE_CLOUDFLARE" =~ ^[Yy]$ ]]; then
+            # URL aus config.yml extrahieren
+            if [[ -f "$HOME/.cloudflared/config.yml" ]]; then
+                CLOUDFLARE_URL=$(grep -oP 'https://[a-z0-9-]+\.cfargotunnel\.com' "$HOME/.cloudflared/config.yml" | head -n1 || true)
+                if [[ -z "$CLOUDFLARE_URL" ]]; then
+                    TID=$(grep -oP 'hostname: \K[a-z0-9-]+\.cfargotunnel\.com' "$HOME/.cloudflared/config.yml" | head -n1 || true)
+                    [[ -n "$TID" ]] && CLOUDFLARE_URL="https://$TID"
+                fi
+            fi
+            echo "  ✓ Cloudflare Tunnel läuft"
+        fi
+    else
+        echo "  ⚠ setup-cloudflare-tunnel.sh nicht gefunden — überspringe"
+        ENABLE_CLOUDFLARE="n"
+    fi
+else
+    echo "[14/14] Cloudflare Tunnel übersprungen"
+fi
+
 # === Fertig ===
 LOCAL_IP=$(hostname -I | awk '{print $1}')
 echo
 echo "============================================================"
 echo " ✅ Fresh-Install abgeschlossen"
 echo "============================================================"
-echo " Dashboard:  http://${LOCAL_IP}:8080"
-echo " App:        http://${LOCAL_IP}:8002"
-echo " API-Docs:   http://${LOCAL_IP}:8002/docs"
+echo
+echo "🏠 LOKAL (im WLAN):"
+echo "   App:        http://${LOCAL_IP}:8002"
+echo "   Dashboard:  http://${LOCAL_IP}:8080"
+echo "   API-Docs:   http://${LOCAL_IP}:8002/docs"
+echo
+if [[ -n "$TAILSCALE_IP" ]]; then
+    echo "🔒 TAILSCALE (privates VPN, nur deine Geräte):"
+    echo "   App:        http://${TAILSCALE_IP}:8002"
+    echo "   Dashboard:  http://${TAILSCALE_IP}:8080"
+    echo "   → Tailscale-App auf Handy/PC installieren mit gleichem Account"
+    echo
+fi
+if [[ -n "$CLOUDFLARE_URL" ]]; then
+    echo "🌐 ÖFFENTLICH (Cloudflare Tunnel, weltweit erreichbar):"
+    echo "   App:        ${CLOUDFLARE_URL}"
+    echo "   → Diese URL kannst du an Kunden/Externe weitergeben"
+    echo
+fi
 echo "============================================================"
 echo
 echo "Service-Status:"
 systemctl is-active inventar-backend && echo "  ✓ Backend läuft"  || echo "  ✗ Backend nicht aktiv"
 systemctl is-active inventar-dashboard && echo "  ✓ Dashboard läuft" || echo "  ✗ Dashboard nicht aktiv"
 systemctl is-active mongod 2>/dev/null && echo "  ✓ MongoDB läuft"  || systemctl is-active mongodb && echo "  ✓ MongoDB läuft (legacy)" || echo "  ✗ MongoDB nicht aktiv"
+[[ -n "$TAILSCALE_IP" ]] && (systemctl is-active tailscaled >/dev/null && echo "  ✓ Tailscale läuft" || echo "  ⚠ Tailscale nicht aktiv")
+[[ -n "$CLOUDFLARE_URL" ]] && (systemctl is-active cloudflared >/dev/null && echo "  ✓ Cloudflare Tunnel läuft" || echo "  ⚠ Cloudflare Tunnel nicht als Service aktiv")
 echo
 echo "Logs anschauen:"
 echo "  sudo journalctl -u inventar-backend -f"
 echo "  sudo journalctl -u inventar-dashboard -f"
+[[ -n "$CLOUDFLARE_URL" ]] && echo "  sudo journalctl -u cloudflared -f"
 echo
 echo "Optional als nächstes:"
-echo "  • Tailscale: curl -fsSL https://tailscale.com/install.sh | sh && sudo tailscale up"
-echo "  • HTTPS:      ./pi-setup/enable-tailscale-funnel.sh"
-echo "  • fail2ban:   sudo apt install fail2ban && sudo cp pi-setup/fail2ban-*.conf /etc/fail2ban/filter.d/ && sudo systemctl restart fail2ban"
-echo "  • Backup-Test: ./pi-setup/test-backup-restore.sh"
+echo "  • fail2ban:    sudo apt install fail2ban && sudo cp pi-setup/fail2ban-*.conf /etc/fail2ban/filter.d/ && sudo systemctl restart fail2ban"
+echo "  • Backup-Test: ~/inventar/pi-setup/test-backup-restore.sh"
+echo "  • AI-Inventur: Backend-.env editieren, ANTHROPIC_API_KEY oder OPENAI_API_KEY setzen"
