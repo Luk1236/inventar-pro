@@ -286,6 +286,15 @@ async def api_health_check():
     from fastapi.responses import JSONResponse
     return JSONResponse(payload, status_code=status)
 
+@api_router.get("/server-info", tags=["health"])
+async def server_info(request: Request):
+    """Returns the public URL this request arrived at — useful for QR-code/URL sharing."""
+    base = str(request.base_url).rstrip("/")
+    # Strip /api suffix that reverse proxies may add
+    if base.endswith("/api"):
+        base = base[:-4]
+    return {"url": base, "version": app.version}
+
 # RBAC (Permission class, ROLE_PERMISSIONS, has_permission, require_permission)
 # extracted to app/deps/auth.py (Phase 3 refactor — see imports above).
 

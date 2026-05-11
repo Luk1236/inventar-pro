@@ -18,7 +18,7 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { useTheme } from '../../contexts/ThemeContext';
-import apiService, { setBackendUrl, getToken } from '../../services/apiService';
+import apiService, { setBackendUrl, getBackendUrl, getToken } from '../../services/apiService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -55,6 +55,7 @@ export default function SettingsPage() {
   const [serverUrl, setServerUrlState] = useState('');
   const [serverUrlSaving, setServerUrlSaving] = useState(false);
   const [serverUrlSaved, setServerUrlSaved] = useState(false);
+  const [serverUrlTesting, setServerUrlTesting] = useState(false);
 
   // Collapsible groups - all collapsed by default for cleaner UI
   const [expandedGroups, setExpandedGroups] = useState<{ [key: string]: boolean }>({
@@ -437,6 +438,28 @@ export default function SettingsPage() {
       Alert.alert('Fehler', 'Server-URL konnte nicht gespeichert werden.');
     } finally {
       setServerUrlSaving(false);
+    }
+  };
+
+  const testAndDetectUrl = async () => {
+    setServerUrlTesting(true);
+    const candidate = serverUrl.trim().replace(/\/$/, '') || getBackendUrl();
+    try {
+      const res = await fetch(`${candidate}/api/server-info`, { signal: AbortSignal.timeout(5000) });
+      if (res.ok) {
+        const data = await res.json();
+        const detected = (data.url as string).replace(/\/$/, '');
+        setServerUrlState(detected);
+        await AsyncStorage.setItem('server_url', detected);
+        setBackendUrl(detected);
+        Alert.alert('Verbunden', `Server erreichbar.\nURL: ${detected}`);
+      } else {
+        Alert.alert('Fehler', `Server antwortet mit ${res.status}.`);
+      }
+    } catch {
+      Alert.alert('Nicht erreichbar', `Kein Server gefunden unter:\n${candidate}\n\nPrüfe URL und ob der Tunnel läuft.`);
+    } finally {
+      setServerUrlTesting(false);
     }
   };
 
@@ -1754,7 +1777,7 @@ export default function SettingsPage() {
           <View style={[styles.groupContent, { backgroundColor: colors.card }]}>
             <View style={{ padding: 16 }}>
               <Text style={{ fontSize: 13, color: colors.subText ?? colors.textSecondary, marginBottom: 6 }}>
-                Server-URL (Raspberry Pi IP oder Cloudflare-URL)
+                Server-URL (LAN-IP oder Cloudflare/Tunnel-URL)
               </Text>
               <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                 <TextInput
@@ -1770,11 +1793,29 @@ export default function SettingsPage() {
                   }}
                   value={serverUrl}
                   onChangeText={setServerUrlState}
-                  placeholder="http://192.168.1.100:8002"
+                  placeholder="https://xyz.trycloudflare.com"
                   placeholderTextColor={colors.subText ?? colors.textSecondary}
                   autoCapitalize="none"
                   keyboardType="url"
                 />
+                {/* Test connection */}
+                <TouchableOpacity
+                  onPress={testAndDetectUrl}
+                  disabled={serverUrlTesting}
+                  style={{
+                    backgroundColor: '#FF9500',
+                    padding: 10,
+                    borderRadius: 8,
+                    width: 44,
+                    alignItems: 'center',
+                  }}
+                >
+                  {serverUrlTesting
+                    ? <ActivityIndicator size="small" color="#fff" />
+                    : <Ionicons name="wifi-outline" size={20} color="#fff" />
+                  }
+                </TouchableOpacity>
+                {/* Save */}
                 <TouchableOpacity
                   onPress={saveServerUrl}
                   disabled={serverUrlSaving}
@@ -1792,6 +1833,10 @@ export default function SettingsPage() {
                   }
                 </TouchableOpacity>
               </View>
+              <Text style={{ fontSize: 11, color: colors.subText ?? colors.textSecondary, marginTop: 6 }}>
+                {'\u{1F4F6}'} LAN: http://192.168.x.x:8002 {'  '}{'\u{1F310}'} Extern: https://xyz.trycloudflare.com{'\n'}
+                Wifi-Button: Verbindung testen & URL automatisch erkennen
+              </Text>
             </View>
           </View>
         )}
