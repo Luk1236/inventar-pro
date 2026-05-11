@@ -70,32 +70,32 @@ fi
 if ! command -v mongod &>/dev/null; then
   info "MongoDB installieren..."
   if [[ "$ARCH" == "aarch64" ]]; then
-    # MongoDB 7.0 für ARM64 / Ubuntu 22.04
+    # MongoDB 8.0 für ARM64 / Ubuntu 22.04+
     apt-get install -y -qq gnupg curl
-    curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | \
-      gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+    curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | \
+      gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
 
     # Raspberry Pi OS (bookworm) basiert auf Debian 12
     OS_CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
     case "$OS_CODENAME" in
       bookworm|trixie)
-        echo "deb [ arch=arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/debian bookworm/mongodb-org/7.0 main" \
-          > /etc/apt/sources.list.d/mongodb-org-7.0.list
+        echo "deb [ arch=arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" \
+          > /etc/apt/sources.list.d/mongodb-org-8.0.list
         ;;
       jammy|focal|noble)
-        echo "deb [ arch=arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${OS_CODENAME}/mongodb-org/7.0 multiverse" \
-          > /etc/apt/sources.list.d/mongodb-org-7.0.list
+        echo "deb [ arch=arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${OS_CODENAME}/mongodb-org/8.0 multiverse" \
+          > /etc/apt/sources.list.d/mongodb-org-8.0.list
         ;;
       *)
         warn "Unbekanntes OS ($OS_CODENAME) – versuche Debian bookworm-Paket"
-        echo "deb [ arch=arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/debian bookworm/mongodb-org/7.0 main" \
-          > /etc/apt/sources.list.d/mongodb-org-7.0.list
+        echo "deb [ arch=arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" \
+          > /etc/apt/sources.list.d/mongodb-org-8.0.list
         ;;
     esac
 
     apt-get update -qq
     apt-get install -y -qq mongodb-org || {
-      warn "MongoDB 7 fehlgeschlagen – versuche mongod aus Distro-Repo..."
+      warn "MongoDB 8 fehlgeschlagen – versuche mongod aus Distro-Repo..."
       apt-get install -y -qq mongodb || error "MongoDB konnte nicht installiert werden."
     }
   else

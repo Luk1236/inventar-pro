@@ -55,7 +55,7 @@ sudo bash setup-raspi.sh
 
 Das Script installiert automatisch:
 - Python 3 + virtuelle Umgebung
-- MongoDB 7.0
+- MongoDB 8.0
 - Alle Python-Dependencies
 - systemd-Service (Auto-Start beim Booten)
 - Optional: Cloudflare Tunnel

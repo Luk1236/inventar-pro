@@ -35,7 +35,7 @@ SERVICE_USER="${USER}"
 BACKEND_PORT=8002
 FRONTEND_PORT=8081
 NODE_VERSION=20
-MONGO_VERSION=7.0
+MONGO_VERSION=8.0
 
 # ── Prüfungen ────────────────────────────────────────────────
 step "Schritt 0 — Systemprüfung"
