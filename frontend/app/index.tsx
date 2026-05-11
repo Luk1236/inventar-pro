@@ -941,7 +941,7 @@ export default function Index() {
     } catch (error: any) {
       const msg = error.message || 'Anmeldung fehlgeschlagen';
       if (msg === 'NO_INTERNET' || msg === 'TIMEOUT') {
-        setAuthError('Backend nicht erreichbar (' + getBackendUrl() + ')');
+        setAuthError('Server nicht erreichbar: ' + getBackendUrl() + '\nBitte Server-URL unten prüfen oder anpassen.');
         setShowServerConfig(true);
       } else {
         setAuthError(msg);
