@@ -1,7 +1,21 @@
 #!/bin/bash
-# Inventar Pro – Raspberry Pi Setup
+# ⚠️ DEPRECATED ⚠️
+# Dieses Skript wird nicht mehr gepflegt. Nutze stattdessen:
+#   pi-setup/fresh-install.sh
+# Vorteile von fresh-install.sh:
+#   - Installiert in $HOME/inventar (nicht /opt) — einfacher für Updates
+#   - Setzt Dashboard-Auth mit bcrypt auf
+#   - Konfiguriert Backup-Timer + Weekly-Reboot
+#   - Setzt EXPO_PUBLIC_BACKEND_URL automatisch auf Pi-IP
+#
+# Inventar Pro – Raspberry Pi Setup (LEGACY)
 # Läuft auf Raspberry Pi OS (64-bit) oder Ubuntu 22.04 ARM
 # Aufruf: bash setup-raspi.sh
+
+echo "⚠️  DEPRECATED: setup-raspi.sh wird nicht mehr gepflegt."
+echo "    Nutze: ~/inventar/pi-setup/fresh-install.sh"
+read -p "    Trotzdem fortfahren? (y/N): " _CONFIRM
+[[ "$_CONFIRM" != "y" && "$_CONFIRM" != "Y" ]] && exit 0
 
 set -e
 set -o pipefail

@@ -9254,6 +9254,15 @@ app.include_router(_api_router_v1)
 # damit sie nicht durch nachfolgende Router-Rebuilds verloren geht.
 app.add_api_websocket_route("/ws", websocket_endpoint)
 
+# Static Frontend (nach allen API-Routen, damit /api/* Vorrang hat)
+_dist_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+if os.path.isdir(_dist_dir):
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory=_dist_dir, html=True), name="frontend")
+    logger.info(f"Static frontend gemountet von {_dist_dir}")
+else:
+    logger.warning(f"Kein statisches Frontend gefunden ({_dist_dir}) — bitte 'npx expo export --platform web' im frontend/ ausführen")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8002)

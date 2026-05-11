@@ -1,12 +1,26 @@
 #!/usr/bin/env bash
+# ⚠️ DEPRECATED ⚠️
+# Dieses Skript wird nicht mehr gepflegt. Nutze stattdessen:
+#   pi-setup/fresh-install.sh
+#
+# Unterschiede:
+#   pi-install.sh        — alte Version, installiert in ${HOME}/inventar/Final-main/
+#   fresh-install.sh     — neue Version, installiert in ${HOME}/inventar/, mit Auth,
+#                          Multi-Lager, AI-Inventur, Backup-Timer
+#
 # ============================================================
-#  Inventar Pro — Raspberry Pi Vollinstallation
+#  Inventar Pro — Raspberry Pi Vollinstallation (LEGACY)
 #  Getestet auf: Raspberry Pi OS Bookworm 64-bit (Pi 4 / Pi 5)
 #
 #  Aufruf:
 #    chmod +x pi-install.sh
 #    ./pi-install.sh
 # ============================================================
+echo "⚠️  DEPRECATED: pi-install.sh wird nicht mehr gepflegt."
+echo "    Nutze: ~/inventar/pi-setup/fresh-install.sh"
+read -p "    Trotzdem fortfahren? (y/N): " _CONFIRM
+[[ "$_CONFIRM" != "y" && "$_CONFIRM" != "Y" ]] && exit 0
+
 set -euo pipefail
 
 # ── Farben ──────────────────────────────────────────────────

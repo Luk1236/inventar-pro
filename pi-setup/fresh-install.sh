@@ -45,16 +45,35 @@ fi
 echo "  Node:  $(node --version)"
 echo "  npm:   $(npm --version)"
 
-# === 3. MongoDB installieren ===
-echo "[3/12] MongoDB installieren..."
+# === 3. MongoDB 8.0 installieren ===
+echo "[3/12] MongoDB 8.0 installieren..."
 if ! command -v mongod >/dev/null 2>&1; then
     ARCH=$(dpkg --print-architecture)
     if [[ "$ARCH" == "arm64" ]]; then
-        # Pi OS 64-bit (empfohlen)
-        curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
-        echo "deb [arch=arm64,amd64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg] http://repo.mongodb.org/apt/debian bookworm/mongodb-org/7.0 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+        # Pi OS 64-bit (empfohlen) — MongoDB 8.0 für ARM64
+        OS_CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
+        sudo apt-get install -y -qq gnupg curl
+        curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
+        case "$OS_CODENAME" in
+            bookworm|trixie)
+                echo "deb [ arch=arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+                ;;
+            jammy|focal|noble)
+                echo "deb [ arch=arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${OS_CODENAME}/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+                ;;
+            *)
+                echo "  ⚠ Unbekanntes OS ($OS_CODENAME) — versuche Debian bookworm-Paket"
+                echo "deb [ arch=arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
+                ;;
+        esac
         sudo apt-get update -qq
-        sudo apt-get install -y -qq mongodb-org
+        sudo apt-get install -y -qq mongodb-org || {
+            echo "  ⚠ MongoDB 8.0 fehlgeschlagen — versuche Distro-Paket"
+            sudo apt-get install -y -qq mongodb || {
+                echo "  ✗ MongoDB konnte nicht installiert werden!"
+                exit 1
+            }
+        }
     else
         echo "  ⚠ 32-bit Pi OS erkannt — installiere mongodb-server aus Debian-Repo (älter, eingeschränkt)"
         sudo apt-get install -y -qq mongodb-server || {
@@ -126,9 +145,42 @@ fi
 # === 7. Frontend (npm install + static build) ===
 echo "[7/12] Frontend installieren + bauen..."
 cd "$INSTALL_DIR/frontend"
+
+# Backend-URL für den Build ermitteln und in app.json einsetzen
+DETECTED_IP=$(hostname -I | awk '{print $1}')
+BACKEND_URL_DEFAULT="http://${DETECTED_IP}:8002"
+echo "  Aktuelle Pi-IP:  $DETECTED_IP"
+echo "  Default Backend: $BACKEND_URL_DEFAULT"
+read -p "  Backend-URL für die App (Enter = Default): " BACKEND_URL
+BACKEND_URL="${BACKEND_URL:-$BACKEND_URL_DEFAULT}"
+
+# In app.json einsetzen (vor dem Build, sonst wird localhost einkompiliert)
+if grep -q "EXPO_PUBLIC_BACKEND_URL" app.json; then
+    # Backup vor Änderung
+    cp app.json app.json.bak
+    # Python verwenden (sed mit URLs ist heikel)
+    python3 -c "
+import json
+with open('app.json') as f: cfg = json.load(f)
+cfg['expo']['extra']['EXPO_PUBLIC_BACKEND_URL'] = '$BACKEND_URL'
+with open('app.json','w') as f: json.dump(cfg, f, indent=2)
+"
+    echo "  ✓ app.json → EXPO_PUBLIC_BACKEND_URL=$BACKEND_URL"
+fi
+
+echo "  → npm install läuft (kann 5-10 Min dauern)..."
 npm install --silent
-echo "  → npm install fertig"
-npx expo export --platform web
+
+# Speicher-Limit für Pi 4/4GB
+echo "  → Frontend-Build (Speicher-begrenzt für Pi)..."
+NODE_OPTIONS="--max-old-space-size=2048" EXPO_PUBLIC_BACKEND_URL="$BACKEND_URL" \
+    ./node_modules/.bin/expo export --platform web || {
+    echo "  ⚠ Build fehlgeschlagen mit 2 GB Heap — versuche unbeschränkt"
+    EXPO_PUBLIC_BACKEND_URL="$BACKEND_URL" ./node_modules/.bin/expo export --platform web || {
+        echo "  ✗ Frontend-Build fehlgeschlagen. Tipp: Build auf dem PC machen + rsync nach dist/"
+        exit 1
+    }
+}
 echo "  ✓ Frontend gebaut nach frontend/dist/"
 
 # === 8. systemd Service-Files installieren ===
