@@ -4,21 +4,36 @@
  * Requires: npx expo install @sentry/react-native
  * DSN: set EXPO_PUBLIC_SENTRY_DSN in frontend/.env
  *
- * Gracefully no-ops if the package is not yet installed or DSN not configured.
+ * Gracefully no-ops if:
+ *  - Package not installed
+ *  - DSN not configured
+ *  - Running in Expo Go (native module not available)
  */
+import Constants from 'expo-constants';
+
+// In Expo Go läuft kein nativer Sentry-Code → Init würde crashen.
+// Wir erkennen Expo Go via Constants.executionEnvironment.
+// Werte: 'standalone' (Native Build), 'storeClient' (Expo Go), 'bare' (Bare Workflow)
+const isExpoGo = Constants.executionEnvironment === 'storeClient';
 
 let Sentry: any = null;
 
-try {
-  Sentry = require('@sentry/react-native');
-} catch {
-  // Package not installed yet — tracking disabled
+if (!isExpoGo) {
+  try {
+    Sentry = require('@sentry/react-native');
+  } catch {
+    // Package not installed yet — tracking disabled
+  }
 }
 
 const DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
 let initialized = false;
 
 export function initSentry() {
+  if (isExpoGo) {
+    console.log('[Sentry] Skipped — running in Expo Go (use native build for crash tracking)');
+    return;
+  }
   if (!Sentry || !DSN || initialized) return;
   try {
     Sentry.init({

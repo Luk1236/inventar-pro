@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import apiService from './apiService';
 
 // Configure notification handler
@@ -40,11 +41,27 @@ class PushNotificationService {
         return null;
       }
 
-      // Get Expo push token
-      const tokenData = await Notifications.getExpoPushTokenAsync({
-        projectId: 'your-project-id', // Replace with actual project ID if needed
-      });
-      
+      // ProjectId dynamisch aus app.json/app.config.js lesen.
+      // In Expo Go: optional (Expo Go nutzt eigenen Token).
+      // Im Native Build: aus eas.projectId.
+      const projectId =
+        Constants.expoConfig?.extra?.eas?.projectId ??
+        (Constants as any).easConfig?.projectId ??
+        undefined;
+
+      const isExpoGo = Constants.executionEnvironment === 'storeClient';
+      if (!projectId && !isExpoGo) {
+        console.warn(
+          '[Push] Keine EAS projectId gefunden. Führe `eas init` aus, ' +
+          'damit Push-Notifications im Native Build funktionieren.'
+        );
+      }
+
+      // Get Expo push token (projectId nur übergeben wenn vorhanden)
+      const tokenData = await Notifications.getExpoPushTokenAsync(
+        projectId ? { projectId } : undefined
+      );
+
       this.expoPushToken = tokenData.data;
       
       // Store token locally

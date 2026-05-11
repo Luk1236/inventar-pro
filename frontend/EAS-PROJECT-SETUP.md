@@ -42,12 +42,26 @@ Im Login-Screen → "Server konfigurieren" → URL eintragen:
 npm run start:expogo:lan
 ```
 
-### Was funktioniert NICHT in Expo Go?
-- Sentry Crash-Reporting (in Expo Go irrelevant)
-- Push-Notifications (nur lokale gehen)
-- Tiefe System-Integrationen
+### Was funktioniert in Expo Go?
 
-Alles andere — Kamera, Foto-Auswahl, Face-ID, PDF-Druck, WebViews, 3D-Visualisierung — funktioniert ✅
+| Feature | Expo Go | Native Build | Hinweis |
+|---------|:-------:|:-----------:|---------|
+| Kamera, Barcode-Scanner | ✅ | ✅ | |
+| Foto-Auswahl | ✅ | ✅ | |
+| Face-ID / Fingerabdruck | ✅ | ✅ | |
+| PDF drucken | ✅ | ✅ | |
+| 3D-Lager-Visualisierung | ✅ | ✅ | |
+| WebView | ✅ | ✅ | |
+| Lokale Notifications | ✅ | ✅ | DGUV-Erinnerungen, Wartung |
+| Remote Push-Notifications | ✅ Expo-Token | ✅ FCM/APNS-Token | Beide via `/api/push-tokens` registriert |
+| Sentry Crash-Reports | ❌ skip | ✅ aktiv | Code skipt Init in Expo Go automatisch |
+| Background-Tasks | ⚠️ limitiert | ✅ | |
+| Deep-Linking | ⚠️ via `exp://` | ✅ native Scheme | |
+
+**Code-Anpassungen** (alle automatisch — du musst nichts tun):
+- `sentryService.ts` erkennt Expo Go via `Constants.executionEnvironment` und überspringt `Sentry.init`
+- `pushNotificationService.ts` liest `projectId` dynamisch aus `Constants.expoConfig.extra.eas.projectId`
+- Backend-Endpoint `POST /api/push-tokens` speichert Token unabhängig vom Typ
 
 **Wenn die App in Expo Go crasht:** siehe Phase 2 unten (Development Build).
 
