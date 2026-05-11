@@ -52,7 +52,7 @@ export default function CustomFieldsPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-  useFocusEffect(load);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const tabFields = fields.filter(f => f.entity_type === activeTab);
 

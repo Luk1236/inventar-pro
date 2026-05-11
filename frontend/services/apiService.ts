@@ -352,6 +352,14 @@ class ApiService {
     return this.request<T>(endpoint, { method: 'DELETE' }, config);
   }
 
+  async patch<T>(endpoint: string, data?: any, config?: RequestConfig): Promise<T> {
+    return this.request<T>(
+      endpoint,
+      { method: 'PATCH', body: data ? JSON.stringify(data) : undefined },
+      config
+    );
+  }
+
   // ===========================================
   // Auth Methods
   // ===========================================

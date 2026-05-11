@@ -40,7 +40,7 @@ export default function ProjectTemplatesPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-  useFocusEffect(load);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const openCreate = () => {
     setEditingId(null);

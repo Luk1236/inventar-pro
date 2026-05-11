@@ -1,5 +1,8 @@
 import 'react-native-gesture-handler';
 import React from 'react';
+import { initSentry } from '../services/sentryService';
+
+initSentry();
 import { View, Platform, StatusBar } from 'react-native';
 import { Stack } from 'expo-router';
 import { ThemeProvider } from '../contexts/ThemeContext';

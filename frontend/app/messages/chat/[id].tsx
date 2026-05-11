@@ -19,6 +19,8 @@ import Constants from 'expo-constants';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
+import { getToken } from '../../../services/apiService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || process.env.EXPO_PUBLIC_BACKEND_URL;
 

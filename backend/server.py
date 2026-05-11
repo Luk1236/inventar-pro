@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, Response, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -115,7 +116,148 @@ SMTP_USERNAME = settings.SMTP_USERNAME
 SMTP_PASSWORD = settings.SMTP_PASSWORD
 NOTIFICATION_EMAIL = settings.NOTIFICATION_EMAIL
 
-app = FastAPI(title="Inventory Management System", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ── STARTUP ──────────────────────────────────────────────────────────────
+    await ensure_admin_user()
+    _validate_smtp_config()
+
+    # Database Indexes
+    try:
+        await db.articles.create_index("id", unique=True)
+        await db.articles.create_index("inventory_code", unique=True)
+        await db.articles.create_index("category_id")
+        await db.articles.create_index("name")
+        await db.articles.create_index("status")
+        await db.users.create_index("id", unique=True)
+        await db.users.create_index("username", unique=True)
+        await db.users.create_index("email", unique=True)
+        await db.events.create_index("id", unique=True)
+        await db.events.create_index("event_number", unique=True)
+        await db.events.create_index("customer_id")
+        await db.events.create_index("start_date")
+        await db.events.create_index("status")
+        await db.bookings.create_index("id", unique=True)
+        await db.bookings.create_index("event_id")
+        await db.bookings.create_index("article_id")
+        await db.bookings.create_index("status")
+        await db.bookings.create_index([("pickup_date", 1), ("return_date", 1)])
+        await db.bookings.create_index([("article_id", 1), ("status", 1), ("pickup_date", 1), ("return_date", 1)])
+        await db.customers.create_index("id", unique=True)
+        await db.customers.create_index("company_name")
+        await db.categories.create_index("id", unique=True)
+        await db.storage_locations.create_index("id", unique=True)
+        await db.maintenance_tasks.create_index("id", unique=True)
+        await db.maintenance_tasks.create_index("article_id")
+        await db.maintenance_tasks.create_index("due_date")
+        await db.maintenance_tasks.create_index("status")
+        await db.maintenance_tasks.create_index([("due_date", 1), ("status", 1)])
+        await db.messages.create_index([("sender_id", 1), ("recipient_id", 1), ("created_at", -1)])
+        await db.messages.create_index([("recipient_id", 1), ("is_read", 1)])
+        await db.articles.create_index([("is_consumable", 1), ("current_stock", 1)])
+        await db.bundles.create_index("id", unique=True)
+        await db.bundles.create_index("bundle_code", unique=True)
+        await db.refresh_tokens.create_index("token")
+        await db.refresh_tokens.create_index("user_id")
+        await db.refresh_tokens.create_index("expires_at", expireAfterSeconds=0)
+        await db.password_reset_tokens.create_index("token", unique=True)
+        await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
+        await db.articles.create_index("deleted")
+        await db.articles.create_index([("deleted", 1), ("status", 1)])
+        await db.events.create_index("deleted")
+        await db.events.create_index([("deleted", 1), ("status", 1), ("start_date", 1)])
+        await db.customers.create_index("is_active")
+        await db.customers.create_index([("is_active", 1), ("company_name", 1)])
+        await db.invoices.create_index("id", unique=True)
+        await db.invoices.create_index("event_id")
+        await db.invoices.create_index("status")
+        await db.invoices.create_index("due_date")
+        await db.invoices.create_index([("status", 1), ("due_date", 1)])
+        await db.quotes.create_index("id", unique=True)
+        await db.quotes.create_index("customer_id")
+        await db.quotes.create_index("status")
+        await db.quotes.create_index([("customer_id", 1), ("status", 1)])
+        await db.time_entries.create_index("id", unique=True)
+        await db.time_entries.create_index("user_id")
+        await db.time_entries.create_index("date")
+        await db.time_entries.create_index([("user_id", 1), ("date", -1)])
+        await db.tasks.create_index("id", unique=True)
+        await db.tasks.create_index("status")
+        await db.tasks.create_index("assigned_to")
+        await db.tasks.create_index("due_date")
+        await db.tasks.create_index([("assigned_to", 1), ("status", 1)])
+        await db.audit_logs.create_index("user_id")
+        await db.audit_logs.create_index("action")
+        await db.audit_logs.create_index([("user_id", 1), ("timestamp", -1)])
+        await db.audit_logs.create_index("timestamp")
+        await db.purchase_orders.create_index("id", unique=True)
+        await db.purchase_orders.create_index("status")
+        await db.purchase_orders.create_index([("status", 1), ("created_at", -1)])
+        # Notification history indexes
+        await db.notification_history.create_index("user_id")
+        await db.notification_history.create_index([("user_id", 1), ("created_at", -1)])
+        await db.notification_history.create_index("created_at", expireAfterSeconds=2592000)  # 30 days TTL
+        logging.info("Database indexes created/verified successfully")
+    except Exception as e:
+        logging.error(f"Error creating indexes: {str(e)}")
+
+    # Scheduler jobs
+    scheduler.add_job(
+        scheduled_backup_job,
+        'cron',
+        hour=2,
+        minute=0,
+        id='daily_backup',
+        replace_existing=True,
+        misfire_grace_time=600,
+        coalesce=True
+    )
+
+    async def _cleanup_expired_tokens():
+        now = datetime.now(timezone.utc)
+        rr = await db.refresh_tokens.delete_many({"expires_at": {"$lt": now}})
+        wr = await db.ws_tokens.delete_many({"expires_at": {"$lt": now}})
+        if rr.deleted_count or wr.deleted_count:
+            logging.info(
+                "Token-Cleanup: %d refresh_tokens, %d ws_tokens gelöscht",
+                rr.deleted_count, wr.deleted_count
+            )
+
+    scheduler.add_job(
+        _cleanup_expired_tokens,
+        'cron',
+        hour=2,
+        minute=15,
+        id='token_cleanup',
+        replace_existing=True,
+        misfire_grace_time=600,
+        coalesce=True
+    )
+    scheduler.add_job(
+        send_overdue_returns_email,
+        'cron',
+        hour=7,
+        minute=30,
+        id='overdue_returns_email',
+        replace_existing=True,
+        misfire_grace_time=1800,
+        coalesce=True
+    )
+    scheduler.start()
+
+    logging.info("Application startup complete - Admin user initialized")
+    logging.info("Daily backup scheduler started (runs at 2:00 AM)")
+    logging.info("Token-Cleanup scheduler started (runs at 2:15 AM)")
+    logging.info("Rate limiting enabled: 10 requests/minute for login")
+
+    yield  # ── server is running ─────────────────────────────────────────────
+
+    # ── SHUTDOWN ─────────────────────────────────────────────────────────────
+    scheduler.shutdown()
+    client.close()
+
+
+app = FastAPI(title="Inventory Management System", version="1.0.0", lifespan=lifespan)
 api_router = APIRouter(prefix="/api")
 
 # M4 — Health check (used by load balancers, Docker HEALTHCHECK, monitoring)
@@ -831,6 +973,58 @@ async def get_pending_notifications(current_user: User = Depends(get_current_use
         "unread_messages": message_count,
         "tasks": upcoming_tasks[:5]  # Return top 5
     }
+
+# =============================================================================
+# NOTIFICATION HISTORY
+# =============================================================================
+
+async def _store_notification(user_id: str, title: str, body: str, notif_type: str, link: str = ""):
+    """Persist a notification to the notification_history collection."""
+    await db.notification_history.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "title": title,
+        "body": body,
+        "type": notif_type,
+        "link": link,
+        "read": False,
+        "created_at": datetime.now(timezone.utc),
+    })
+
+@api_router.get("/notifications/history")
+async def get_notification_history(
+    limit: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(get_current_user)
+):
+    """Return the last N notifications for the current user."""
+    docs = await db.notification_history.find(
+        {"user_id": current_user.id},
+        sort=[("created_at", -1)],
+        limit=limit
+    ).to_list(limit)
+    for d in docs:
+        d.pop("_id", None)
+    return docs
+
+@api_router.patch("/notifications/history/{notif_id}/read")
+async def mark_notification_read(
+    notif_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Mark a single notification as read."""
+    await db.notification_history.update_one(
+        {"id": notif_id, "user_id": current_user.id},
+        {"$set": {"read": True}}
+    )
+    return {"ok": True}
+
+@api_router.delete("/notifications/history/read")
+async def clear_read_notifications(current_user: User = Depends(get_current_user)):
+    """Delete all read notifications for the current user."""
+    result = await db.notification_history.delete_many(
+        {"user_id": current_user.id, "read": True}
+    )
+    return {"deleted": result.deleted_count}
 
 @api_router.post("/sync/now")
 async def sync_now(current_user: User = Depends(get_current_user)):
@@ -6964,6 +7158,108 @@ async def get_invoice_pdf_data(
         raise HTTPException(status_code=500, detail="Interner Serverfehler. Details wurden protokolliert.")
 
 
+@api_router.get("/invoices/{invoice_id}/pdf")
+async def download_invoice_pdf(
+    invoice_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Generate and download invoice as PDF (reportlab)."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors as rl_colors
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_RIGHT, TA_CENTER
+    from io import BytesIO
+    from fastapi.responses import StreamingResponse
+
+    invoice = await db.invoices.find_one({"id": invoice_id})
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Rechnung nicht gefunden")
+
+    event = await db.events.find_one({"id": invoice.get("event_id")}) or {}
+    customer = await db.customers.find_one({"id": invoice.get("customer_id")}) or {}
+    bookings = await db.bookings.find({
+        "event_id": invoice.get("event_id"),
+        "status": {"$ne": "cancelled"}
+    }).to_list(200)
+
+    items = []
+    for b in bookings:
+        art = await db.articles.find_one({"id": b.get("article_id")})
+        if art:
+            qty = b.get("quantity", 1)
+            price = b.get("unit_price", art.get("rental_price", 0)) or 0
+            items.append({
+                "name": art.get("name", "–"),
+                "code": art.get("inventory_code", "–"),
+                "qty": qty,
+                "price": price,
+                "total": qty * price,
+            })
+
+    app_settings = await db.app_settings.find_one({"_id": "main"}) or {}
+    company = app_settings.get("company_name", "Inventar Pro")
+
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+    styles = getSampleStyleSheet()
+    blue = rl_colors.HexColor('#007AFF')
+    elements = []
+
+    elements.append(Paragraph(company, ParagraphStyle('Title', parent=styles['Heading1'], fontSize=20, textColor=blue)))
+    elements.append(Spacer(1, 0.3*cm))
+    elements.append(HRFlowable(width="100%", thickness=1, color=blue))
+    elements.append(Spacer(1, 0.4*cm))
+
+    inv_no = invoice.get("invoice_number", invoice_id[:8])
+    inv_date = invoice.get("created_at", "")[:10] if invoice.get("created_at") else "–"
+    due_date = invoice.get("due_date", "")[:10] if invoice.get("due_date") else "–"
+    elements.append(Paragraph(f"<b>Rechnung Nr. {inv_no}</b>", styles['Heading2']))
+    elements.append(Paragraph(f"Datum: {inv_date}  |  Fällig: {due_date}", styles['Normal']))
+    elements.append(Spacer(1, 0.3*cm))
+
+    cname = customer.get("company_name") or f"{customer.get('first_name','')} {customer.get('last_name','')}".strip() or "–"
+    elements.append(Paragraph(f"<b>Empfänger:</b> {cname}", styles['Normal']))
+    if customer.get("email"):
+        elements.append(Paragraph(f"E-Mail: {customer['email']}", styles['Normal']))
+    elements.append(Spacer(1, 0.5*cm))
+
+    table_data = [["Artikel", "Code", "Menge", "Einzelpreis", "Gesamt"]]
+    for it in items:
+        table_data.append([
+            it["name"],
+            it["code"],
+            str(it["qty"]),
+            f"{it['price']:.2f} €",
+            f"{it['total']:.2f} €",
+        ])
+    total = sum(it["total"] for it in items)
+    table_data.append(["", "", "", Paragraph("<b>Gesamt</b>", styles['Normal']), Paragraph(f"<b>{total:.2f} €</b>", styles['Normal'])])
+
+    t = Table(table_data, colWidths=[6*cm, 3*cm, 2*cm, 3*cm, 3*cm])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), blue),
+        ('TEXTCOLOR', (0, 0), (-1, 0), rl_colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [rl_colors.white, rl_colors.HexColor('#F0F6FF')]),
+        ('GRID', (0, 0), (-1, -1), 0.5, rl_colors.HexColor('#DDDDDD')),
+        ('ALIGN', (2, 0), (-1, -1), 'RIGHT'),
+        ('LINEABOVE', (0, -1), (-1, -1), 1, blue),
+    ]))
+    elements.append(t)
+
+    doc.build(elements)
+    buf.seek(0)
+    safe_no = inv_no.replace("/", "-")
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="Rechnung_{safe_no}.pdf"'},
+    )
+
+
 # ============================================================
 # CREW & FUHRPARK - Mitarbeiter und Fahrzeuge verwalten
 # ============================================================
@@ -7676,6 +7972,66 @@ async def restore_database_from_backup():
         return False, str(e)
 
 # Scheduled backup job
+async def send_overdue_returns_email():
+    """Daily job: send one summary email for all bookings whose return_date has passed."""
+    try:
+        now = datetime.now(timezone.utc)
+        overdue = await db.bookings.find({
+            "return_date": {"$lt": now.isoformat()},
+            "status": {"$in": ["active", "confirmed"]},
+            "overdue_notified": {"$ne": True},
+        }).to_list(200)
+
+        if not overdue:
+            return
+
+        if not SMTP_USERNAME or not SMTP_PASSWORD or not NOTIFICATION_EMAIL:
+            logging.warning("SMTP not configured – overdue-returns email skipped")
+            return
+
+        import aiosmtplib
+        from email.message import EmailMessage
+
+        lines = []
+        ids_to_mark = []
+        for b in overdue:
+            event_id = b.get("event_id", "–")
+            article_id = b.get("article_id", "–")
+            return_date = b.get("return_date", "–")
+            lines.append(f"  • Buchung {b.get('id','?')}  |  Artikel {article_id}  |  Event {event_id}  |  fällig: {return_date}")
+            ids_to_mark.append(b.get("id"))
+
+        body = (
+            f"Überfällige Rückgaben – {now.strftime('%d.%m.%Y')}\n\n"
+            + "\n".join(lines)
+            + "\n\nBitte prüfen und im System aktualisieren."
+        )
+
+        msg = EmailMessage()
+        msg["From"] = SMTP_USERNAME
+        msg["To"] = NOTIFICATION_EMAIL
+        msg["Subject"] = f"Überfällige Rückgaben: {len(overdue)} Buchung(en)"
+        msg.set_content(body)
+
+        await aiosmtplib.send(
+            msg,
+            hostname=SMTP_SERVER,
+            port=SMTP_PORT,
+            username=SMTP_USERNAME,
+            password=SMTP_PASSWORD,
+            start_tls=True,
+        )
+
+        await db.bookings.update_many(
+            {"id": {"$in": ids_to_mark}},
+            {"$set": {"overdue_notified": True}}
+        )
+        logging.info("Overdue-returns email sent: %d bookings", len(overdue))
+
+    except Exception as e:
+        logging.error("overdue_returns_email job failed: %s", e, exc_info=True)
+
+
 def scheduled_backup_job():
     """Job to run daily backup"""
     loop = asyncio.new_event_loop()
@@ -8573,177 +8929,6 @@ def _validate_smtp_config():
         logging.info("SMTP configured: %s as %s", SMTP_SERVER, SMTP_USERNAME)
 
 
-@app.on_event("startup")
-async def startup_event():
-    await ensure_admin_user()
-    _validate_smtp_config()
-
-    # ===========================================
-    # DATABASE INDEXES - Performance Optimization
-    # ===========================================
-    try:
-        # Articles indexes
-        await db.articles.create_index("id", unique=True)
-        await db.articles.create_index("inventory_code", unique=True)
-        await db.articles.create_index("category_id")
-        await db.articles.create_index("name")
-        await db.articles.create_index("status")
-        
-        # Users indexes
-        await db.users.create_index("id", unique=True)
-        await db.users.create_index("username", unique=True)
-        await db.users.create_index("email", unique=True)
-        
-        # Events indexes
-        await db.events.create_index("id", unique=True)
-        await db.events.create_index("event_number", unique=True)
-        await db.events.create_index("customer_id")
-        await db.events.create_index("start_date")
-        await db.events.create_index("status")
-        
-        # Bookings indexes
-        await db.bookings.create_index("id", unique=True)
-        await db.bookings.create_index("event_id")
-        await db.bookings.create_index("article_id")
-        await db.bookings.create_index("status")
-        # Korrekter Feldname: pickup_date/return_date (nicht start_date/end_date)
-        await db.bookings.create_index([("pickup_date", 1), ("return_date", 1)])
-        # Zusammengesetzter Index für Konflikt-Checks (article_id + status + Datum)
-        await db.bookings.create_index([("article_id", 1), ("status", 1), ("pickup_date", 1), ("return_date", 1)])
-
-        # Customers indexes
-        await db.customers.create_index("id", unique=True)
-        await db.customers.create_index("company_name")
-
-        # Categories indexes
-        await db.categories.create_index("id", unique=True)
-
-        # Storage locations indexes
-        await db.storage_locations.create_index("id", unique=True)
-
-        # Maintenance indexes
-        await db.maintenance_tasks.create_index("id", unique=True)
-        await db.maintenance_tasks.create_index("article_id")
-        await db.maintenance_tasks.create_index("due_date")
-        await db.maintenance_tasks.create_index("status")
-        # Compound index for overdue alerts query
-        await db.maintenance_tasks.create_index([("due_date", 1), ("status", 1)])
-
-        # Messages indexes (for conversation queries)
-        await db.messages.create_index([("sender_id", 1), ("recipient_id", 1), ("created_at", -1)])
-        await db.messages.create_index([("recipient_id", 1), ("is_read", 1)])
-
-        # Consumable stock alert compound index
-        await db.articles.create_index([("is_consumable", 1), ("current_stock", 1)])
-
-        # Bundles indexes
-        await db.bundles.create_index("id", unique=True)
-        await db.bundles.create_index("bundle_code", unique=True)
-
-        # Refresh tokens indexes
-        await db.refresh_tokens.create_index("token")
-        await db.refresh_tokens.create_index("user_id")
-        await db.refresh_tokens.create_index("expires_at", expireAfterSeconds=0)  # TTL index
-
-        # F2: Password reset tokens indexes (TTL auto-expires tokens after 1 hour)
-        await db.password_reset_tokens.create_index("token", unique=True)
-        await db.password_reset_tokens.create_index("expires_at", expireAfterSeconds=0)
-
-        # Soft-delete filter indexes (V7: deleted flag on all major entities)
-        await db.articles.create_index("deleted")
-        await db.articles.create_index([("deleted", 1), ("status", 1)])
-        await db.events.create_index("deleted")
-        await db.events.create_index([("deleted", 1), ("status", 1), ("start_date", 1)])
-        await db.customers.create_index("is_active")
-        await db.customers.create_index([("is_active", 1), ("company_name", 1)])
-
-        # Invoices indexes
-        await db.invoices.create_index("id", unique=True)
-        await db.invoices.create_index("event_id")
-        await db.invoices.create_index("status")
-        await db.invoices.create_index("due_date")
-        await db.invoices.create_index([("status", 1), ("due_date", 1)])
-
-        # Quotes indexes
-        await db.quotes.create_index("id", unique=True)
-        await db.quotes.create_index("customer_id")
-        await db.quotes.create_index("status")
-        await db.quotes.create_index([("customer_id", 1), ("status", 1)])
-
-        # Time entries indexes
-        await db.time_entries.create_index("id", unique=True)
-        await db.time_entries.create_index("user_id")
-        await db.time_entries.create_index("date")
-        await db.time_entries.create_index([("user_id", 1), ("date", -1)])
-
-        # Tasks indexes
-        await db.tasks.create_index("id", unique=True)
-        await db.tasks.create_index("status")
-        await db.tasks.create_index("assigned_to")
-        await db.tasks.create_index("due_date")
-        await db.tasks.create_index([("assigned_to", 1), ("status", 1)])
-
-        # Audit log indexes (for user activity queries)
-        await db.audit_logs.create_index("user_id")
-        await db.audit_logs.create_index("action")
-        await db.audit_logs.create_index([("user_id", 1), ("timestamp", -1)])
-        await db.audit_logs.create_index("timestamp")
-
-        # Purchase orders indexes
-        await db.purchase_orders.create_index("id", unique=True)
-        await db.purchase_orders.create_index("status")
-        await db.purchase_orders.create_index([("status", 1), ("created_at", -1)])
-
-        logging.info("Database indexes created/verified successfully")
-    except Exception as e:
-        logging.error(f"Error creating indexes: {str(e)}")
-    
-    # Start backup scheduler
-    scheduler.add_job(
-        scheduled_backup_job,
-        'cron',
-        hour=2,
-        minute=0,
-        id='daily_backup',
-        replace_existing=True,
-        misfire_grace_time=600,
-        coalesce=True
-    )
-
-    # Täglich abgelaufene Tokens löschen (refresh_tokens + ws_tokens)
-    async def _cleanup_expired_tokens():
-        now = datetime.now(timezone.utc)
-        rr = await db.refresh_tokens.delete_many({"expires_at": {"$lt": now}})
-        wr = await db.ws_tokens.delete_many({"expires_at": {"$lt": now}})
-        if rr.deleted_count or wr.deleted_count:
-            logging.info(
-                "Token-Cleanup: %d refresh_tokens, %d ws_tokens gelöscht",
-                rr.deleted_count, wr.deleted_count
-            )
-
-    scheduler.add_job(
-        _cleanup_expired_tokens,
-        'cron',
-        hour=2,
-        minute=15,
-        id='token_cleanup',
-        replace_existing=True,
-        misfire_grace_time=600,
-        coalesce=True
-    )
-    scheduler.start()
-
-    logging.info("Application startup complete - Admin user initialized")
-    logging.info("Daily backup scheduler started (runs at 2:00 AM)")
-    logging.info("Token-Cleanup scheduler started (runs at 2:15 AM)")
-    logging.info("Rate limiting enabled: 10 requests/minute for login")
-
-# Sync service initialization removed for now
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    scheduler.shutdown()
-    client.close()
 
 # =============================================================================
 # /api/v1 Route Aliases — registered AFTER all @app routes above

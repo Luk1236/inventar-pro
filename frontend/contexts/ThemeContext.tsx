@@ -29,6 +29,7 @@ interface ColorScheme {
   card: string;
   text: string;
   textSecondary: string;
+  subText: string;
   border: string;
   primary: string;
   secondary: string;
@@ -36,6 +37,8 @@ interface ColorScheme {
   warning: string;
   danger: string;
   info: string;
+  muted: string;
+  input: string;
 }
 
 // Default functional colors (Page4 inspired)
@@ -53,6 +56,7 @@ const lightColors: ColorScheme = {
   card: '#ffffff',
   text: '#333333',
   textSecondary: '#666666',
+  subText: '#999999',
   border: '#e9ecef',
   primary: '#007AFF',
   secondary: '#8B5CF6',
@@ -60,6 +64,8 @@ const lightColors: ColorScheme = {
   warning: '#FF9500',
   danger: '#FF3B30',
   info: '#5AC8FA',
+  muted: '#adb5bd',
+  input: '#f0f2f5',
 };
 
 const darkColors: ColorScheme = {
@@ -67,6 +73,7 @@ const darkColors: ColorScheme = {
   card: '#1c1c1e',
   text: '#ffffff',
   textSecondary: '#98989d',
+  subText: '#636366',
   border: '#38383a',
   primary: '#0A84FF',
   secondary: '#A78BFA',
@@ -74,6 +81,8 @@ const darkColors: ColorScheme = {
   warning: '#FF9F0A',
   danger: '#FF453A',
   info: '#64D2FF',
+  muted: '#636366',
+  input: '#2c2c2e',
 };
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);

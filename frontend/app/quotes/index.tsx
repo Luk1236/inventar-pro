@@ -45,7 +45,7 @@ export default function QuotesPage() {
   }, []);
 
   useEffect(() => { loadQuotes(); }, [loadQuotes]);
-  useFocusEffect(loadQuotes);
+  useFocusEffect(useCallback(() => { loadQuotes(); }, [loadQuotes]));
 
   const handleSignQuote = (quote: any) => {
     setSigningQuote(quote);

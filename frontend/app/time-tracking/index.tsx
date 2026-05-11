@@ -37,7 +37,7 @@ export default function TimeTrackingPage() {
   }, [currentMonth]);
 
   useEffect(() => { load(); }, [load]);
-  useFocusEffect(load);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const deleteEntry = (entry: any) => {
     Alert.alert('Eintrag löschen', 'Diesen Zeiteintrag wirklich löschen?', [

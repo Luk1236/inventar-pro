@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
+import {View,
   Text,
   StyleSheet,
   TouchableOpacity,
@@ -10,9 +9,7 @@ import {
   Alert,
   TextInput,
   Modal,
-  RefreshControl,
-  Slider,
-} from 'react-native';
+  RefreshControl} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -21,6 +18,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import apiService, { getToken } from '../../services/apiService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ShelfVisualizer3D from '../../components/warehouse/ShelfVisualizer3D';
+import Slider from '@react-native-community/slider';
 
 interface StorageLocation {
   id: string;

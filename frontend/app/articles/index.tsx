@@ -66,6 +66,9 @@ export default function ArticlesPage() {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [showFilters, setShowFilters] = useState(false);
   const [consumableAlertCount, setConsumableAlertCount] = useState(0);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const styles = StyleSheet.create({
     container: {
@@ -485,6 +488,49 @@ export default function ArticlesPage() {
     return 'Verfügbar';
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => setSelectedIds(new Set(filteredArticles.map(a => a.id)));
+  const clearSelection = () => { setSelectedIds(new Set()); setSelectMode(false); };
+
+  const bulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    Alert.alert(
+      'Artikel löschen',
+      `${selectedIds.size} Artikel wirklich löschen?`,
+      [
+        { text: 'Abbrechen', style: 'cancel' },
+        {
+          text: 'Löschen', style: 'destructive', onPress: async () => {
+            setBulkLoading(true);
+            const ids = [...selectedIds];
+            await Promise.all(ids.map(id => apiService.delete(`/api/articles/${id}`, { showErrorAlert: false }).catch(() => {})));
+            setArticles(prev => prev.filter(a => !selectedIds.has(a.id)));
+            clearSelection();
+            setBulkLoading(false);
+          }
+        }
+      ]
+    );
+  };
+
+  const bulkSetStatus = async (status: string) => {
+    if (selectedIds.size === 0) return;
+    setBulkLoading(true);
+    await Promise.all([...selectedIds].map(id =>
+      apiService.put(`/api/articles/${id}`, { status }, { showErrorAlert: false }).catch(() => {})
+    ));
+    setArticles(prev => prev.map(a => selectedIds.has(a.id) ? { ...a, status } : a));
+    clearSelection();
+    setBulkLoading(false);
+  };
+
   const filteredArticles = useMemo(() => articles.filter(article => {
     const matchesSearch = searchTerm === '' ||
       article.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -499,12 +545,21 @@ export default function ArticlesPage() {
   const renderArticleCard = useCallback(({ item: article }: { item: Article }) => (
     <View
       key={article.id}
-      style={[styles.articleCard, viewMode === 'grid' && styles.gridCard]}
+      style={[styles.articleCard, viewMode === 'grid' && styles.gridCard, selectMode && selectedIds.has(article.id) && { borderColor: colors.primary, borderWidth: 2 }]}
     >
+      {selectMode && (
+        <TouchableOpacity
+          onPress={() => toggleSelect(article.id)}
+          style={{ position: 'absolute', top: 10, right: 10, zIndex: 10, width: 28, height: 28, borderRadius: 14, backgroundColor: selectedIds.has(article.id) ? colors.primary : colors.border, justifyContent: 'center', alignItems: 'center' }}
+        >
+          {selectedIds.has(article.id) && <Ionicons name="checkmark" size={16} color="white" />}
+        </TouchableOpacity>
+      )}
       <View style={styles.cardContent}>
         <TouchableOpacity
           style={styles.articleHeader}
           onPress={() => {
+            if (selectMode) { toggleSelect(article.id); return; }
             router.push(`/articles/${article.id}`);
           }}
           activeOpacity={0.7}
@@ -605,6 +660,12 @@ export default function ArticlesPage() {
             <Ionicons name="cloud-upload-outline" size={22} color={colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity
+            style={[styles.importButton, selectMode && { backgroundColor: colors.primary + '20' }]}
+            onPress={() => { setSelectMode(s => !s); if (selectMode) clearSelection(); }}
+          >
+            <Ionicons name={selectMode ? 'checkmark-done-outline' : 'checkbox-outline'} size={22} color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
             style={styles.addButton}
             onPress={() => router.push('/articles/add')}
           >
@@ -612,6 +673,31 @@ export default function ArticlesPage() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Bulk Action Bar */}
+      {selectMode && (
+        <View style={{ backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 10 }}>
+          <TouchableOpacity onPress={selectAll}>
+            <Text style={{ color: 'white', fontWeight: '600' }}>Alle ({filteredArticles.length})</Text>
+          </TouchableOpacity>
+          <Text style={{ color: 'rgba(255,255,255,0.6)' }}>|</Text>
+          <Text style={{ color: 'white', flex: 1 }}>{selectedIds.size} ausgewählt</Text>
+          {bulkLoading
+            ? <ActivityIndicator color="white" />
+            : <>
+              <TouchableOpacity onPress={() => bulkSetStatus('verfügbar')} style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                <Text style={{ color: 'white', fontSize: 13 }}>Verfügbar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => bulkSetStatus('defekt')} style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                <Text style={{ color: 'white', fontSize: 13 }}>Defekt</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={bulkDelete} style={{ backgroundColor: '#FF3B30', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
+                <Text style={{ color: 'white', fontSize: 13 }}>Löschen</Text>
+              </TouchableOpacity>
+            </>
+          }
+        </View>
+      )}
 
       {/* Search and Filter Bar */}
       <View style={styles.searchContainer}>

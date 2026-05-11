@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
+import {View,
   Text,
   StyleSheet,
   TouchableOpacity,
@@ -10,9 +9,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Modal,
-  Slider,
-} from 'react-native';
+  Modal} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -21,6 +18,8 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
 import ShelfVisualizer3D from '../../components/warehouse/ShelfVisualizer3D';
+import { getToken } from '../../services/apiService';
+import Slider from '@react-native-community/slider';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || process.env.EXPO_PUBLIC_BACKEND_URL;
 

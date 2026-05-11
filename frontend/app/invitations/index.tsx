@@ -40,7 +40,7 @@ export default function InvitationsPage() {
     finally { setLoading(false); }
   }, []);
 
-  useFocusEffect(load);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const filtered = filterStatus ? invitations.filter(i => i.status === filterStatus) : invitations;
 

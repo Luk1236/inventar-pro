@@ -40,7 +40,7 @@ export default function IntegrationsPage() {
     finally { setLoading(false); }
   }, []);
 
-  useFocusEffect(load);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const openCreate = () => {
     setEditingId(null);

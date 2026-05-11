@@ -22,6 +22,7 @@ import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
+import { getToken } from '../../services/apiService';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || process.env.EXPO_PUBLIC_BACKEND_URL;
 
@@ -81,6 +82,37 @@ export default function AddArticlePage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [eanInput, setEanInput] = useState('');
+  const [eanLoading, setEanLoading] = useState(false);
+
+  const lookupEAN = async (ean: string) => {
+    if (!ean.trim()) return;
+    setEanLoading(true);
+    try {
+      const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${ean.trim()}.json`);
+      const json = await res.json();
+      if (json.status === 1 && json.product) {
+        const p = json.product;
+        const name = p.product_name_de || p.product_name || '';
+        const brand = p.brands || '';
+        const description = [brand, p.categories_tags?.[0]?.replace(/^en:/, '')].filter(Boolean).join(' – ');
+        setFormData(prev => ({
+          ...prev,
+          name: name || prev.name,
+          description: description || prev.description,
+          inventory_code: prev.inventory_code || ean.trim(),
+        }));
+        Alert.alert('EAN gefunden', `Produkt: ${name || '(kein Name)'}`);
+      } else {
+        Alert.alert('Nicht gefunden', `Kein Produkt für EAN ${ean} in OpenFoodFacts.`);
+      }
+    } catch {
+      Alert.alert('Fehler', 'EAN-Lookup fehlgeschlagen. Bitte Internetverbindung prüfen.');
+    } finally {
+      setEanLoading(false);
+    }
+  };
+
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [showSubRentalSupplierModal, setShowSubRentalSupplierModal] = useState(false);
   const [showStorageModal, setShowStorageModal] = useState(false);
@@ -565,6 +597,31 @@ export default function AddArticlePage() {
         {/* Basic Info Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Grundinformationen</Text>
+
+          {/* EAN / Barcode Lookup */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>EAN-Barcode (optional – Daten automatisch befüllen)</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={eanInput}
+                onChangeText={setEanInput}
+                placeholder="z.B. 4006381333627"
+                placeholderTextColor={colors.textSecondary}
+                keyboardType="numeric"
+              />
+              <TouchableOpacity
+                style={{ backgroundColor: colors.primary, borderRadius: 10, paddingHorizontal: 14, justifyContent: 'center', alignItems: 'center', minWidth: 60 }}
+                onPress={() => lookupEAN(eanInput)}
+                disabled={eanLoading}
+              >
+                {eanLoading
+                  ? <ActivityIndicator color="white" size="small" />
+                  : <Ionicons name="search-outline" size={20} color="white" />
+                }
+              </TouchableOpacity>
+            </View>
+          </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Artikelname *</Text>

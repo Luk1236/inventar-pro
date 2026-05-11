@@ -83,7 +83,7 @@ export default function AbsencesPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-  useFocusEffect(load);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const onRefresh = async () => {
     setRefreshing(true);

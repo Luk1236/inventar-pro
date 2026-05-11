@@ -27,6 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const GlobalSearch = React.lazy(() => import('../components/GlobalSearch'));
 import { useTheme } from '../contexts/ThemeContext';
 import { useWebSocket } from '../hooks/useWebSocket';
+import NetInfo from '@react-native-community/netinfo';
 
 
 const { width } = Dimensions.get('window');
@@ -133,10 +134,12 @@ export default function Index() {
   }, []);
 
   const [wsReady, setWsReady] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
   const [sessionWarningVisible, setSessionWarningVisible] = useState(false);
   const sessionTimerRef = useRef<any>(null);
 
-  const [notifications, setNotifications] = useState<{title: string, body: string, type: string}[]>([]);
+  const [notifications, setNotifications] = useState<{id?: string, title: string, body: string, type: string, read?: boolean, created_at?: string}[]>([]);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [notifModalVisible, setNotifModalVisible] = useState(false);
 
   const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
@@ -403,72 +406,10 @@ export default function Index() {
       color: colors.textSecondary,
       fontWeight: '400',
     },
-    // Widgets - Modern Cards
-    widgetRow: {
-      flexDirection: 'row',
-      gap: 16,
-      marginBottom: 16,
-    },
-    widget: {
-      flex: 1,
-      backgroundColor: colors.card,
-      borderRadius: 20,
-      padding: 20,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: isDark ? 0.15 : 0.03,
-      shadowRadius: 12,
-      elevation: 3,
-      borderWidth: 1,
-      borderColor: isDark ? 'transparent' : 'rgba(0,0,0,0.03)',
-    },
-    widgetRed: {
-      borderLeftWidth: 0,
-      borderTopWidth: 3,
-      borderTopColor: '#FF3B30',
-    },
-    widgetOrange: {
-      borderLeftWidth: 0,
-      borderTopWidth: 3,
-      borderTopColor: '#FF9500',
-    },
-    widgetGreen: {
-      borderLeftWidth: 0,
-      borderTopWidth: 3,
-      borderTopColor: '#34C759',
-    },
-    widgetBlue: {
-      borderLeftWidth: 0,
-      borderTopWidth: 3,
-      borderTopColor: colors.primary,
-    },
     widgetPurple: {
       borderLeftWidth: 0,
       borderTopWidth: 3,
       borderTopColor: '#5856D6',
-    },
-    widgetNumber: {
-      fontSize: 36,
-      fontWeight: '800',
-      color: colors.text,
-      letterSpacing: -1,
-    },
-    widgetLabel: {
-      fontSize: 13,
-      color: colors.textSecondary,
-      marginTop: 6,
-      fontWeight: '500',
-      letterSpacing: 0.2,
-    },
-    widgetIcon: {
-      position: 'absolute',
-      top: 16,
-      right: 16,
-      width: 44,
-      height: 44,
-      borderRadius: 14,
-      justifyContent: 'center',
-      alignItems: 'center',
     },
     // Sections - Modern Headers
     sectionTitle: {
@@ -763,6 +704,13 @@ export default function Index() {
     }
   }, [isLoggedIn]);
 
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(state.isConnected !== false);
+    });
+    return unsubscribe;
+  }, []);
+
   // Reload user data when returning to this screen (e.g., from profile page)
   useFocusEffect(
     useCallback(() => {
@@ -868,25 +816,40 @@ export default function Index() {
 
   const loadNotifications = async () => {
     try {
-      const [tasks, inspections] = await Promise.all([
+      const [tasks, inspections, history] = await Promise.all([
         apiService.get<any[]>('/api/tasks', { showErrorAlert: false }),
         apiService.get<any[]>('/api/inspections', { showErrorAlert: false }),
+        apiService.get<any[]>('/api/notifications/history', { showErrorAlert: false }),
       ]);
       const today = new Date().toISOString().split('T')[0];
-      const notifs: {title: string, body: string, type: string}[] = [];
+      const notifs: {id?: string, title: string, body: string, type: string, read?: boolean, created_at?: string}[] = [];
       // Überfällige Aufgaben
       (tasks || []).filter(t => t.status !== 'erledigt' && t.due_date && t.due_date < today).forEach(t => {
-        notifs.push({ title: `Aufgabe überfällig`, body: t.title, type: 'task' });
+        notifs.push({ title: 'Aufgabe überfällig', body: t.title, type: 'task', read: false });
       });
       // Überfällige Prüfungen
       (inspections || []).filter(i => i.result === 'ausstehend' && i.due_date && i.due_date < today).forEach(i => {
-        notifs.push({ title: `Prüfung überfällig`, body: i.article_name || i.inspection_type, type: 'inspection' });
+        notifs.push({ title: 'Prüfung überfällig', body: i.article_name || i.inspection_type, type: 'inspection', read: false });
+      });
+      // Persistent history from backend
+      (history || []).forEach((h: any) => {
+        notifs.push({ id: h.id, title: h.title, body: h.body, type: h.type, read: h.read, created_at: h.created_at });
       });
       setNotifications(notifs);
+      setUnreadNotifCount(notifs.filter(n => !n.read).length);
     } catch (error) {
       if (__DEV__) console.warn('[Dashboard] loadNotifications failed:', error);
       setNotifications([]);
     }
+  };
+
+  const markAllNotifsRead = async () => {
+    const unread = notifications.filter(n => n.id && !n.read);
+    await Promise.all(unread.map(n =>
+      apiService.patch(`/api/notifications/history/${n.id}/read`, {}, { showErrorAlert: false }).catch(() => {})
+    ));
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setUnreadNotifCount(0);
   };
 
   const loadDashboardStats = async () => {
@@ -1248,6 +1211,12 @@ export default function Index() {
   return (
     <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
+      {!isOnline && (
+        <View style={{ backgroundColor: '#FF3B30', paddingVertical: 6, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Ionicons name="cloud-offline-outline" size={16} color="white" />
+          <Text style={{ color: 'white', fontSize: 13, fontWeight: '600' }}>Keine Verbindung – Daten können veraltet sein</Text>
+        </View>
+      )}
       {searchVisible && (
         <React.Suspense fallback={null}>
           <GlobalSearch visible={true} onClose={() => setSearchVisible(false)} />
@@ -1291,7 +1260,7 @@ export default function Index() {
             onPress={() => setNotifModalVisible(true)}
           >
             <Ionicons name="notifications-outline" size={24} color={colors.primary} />
-            {notifications.length > 0 && (
+            {unreadNotifCount > 0 && (
               <View style={{
                 position: 'absolute', top: 2, right: 2,
                 backgroundColor: '#FF3B30', borderRadius: 10,
@@ -1300,7 +1269,7 @@ export default function Index() {
                 paddingHorizontal: 2,
               }}>
                 <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>
-                  {notifications.length > 99 ? '99+' : notifications.length}
+                  {unreadNotifCount > 99 ? '99+' : unreadNotifCount}
                 </Text>
               </View>
             )}
@@ -1788,9 +1757,16 @@ export default function Index() {
           <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '70%' }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text }}>Benachrichtigungen</Text>
-              <TouchableOpacity onPress={() => setNotifModalVisible(false)}>
-                <Ionicons name="close" size={24} color={colors.textSecondary} />
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                {unreadNotifCount > 0 && (
+                  <TouchableOpacity onPress={markAllNotifsRead} style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: colors.primary + '20', borderRadius: 8 }}>
+                    <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>Alle gelesen</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => setNotifModalVisible(false)}>
+                  <Ionicons name="close" size={24} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
             </View>
             {notifications.length === 0 ? (
               <View style={{ alignItems: 'center', paddingVertical: 40 }}>
@@ -1800,13 +1776,17 @@ export default function Index() {
             ) : (
               <ScrollView>
                 {notifications.map((n, i) => (
-                  <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: colors.border, gap: 12 }}>
+                  <View key={n.id || i} style={{ flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: colors.border, gap: 12, opacity: n.read ? 0.6 : 1 }}>
                     <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: n.type === 'task' ? '#FF950020' : '#FF3B3020', justifyContent: 'center', alignItems: 'center' }}>
                       <Ionicons name={n.type === 'task' ? 'checkbox-outline' : 'shield-checkmark-outline'} size={18} color={n.type === 'task' ? '#FF9500' : '#FF3B30'} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: colors.text, fontWeight: '600', fontSize: 14 }}>{n.title}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={{ color: colors.text, fontWeight: n.read ? '400' : '600', fontSize: 14, flex: 1 }}>{n.title}</Text>
+                        {!n.read && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary }} />}
+                      </View>
                       <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 2 }}>{n.body}</Text>
+                      {n.created_at && <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>{new Date(n.created_at).toLocaleString('de-DE')}</Text>}
                     </View>
                   </View>
                 ))}
