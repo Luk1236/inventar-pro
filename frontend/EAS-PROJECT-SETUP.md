@@ -2,6 +2,57 @@
 
 Komplette Schritt-für-Schritt Anleitung zum Bauen und Veröffentlichen der App.
 
+---
+
+## 🚀 SCHNELLSTART: Expo Go (kein Build, 2 Min Setup)
+
+**Schnellster Weg zum Testen — keine Apple/Google-Accounts, kein Build, keine Wartezeit.**
+
+### Auf dem Handy
+1. **Expo Go App** installieren (Play Store / App Store)
+
+### Am Windows-PC
+```powershell
+cd "C:\Users\lukas\OneDrive\Desktop\Lager\Final-main\frontend"
+npm install      # einmalig
+npm run start:expogo
+```
+
+Was passiert:
+- `EXPO_GO_MODE=1` wird gesetzt → `app.config.js` deaktiviert Sentry + New Architecture
+- Expo startet Dev-Server mit Tunnel (funktioniert auch über Mobilfunk)
+- Im Terminal erscheint ein **QR-Code**
+
+### QR-Code scannen
+- **Android:** Expo Go App → "Scan QR code" → QR im Terminal scannen
+- **iOS:** Native Kamera-App → auf QR halten → "In Expo Go öffnen"
+
+App lädt 30-60s, dann ist der Login-Screen da.
+
+### Backend-URL setzen
+Im Login-Screen → "Server konfigurieren" → URL eintragen:
+- Cloudflare: `https://<dein-tunnel>.cfargotunnel.com`
+- Tailscale: `http://<tailscale-ip>:8002`
+- Lokales WLAN: `http://<pi-ip>:8002`
+
+→ Login → fertig!
+
+### Alternative ohne Tunnel (schneller, aber nur im gleichen WLAN)
+```powershell
+npm run start:expogo:lan
+```
+
+### Was funktioniert NICHT in Expo Go?
+- Sentry Crash-Reporting (in Expo Go irrelevant)
+- Push-Notifications (nur lokale gehen)
+- Tiefe System-Integrationen
+
+Alles andere — Kamera, Foto-Auswahl, Face-ID, PDF-Druck, WebViews, 3D-Visualisierung — funktioniert ✅
+
+**Wenn die App in Expo Go crasht:** siehe Phase 2 unten (Development Build).
+
+---
+
 ## Was du schon hast (im Repo)
 
 ✅ Android-Package konfiguriert (`com.inventarpro.app`)

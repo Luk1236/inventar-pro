@@ -1,9 +1,11 @@
 {
   "name": "frontend",
   "main": "expo-router/entry",
-  "version": "1.0.70",
+  "version": "1.0.71",
   "scripts": {
     "start": "expo start",
+    "start:expogo": "node scripts/start-expogo.js --tunnel",
+    "start:expogo:lan": "node scripts/start-expogo.js --lan",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
