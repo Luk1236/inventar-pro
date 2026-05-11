@@ -1,0 +1,12 @@
+# fail2ban Jail für Inventar Pro Dashboard
+# Installation: sudo cp fail2ban-jail.local /etc/fail2ban/jail.d/inventar.local
+
+[inventar]
+enabled  = true
+filter   = inventar
+backend  = systemd
+journalmatch = _SYSTEMD_UNIT=inventar-dashboard.service
+maxretry = 5
+findtime = 300
+bantime  = 3600
+action   = iptables-allports[name=inventar]

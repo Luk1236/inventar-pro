@@ -1,0 +1,9 @@
+[Unit]
+Description=Inventar Pro Weekly Reboot Timer
+
+[Timer]
+OnCalendar=Sun *-*-* 04:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

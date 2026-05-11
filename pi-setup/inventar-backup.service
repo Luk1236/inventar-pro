@@ -1,0 +1,13 @@
+[Unit]
+Description=Inventar Pro Daily Backup
+After=mongod.service
+Requires=mongod.service
+
+[Service]
+Type=oneshot
+User=admin
+WorkingDirectory=/home/admin/inventar
+ExecStart=/home/admin/inventar/pi-setup/auto-backup.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=inventar-backup

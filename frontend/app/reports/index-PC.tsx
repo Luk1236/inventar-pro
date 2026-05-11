@@ -123,14 +123,6 @@ export default function ReportsPage() {
 
   const reports: ReportOption[] = [
     {
-      id: 'charts',
-      title: 'Charts & Analytics',
-      description: 'Visuelle Auswertungen und Diagramme',
-      icon: 'pie-chart-outline',
-      color: '#AF52DE',
-      action: () => router.push('/reports/charts'),
-    },
-    {
       id: '1',
       title: 'Inventarliste',
       description: 'Alle Artikel exportieren (CSV/PDF)',

@@ -1676,7 +1676,7 @@ export default function WarehouseVisualizer3D({
         source={{ html }}
         style={styles.webview}
         javaScriptEnabled
-        originWhitelist={['*']}
+        originWhitelist={['']}
         onMessage={handleMessage}
         allowsInlineMediaPlayback
         scrollEnabled={false}

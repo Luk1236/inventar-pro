@@ -1,0 +1,6 @@
+[Unit]
+Description=Inventar Pro Weekly Reboot
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/shutdown -r +1 "Weekly auto-reboot in 1 minute"

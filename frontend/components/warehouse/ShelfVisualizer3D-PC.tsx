@@ -682,7 +682,8 @@ export default function ShelfVisualizer3D({ blocks, levels, spots, fillData, onS
         source={{ html }}
         style={styles.webview}
         javaScriptEnabled
-        originWhitelist={['']}
+        originWhitelist={['*']}
+        mixedContentMode="always"
         allowsInlineMediaPlayback
         onMessage={(event) => {
           try {
