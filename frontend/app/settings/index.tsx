@@ -20,6 +20,12 @@ import Constants from 'expo-constants';
 import { useTheme } from '../../contexts/ThemeContext';
 import apiService, { setBackendUrl, getBackendUrl, getToken } from '../../services/apiService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  isBiometricAvailable,
+  isBiometricEnabled,
+  setBiometricEnabled,
+  getBiometricType,
+} from '../../services/biometricService';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -51,6 +57,20 @@ export default function SettingsPage() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
 
+  // Biometrics
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnabled, setBiometricEnabledState] = useState(false);
+  const [biometricType, setBiometricTypeState] = useState('Biometrie');
+
+  // 2FA / TOTP
+  const [totpEnabled, setTotpEnabled] = useState(false);
+  const [totpSetupVisible, setTotpSetupVisible] = useState(false);
+  const [totpQrCode, setTotpQrCode] = useState('');
+  const [totpSecret, setTotpSecret] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+  const [totpDisableCode, setTotpDisableCode] = useState('');
+  const [totpLoading, setTotpLoading] = useState(false);
+
   // Server URL section
   const [serverUrl, setServerUrlState] = useState('');
   const [serverUrlSaving, setServerUrlSaving] = useState(false);
@@ -63,6 +83,7 @@ export default function SettingsPage() {
     einstellungen: false,
     kommunikation: false,
     finanzen: false,
+    sicherheit: false,
     server: false,
     info: false,
   });
@@ -269,6 +290,20 @@ export default function SettingsPage() {
       setAutoSyncEnabled(sync !== 'false');
       const savedServerUrl = await AsyncStorage.getItem('server_url');
       if (savedServerUrl) setServerUrlState(savedServerUrl);
+
+      // Biometrics
+      const avail = await isBiometricAvailable();
+      setBiometricAvailable(avail);
+      if (avail) {
+        setBiometricEnabledState(await isBiometricEnabled());
+        setBiometricTypeState(await getBiometricType());
+      }
+
+      // TOTP status
+      try {
+        const status = await apiService.get<any>('/api/users/totp/status', { showErrorAlert: false });
+        setTotpEnabled(status?.totp_enabled ?? false);
+      } catch {}
     } catch (error) {
       console.error('Error loading settings:', error);
     }
@@ -439,6 +474,54 @@ export default function SettingsPage() {
     } finally {
       setServerUrlSaving(false);
     }
+  };
+
+  const toggleBiometric = async (value: boolean) => {
+    await setBiometricEnabled(value);
+    setBiometricEnabledState(value);
+  };
+
+  const startTotpSetup = async () => {
+    setTotpLoading(true);
+    try {
+      const data = await apiService.post<any>('/api/users/totp/setup');
+      setTotpQrCode(data.qr_code);
+      setTotpSecret(data.secret);
+      setTotpCode('');
+      setTotpSetupVisible(true);
+    } catch {
+      Alert.alert('Fehler', '2FA-Setup konnte nicht gestartet werden.');
+    } finally {
+      setTotpLoading(false);
+    }
+  };
+
+  const confirmTotpSetup = async () => {
+    if (totpCode.length !== 6) { Alert.alert('Fehler', 'Bitte 6-stelligen Code eingeben.'); return; }
+    setTotpLoading(true);
+    try {
+      await apiService.post('/api/users/totp/confirm', { code: totpCode });
+      setTotpEnabled(true);
+      setTotpSetupVisible(false);
+      Alert.alert('Aktiviert', '2-Faktor-Authentifizierung ist jetzt aktiv.');
+    } catch {
+      Alert.alert('Fehler', 'Ungültiger Code. Bitte erneut versuchen.');
+    } finally {
+      setTotpLoading(false);
+    }
+  };
+
+  const disableTotp = async () => {
+    Alert.prompt('2FA deaktivieren', 'Aktuellen 6-stelligen Code eingeben:', async (code) => {
+      if (!code) return;
+      try {
+        await apiService.post('/api/users/totp/disable', { code });
+        setTotpEnabled(false);
+        Alert.alert('Deaktiviert', '2-Faktor-Authentifizierung wurde deaktiviert.');
+      } catch {
+        Alert.alert('Fehler', 'Ungültiger Code.');
+      }
+    }, 'plain-text', '', 'number-pad');
   };
 
   const testAndDetectUrl = async () => {
@@ -1768,6 +1851,101 @@ export default function SettingsPage() {
             )}
           </View>
         )}
+
+        {/* ===================================================================
+            SICHERHEIT (Biometrie + 2FA)
+        =================================================================== */}
+        {renderGroupHeader('sicherheit', 'Sicherheit', 'shield-checkmark-outline', 'Biometrie, 2-Faktor-Authentifizierung')}
+        {expandedGroups.sicherheit && (
+          <View style={[styles.groupContent, { backgroundColor: colors.card }]}>
+            {/* Biometric toggle */}
+            {biometricAvailable && (
+              <View style={[styles.settingRow, { borderBottomColor: colors.border }]}>
+                <View style={styles.settingInfo}>
+                  <Ionicons name="finger-print-outline" size={24} color={colors.text} style={styles.settingIcon} />
+                  <View>
+                    <Text style={[styles.settingLabel, { color: colors.text }]}>{biometricType}</Text>
+                    <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>Schnell einloggen ohne Passwort</Text>
+                  </View>
+                </View>
+                <Switch
+                  value={biometricEnabled}
+                  onValueChange={toggleBiometric}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor="white"
+                />
+              </View>
+            )}
+
+            {/* 2FA / TOTP */}
+            <View style={[styles.settingRow, { borderBottomColor: colors.border }]}>
+              <View style={styles.settingInfo}>
+                <Ionicons name="lock-closed-outline" size={24} color={colors.text} style={styles.settingIcon} />
+                <View>
+                  <Text style={[styles.settingLabel, { color: colors.text }]}>2-Faktor-Authentifizierung</Text>
+                  <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
+                    {totpEnabled ? 'Aktiv — Authenticator-App erforderlich' : 'Inaktiv — TOTP aktivieren'}
+                  </Text>
+                </View>
+              </View>
+              {totpLoading
+                ? <ActivityIndicator color={colors.primary} />
+                : <TouchableOpacity
+                    onPress={totpEnabled ? disableTotp : startTotpSetup}
+                    style={{ backgroundColor: totpEnabled ? colors.danger : colors.primary, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 }}
+                  >
+                    <Text style={{ color: 'white', fontWeight: '600', fontSize: 13 }}>{totpEnabled ? 'Deaktivieren' : 'Aktivieren'}</Text>
+                  </TouchableOpacity>
+              }
+            </View>
+          </View>
+        )}
+
+        {/* TOTP Setup Modal */}
+        <Modal visible={totpSetupVisible} transparent animationType="slide">
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 }}>
+            <View style={{ backgroundColor: colors.card, borderRadius: 16, padding: 24 }}>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 12 }}>2FA einrichten</Text>
+              <Text style={{ color: colors.textSecondary, marginBottom: 16, fontSize: 13 }}>
+                Scanne diesen QR-Code mit Google Authenticator, Authy oder einer anderen TOTP-App.
+              </Text>
+              {totpQrCode ? (
+                <Image
+                  source={{ uri: `data:image/png;base64,${totpQrCode}` }}
+                  style={{ width: 200, height: 200, alignSelf: 'center', marginBottom: 16 }}
+                />
+              ) : null}
+              <Text style={{ color: colors.subText ?? colors.textSecondary, fontSize: 11, textAlign: 'center', marginBottom: 16 }}>
+                Oder manuell: {totpSecret}
+              </Text>
+              <Text style={{ color: colors.text, marginBottom: 8 }}>Bestätigungscode eingeben:</Text>
+              <TextInput
+                value={totpCode}
+                onChangeText={setTotpCode}
+                keyboardType="number-pad"
+                maxLength={6}
+                placeholder="123456"
+                placeholderTextColor={colors.subText ?? colors.textSecondary}
+                style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.text, fontSize: 22, textAlign: 'center', letterSpacing: 8, marginBottom: 20 }}
+              />
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TouchableOpacity
+                  onPress={() => setTotpSetupVisible(false)}
+                  style={{ flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, alignItems: 'center' }}
+                >
+                  <Text style={{ color: colors.text }}>Abbrechen</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={confirmTotpSetup}
+                  disabled={totpLoading}
+                  style={{ flex: 1, backgroundColor: colors.primary, borderRadius: 8, padding: 12, alignItems: 'center' }}
+                >
+                  {totpLoading ? <ActivityIndicator color="white" /> : <Text style={{ color: 'white', fontWeight: '600' }}>Bestätigen</Text>}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {/* ===================================================================
             SERVER

@@ -1,0 +1,73 @@
+version: '3.9'
+
+# Inventar Pro – Docker Compose
+# Verwendung: docker compose up -d
+# Logs:       docker compose logs -f backend
+# Stoppen:    docker compose down
+
+services:
+
+  # ── FastAPI Backend ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: inventarpro-backend
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    env_file:
+      - ./backend/.env
+    environment:
+      # Override MongoDB URL to use the service name
+      MONGO_URL: mongodb://mongodb:27017
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - backups:/app/backups
+      - ./backend/.env:/app/.env:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── MongoDB ──────────────────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7
+    container_name: inventarpro-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  # ── Redis (optionaler Cache) ─────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: inventarpro-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+
+volumes:
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+  backups:
+    driver: local

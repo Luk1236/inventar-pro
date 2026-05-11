@@ -105,6 +105,62 @@ def _invalidate_dashboard_cache() -> None:
     _dashboard_cache = {}
     _dashboard_cache_ts = 0.0
 
+# ── Redis-optional TTL cache ─────────────────────────────────────────────────
+# Falls REDIS_URL gesetzt ist, wird Redis genutzt (schneller, persistent über
+# Restarts). Sonst fällt es auf den In-Memory-Dict zurück (Pi-freundlich).
+import json as _json
+_redis_client = None
+try:
+    import redis.asyncio as _aioredis
+    _redis_url = os.environ.get("REDIS_URL", "")
+    if _redis_url:
+        _redis_client = _aioredis.from_url(_redis_url, decode_responses=True)
+        logging.info(f"Redis cache enabled: {_redis_url}")
+except Exception:
+    pass
+
+_mem_cache: dict = {}   # key → (value_str, expires_at)
+
+async def _cache_get(key: str):
+    if _redis_client:
+        try:
+            raw = await _redis_client.get(key)
+            return _json.loads(raw) if raw else None
+        except Exception:
+            pass
+    entry = _mem_cache.get(key)
+    if entry and time.monotonic() < entry[1]:
+        return _json.loads(entry[0])
+    return None
+
+async def _cache_set(key: str, value, ttl: int = 60):
+    raw = _json.dumps(value, default=str)
+    if _redis_client:
+        try:
+            await _redis_client.set(key, raw, ex=ttl)
+            return
+        except Exception:
+            pass
+    _mem_cache[key] = (raw, time.monotonic() + ttl)
+
+async def _cache_delete(key: str):
+    if _redis_client:
+        try:
+            await _redis_client.delete(key)
+        except Exception:
+            pass
+    _mem_cache.pop(key, None)
+
+# ── TOTP / 2FA (pyotp) ───────────────────────────────────────────────────────
+try:
+    import pyotp as _pyotp
+    import qrcode as _qrcode
+    import base64 as _b64
+    _TOTP_AVAILABLE = True
+except ImportError:
+    _TOTP_AVAILABLE = False
+    logging.warning("pyotp/qrcode not installed — 2FA endpoints disabled")
+
 # Scheduler for daily backups
 scheduler = AsyncIOScheduler()
 
@@ -659,13 +715,21 @@ async def login(request: Request, user_credentials: UserLogin):
         # SECURITY: Log failed login attempts
         logging.warning(f"Failed login attempt for user: {user_credentials.username} from IP: {request.client.host}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    
+
     # Check if user is approved
     if not user.get("is_approved", False):
         raise HTTPException(
-            status_code=403, 
+            status_code=403,
             detail="Ihr Konto wartet noch auf die Genehmigung des Administrators. Bitte versuchen Sie es später erneut."
         )
+
+    # 2FA: if TOTP is enabled for this user, verify the code
+    if user.get("totp_enabled") and _TOTP_AVAILABLE:
+        if not user_credentials.totp_code:
+            raise HTTPException(status_code=401, detail="TOTP_REQUIRED")
+        totp = _pyotp.TOTP(user["totp_secret"])
+        if not totp.verify(user_credentials.totp_code, valid_window=1):
+            raise HTTPException(status_code=401, detail="Ungültiger 2FA-Code")
     
     # Create access token (short-lived)
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -4576,6 +4640,167 @@ async def export_customers_csv(current_user: User = Depends(get_current_user)):
     csv_data = "\n".join(csv_lines)
     return Response(content=csv_data, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=customers.csv"})
 
+
+@api_router.get("/reports/articles-xlsx")
+async def export_articles_xlsx(current_user: User = Depends(get_current_user)):
+    """Export articles as Excel (.xlsx) with styled header row."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from fastapi.responses import StreamingResponse
+
+    articles = await db.articles.find({"deleted": {"$ne": True}}).to_list(MAX_EXPORT_ROWS)
+    all_categories = {c["id"]: c["name"] for c in await db.categories.find().to_list(1000)}
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Artikel"
+
+    headers = ["Name", "Inv.-Code", "Kategorie", "Status", "Menge", "Einheit", "Standort", "Preis", "Beschreibung"]
+    hdr_font = Font(bold=True, color="FFFFFF")
+    hdr_fill = PatternFill("solid", fgColor="007AFF")
+    hdr_align = Alignment(horizontal="center")
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = hdr_font
+        cell.fill = hdr_fill
+        cell.alignment = hdr_align
+
+    for i, art in enumerate(articles, 2):
+        ws.cell(i, 1, art.get("name", ""))
+        ws.cell(i, 2, art.get("inventory_code", ""))
+        ws.cell(i, 3, all_categories.get(art.get("category_id", ""), ""))
+        ws.cell(i, 4, art.get("status", ""))
+        ws.cell(i, 5, art.get("current_stock") or art.get("quantity", 0))
+        ws.cell(i, 6, art.get("base_unit", ""))
+        ws.cell(i, 7, art.get("location", ""))
+        ws.cell(i, 8, art.get("price_per_unit", 0))
+        ws.cell(i, 9, art.get("description", ""))
+
+    for col in ws.columns:
+        max_len = max((len(str(c.value or "")) for c in col), default=4)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 42)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=artikel.xlsx"},
+    )
+
+
+@api_router.get("/reports/bookings-xlsx")
+async def export_bookings_xlsx(current_user: User = Depends(get_current_user)):
+    """Export bookings as Excel (.xlsx)."""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from fastapi.responses import StreamingResponse
+
+    bookings = await db.bookings.find({}).sort("start_date", -1).to_list(MAX_EXPORT_ROWS)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Buchungen"
+
+    headers = ["Artikel", "Nutzer", "Start", "Ende", "Status", "Menge", "Notiz"]
+    hdr_font = Font(bold=True, color="FFFFFF")
+    hdr_fill = PatternFill("solid", fgColor="007AFF")
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.font = hdr_font
+        cell.fill = hdr_fill
+        cell.alignment = Alignment(horizontal="center")
+
+    for i, bk in enumerate(bookings, 2):
+        ws.cell(i, 1, bk.get("article_name", bk.get("article_id", "")))
+        ws.cell(i, 2, bk.get("user_name", bk.get("user_id", "")))
+        start = bk.get("start_date")
+        end = bk.get("end_date")
+        ws.cell(i, 3, start.strftime("%d.%m.%Y") if isinstance(start, datetime) else str(start or ""))
+        ws.cell(i, 4, end.strftime("%d.%m.%Y") if isinstance(end, datetime) else str(end or ""))
+        ws.cell(i, 5, bk.get("status", ""))
+        ws.cell(i, 6, bk.get("quantity", 1))
+        ws.cell(i, 7, bk.get("notes", ""))
+
+    for col in ws.columns:
+        max_len = max((len(str(c.value or "")) for c in col), default=4)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 42)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=buchungen.xlsx"},
+    )
+
+
+# ── TOTP / 2FA endpoints ──────────────────────────────────────────────────────
+
+@api_router.post("/users/totp/setup")
+async def totp_setup(current_user: User = Depends(get_current_user)):
+    """Generate a TOTP secret and QR code for the current user."""
+    if not _TOTP_AVAILABLE:
+        raise HTTPException(503, "2FA nicht verfügbar (pyotp nicht installiert)")
+    secret = _pyotp.random_base32()
+    totp = _pyotp.TOTP(secret)
+    uri = totp.provisioning_uri(name=current_user.email, issuer_name="Inventar Pro")
+    # QR code as base64 PNG
+    qr = _qrcode.QRCode(error_correction=_qrcode.constants.ERROR_CORRECT_L)
+    qr.add_data(uri)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    qr_b64 = _b64.b64encode(buf.getvalue()).decode()
+    # Store pending secret (not active until confirmed)
+    await db.users.update_one({"id": current_user.id}, {"$set": {"totp_secret_pending": secret}})
+    return {"secret": secret, "qr_code": qr_b64, "uri": uri}
+
+
+@api_router.post("/users/totp/confirm")
+async def totp_confirm(payload: dict, current_user: User = Depends(get_current_user)):
+    """Confirm TOTP setup by verifying the first code."""
+    if not _TOTP_AVAILABLE:
+        raise HTTPException(503, "2FA nicht verfügbar")
+    user_doc = await db.users.find_one({"id": current_user.id})
+    secret = user_doc.get("totp_secret_pending") if user_doc else None
+    if not secret:
+        raise HTTPException(400, "Kein ausstehender 2FA-Setup")
+    if not _pyotp.TOTP(secret).verify(payload.get("code", ""), valid_window=1):
+        raise HTTPException(400, "Ungültiger Code")
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": {"totp_secret": secret, "totp_enabled": True}, "$unset": {"totp_secret_pending": ""}},
+    )
+    return {"status": "enabled"}
+
+
+@api_router.post("/users/totp/disable")
+async def totp_disable(payload: dict, current_user: User = Depends(get_current_user)):
+    """Disable 2FA for the current user (requires a valid TOTP code)."""
+    if not _TOTP_AVAILABLE:
+        raise HTTPException(503, "2FA nicht verfügbar")
+    user_doc = await db.users.find_one({"id": current_user.id})
+    if not user_doc or not user_doc.get("totp_enabled"):
+        raise HTTPException(400, "2FA ist nicht aktiviert")
+    if not _pyotp.TOTP(user_doc["totp_secret"]).verify(payload.get("code", ""), valid_window=1):
+        raise HTTPException(400, "Ungültiger Code")
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$unset": {"totp_secret": "", "totp_enabled": "", "totp_secret_pending": ""}},
+    )
+    return {"status": "disabled"}
+
+
+@api_router.get("/users/totp/status")
+async def totp_status(current_user: User = Depends(get_current_user)):
+    user_doc = await db.users.find_one({"id": current_user.id})
+    return {"totp_enabled": bool(user_doc and user_doc.get("totp_enabled"))}
+
+
 @api_router.get("/reports/monthly")
 async def generate_monthly_report(
     period: str = "current",
@@ -5521,6 +5746,28 @@ async def register_push_token(
     except Exception as e:
         logging.error(f"Error registering push token: {str(e)}")
         raise HTTPException(status_code=500, detail="Interner Serverfehler. Details wurden protokolliert.")
+
+
+async def _send_push_to_users(user_ids: list, title: str, body: str, data: dict = None):
+    """Send Expo push notifications to a list of user IDs."""
+    if not user_ids:
+        return
+    tokens_cursor = db.push_tokens.find({"user_id": {"$in": user_ids}, "is_active": True})
+    tokens = [doc["token"] async for doc in tokens_cursor]
+    expo_tokens = [t for t in tokens if t and t.startswith("ExponentPushToken")]
+    if not expo_tokens:
+        return
+    messages = [{"to": t, "title": title, "body": body, "data": data or {}} for t in expo_tokens]
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            await client.post(
+                "https://exp.host/--/api/v2/push/send",
+                json=messages,
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+            )
+    except Exception as exc:
+        logging.warning(f"Push notification send failed: {exc}")
 
 
 @api_router.get("/notifications/dguv-reminders")

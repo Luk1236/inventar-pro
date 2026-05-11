@@ -364,10 +364,12 @@ class ApiService {
   // Auth Methods
   // ===========================================
 
-  async login(username: string, password: string): Promise<any> {
+  async login(username: string, password: string, totp_code?: string): Promise<any> {
+    const body: any = { username, password };
+    if (totp_code) body.totp_code = totp_code;
     const response = await this.post<any>(
       '/api/login',
-      { username, password },
+      body,
       { skipAuth: true, showErrorAlert: false }
     );
 

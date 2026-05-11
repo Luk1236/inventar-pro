@@ -45,6 +45,7 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     username: str = Field(..., min_length=1, max_length=50)
     password: str = Field(..., min_length=1, max_length=128)
+    totp_code: Optional[str] = None
 
 
 class Token(BaseModel):

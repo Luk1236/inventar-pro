@@ -18,6 +18,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import * as ImagePicker from 'expo-image-picker';
+import { compressImageToBase64 } from '../../../services/imageService';
 
 import Constants from 'expo-constants';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -459,12 +460,12 @@ export default function EditArticlePage() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8,
-      base64: true,
+      quality: 1,
     });
 
-    if (!result.canceled && result.assets[0].base64) {
-      setFormData(prev => ({ ...prev, image_base64: result.assets[0].base64! }));
+    if (!result.canceled) {
+      const b64 = await compressImageToBase64(result.assets[0].uri);
+      if (b64) setFormData(prev => ({ ...prev, image_base64: b64 }));
     }
   };
 
@@ -473,12 +474,12 @@ export default function EditArticlePage() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8,
-      base64: true,
+      quality: 1,
     });
 
-    if (!result.canceled && result.assets[0].base64) {
-      setFormData(prev => ({ ...prev, image_base64: result.assets[0].base64! }));
+    if (!result.canceled) {
+      const b64 = await compressImageToBase64(result.assets[0].uri);
+      if (b64) setFormData(prev => ({ ...prev, image_base64: b64 }));
     }
   };
 

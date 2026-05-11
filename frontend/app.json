@@ -2,7 +2,7 @@
   "expo": {
     "name": "Inventar Pro",
     "slug": "inventarpro",
-    "version": "1.0.67",
+    "version": "1.0.68",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "inventarpro",
@@ -13,7 +13,7 @@
     },
     "android": {
       "package": "com.inventarpro.app",
-      "versionCode": 10067,
+      "versionCode": 10068,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#007AFF"
@@ -35,6 +35,7 @@
     "plugins": [
       "expo-router",
       "@sentry/react-native/expo",
+      "expo-local-authentication",
       [
         "expo-splash-screen",
         {

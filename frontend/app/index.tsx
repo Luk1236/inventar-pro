@@ -28,6 +28,8 @@ const GlobalSearch = React.lazy(() => import('../components/GlobalSearch'));
 import { useTheme } from '../contexts/ThemeContext';
 import { useWebSocket } from '../hooks/useWebSocket';
 import NetInfo from '@react-native-community/netinfo';
+import * as Notifications from 'expo-notifications';
+import { isBiometricAvailable, isBiometricEnabled, authenticateWithBiometrics } from '../services/biometricService';
 
 
 const { width } = Dimensions.get('window');
@@ -104,6 +106,13 @@ export default function Index() {
   const [authSuccess, setAuthSuccess] = useState<string | null>(null);
   const [showServerConfig, setShowServerConfig] = useState(false);
   const [serverUrlInput, setServerUrlInput] = useState(getBackendUrl());
+
+  // Biometric login
+  const [biometricVisible, setBiometricVisible] = useState(false);
+
+  // TOTP / 2FA
+  const [totpRequired, setTotpRequired] = useState(false);
+  const [totpInput, setTotpInput] = useState('');
 
   const [financialStats, setFinancialStats] = useState<any>(null);
 
@@ -758,7 +767,18 @@ export default function Index() {
           return;
         }
         setUser(parsedUser);
+        // Biometric gate: if enabled, require biometric before showing dashboard
+        const bioEnabled = await isBiometricEnabled();
+        const bioAvail = await isBiometricAvailable();
+        if (bioEnabled && bioAvail) {
+          const ok = await authenticateWithBiometrics('Zum Weitermachen Identität bestätigen');
+          if (!ok) {
+            await apiService.clearAuth();
+            return;
+          }
+        }
         setIsLoggedIn(true);
+        registerPushToken();
       }
     } catch (error) {
       if (__DEV__) console.warn('[Auth] checkAuthStatus failed:', error);
@@ -900,7 +920,16 @@ export default function Index() {
     }
   };
 
-  const handleLogin = async () => {
+  const registerPushToken = async () => {
+    try {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== 'granted') return;
+      const tokenData = await Notifications.getExpoPushTokenAsync();
+      await apiService.post('/api/push-tokens', { token: tokenData.data, platform: 'expo' }, { showErrorAlert: false });
+    } catch {}
+  };
+
+  const handleLogin = async (overrideTotpCode?: string) => {
     if (!username?.trim() || !password?.trim()) {
       setAuthError('Bitte Benutzername und Passwort eingeben');
       return;
@@ -909,16 +938,22 @@ export default function Index() {
     setAuthError(null);
     setAuthSuccess(null);
     try {
-      const response = await apiService.login(username.trim(), password);
+      const response = await apiService.login(username.trim(), password, overrideTotpCode || undefined);
+      setTotpRequired(false);
+      setTotpInput('');
       setAuthSuccess('Anmeldung erfolgreich!');
       setUser(response.user);
       setIsLoggedIn(true);
       startSessionTimer();
+      registerPushToken();
       setUsername('');
       setPassword('');
     } catch (error: any) {
       const msg = error.message || 'Anmeldung fehlgeschlagen';
-      if (msg === 'NO_INTERNET' || msg === 'TIMEOUT') {
+      if (msg === 'TOTP_REQUIRED') {
+        setTotpRequired(true);
+        setAuthError(null);
+      } else if (msg === 'NO_INTERNET' || msg === 'TIMEOUT') {
         setAuthError('Server nicht erreichbar: ' + getBackendUrl() + '\nBitte Server-URL unten prüfen oder anpassen.');
         setShowServerConfig(true);
       } else {
@@ -1062,6 +1097,22 @@ export default function Index() {
               </TouchableOpacity>
             )}
 
+            {/* TOTP step */}
+            {totpRequired && (
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ color: colors.text, marginBottom: 6, fontWeight: '600' }}>2FA-Code eingeben:</Text>
+                <TextInput
+                  value={totpInput}
+                  onChangeText={setTotpInput}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  placeholder="123456"
+                  placeholderTextColor={colors.subText ?? colors.textSecondary}
+                  style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.text, fontSize: 22, textAlign: 'center', letterSpacing: 8 }}
+                />
+              </View>
+            )}
+
             {authError && (
               <View style={{ backgroundColor: isDark ? '#3D0000' : '#FFE5E5', borderRadius: 8, padding: 10, marginBottom: 10 }}>
                 <Text style={{ color: isDark ? '#FF6B6B' : '#CC0000', fontSize: 14 }}>❌ {authError}</Text>
@@ -1074,14 +1125,14 @@ export default function Index() {
             )}
             <TouchableOpacity
               style={styles.primaryButton}
-              onPress={isLogin ? handleLogin : handleRegister}
+              onPress={() => isLogin ? handleLogin(totpRequired ? totpInput : undefined) : handleRegister()}
               disabled={authLoading}
             >
               {authLoading ? (
                 <ActivityIndicator color="white" />
               ) : (
                 <Text style={styles.primaryButtonText}>
-                  {isLogin ? 'Anmelden' : 'Registrieren'}
+                  {totpRequired ? '2FA bestätigen' : isLogin ? 'Anmelden' : 'Registrieren'}
                 </Text>
               )}
             </TouchableOpacity>

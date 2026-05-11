@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,12 +12,16 @@ import {
   Image,
   RefreshControl,
   Modal,
+  Animated,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import apiService, { getToken } from '../../services/apiService';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import apiService, { getToken, getBackendUrl } from '../../services/apiService';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -499,6 +503,28 @@ export default function ArticlesPage() {
   const selectAll = () => setSelectedIds(new Set(filteredArticles.map(a => a.id)));
   const clearSelection = () => { setSelectedIds(new Set()); setSelectMode(false); };
 
+  const downloadExcel = async () => {
+    try {
+      const token = await getToken();
+      const base = getBackendUrl();
+      const url = `${base}/api/reports/articles-xlsx`;
+      const dest = (FileSystem.cacheDirectory ?? '') + 'artikel.xlsx';
+      const dl = await FileSystem.downloadAsync(url, dest, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (dl.status === 200) {
+        await Sharing.shareAsync(dl.uri, {
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          dialogTitle: 'Artikel exportieren',
+        });
+      } else {
+        Alert.alert('Fehler', 'Export fehlgeschlagen.');
+      }
+    } catch (e) {
+      Alert.alert('Fehler', 'Excel-Export fehlgeschlagen.');
+    }
+  };
+
   const bulkDelete = () => {
     if (selectedIds.size === 0) return;
     Alert.alert(
@@ -543,6 +569,25 @@ export default function ArticlesPage() {
   }), [articles, searchTerm, selectedCategory]);
 
   const renderArticleCard = useCallback(({ item: article }: { item: Article }) => (
+    <Swipeable
+      enabled={!selectMode}
+      renderRightActions={(prog, drag) => {
+        const trans = drag.interpolate({ inputRange: [-80, 0], outputRange: [0, 80] });
+        return (
+          <Animated.View style={{ width: 80, transform: [{ translateX: trans }] }}>
+            <TouchableOpacity
+              style={{ flex: 1, backgroundColor: '#FF3B30', justifyContent: 'center', alignItems: 'center', borderRadius: 12, margin: 4 }}
+              onPress={() => Alert.alert('Artikel löschen', `"${article.name}" wirklich löschen?`, [
+                { text: 'Abbrechen', style: 'cancel' },
+                { text: 'Löschen', style: 'destructive', onPress: () => handleDeleteArticle(article.id) },
+              ])}
+            >
+              <Ionicons name="trash" size={24} color="white" />
+            </TouchableOpacity>
+          </Animated.View>
+        );
+      }}
+    >
     <View
       key={article.id}
       style={[styles.articleCard, viewMode === 'grid' && styles.gridCard, selectMode && selectedIds.has(article.id) && { borderColor: colors.primary, borderWidth: 2 }]}
@@ -629,7 +674,8 @@ export default function ArticlesPage() {
         </TouchableOpacity>
       </View>
     </View>
-  ), [viewMode, handleDeleteArticle, getCategoryName, getStockStatusColor, getStockStatusText, colors, isDark]);
+    </Swipeable>
+  ), [viewMode, handleDeleteArticle, getCategoryName, getStockStatusColor, getStockStatusText, colors, isDark, selectMode, selectedIds, toggleSelect]);
 
   if (loading) {
     return (
@@ -653,6 +699,12 @@ export default function ArticlesPage() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Artikel ({articles.length})</Text>
         <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.importButton}
+            onPress={downloadExcel}
+          >
+            <Ionicons name="document-text-outline" size={22} color={colors.primary} />
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.importButton}
             onPress={() => router.push('/articles/import')}
