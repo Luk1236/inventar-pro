@@ -47,7 +47,7 @@ export interface WsMessage {
   id: string;
 }
 
-export function useWebSocket(onMessage: (msg: WsMessage) => void): void {
+export function useWebSocket(onMessage: (msg: WsMessage) => void, enabled = true): void {
   const wsRef = useRef<WebSocket | null>(null);
   const attemptsRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -99,6 +99,7 @@ export function useWebSocket(onMessage: (msg: WsMessage) => void): void {
   }, [connect]);
 
   useEffect(() => {
+    if (!enabled) return;
     mountedRef.current = true;
     connect();
     return () => {
@@ -111,5 +112,5 @@ export function useWebSocket(onMessage: (msg: WsMessage) => void): void {
       }
       wsRef.current?.close();
     };
-  }, [connect]);
+  }, [connect, enabled]);
 }

@@ -3,7 +3,7 @@ const path = require("path");
 
 const config = getDefaultConfig(__dirname);
 
-config.maxWorkers = 2;
+config.maxWorkers = Math.max(2, require('os').cpus().length - 1);
 
 // Fix: Expo 54 uses the ESM exports field of three.js which contains
 // import.meta — Metro can't handle this. Force the CJS build instead.

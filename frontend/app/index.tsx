@@ -24,7 +24,7 @@ import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import apiService, { getToken, setBackendUrl, getBackendUrl } from '../services/apiService';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import GlobalSearch from '../components/GlobalSearch';
+const GlobalSearch = React.lazy(() => import('../components/GlobalSearch'));
 import { useTheme } from '../contexts/ThemeContext';
 import { useWebSocket } from '../hooks/useWebSocket';
 
@@ -132,6 +132,7 @@ export default function Index() {
     setVisibleWidgets(prev => ({ ...prev, [key]: !prev[key] }));
   }, []);
 
+  const [wsReady, setWsReady] = useState(false);
   const [sessionWarningVisible, setSessionWarningVisible] = useState(false);
   const sessionTimerRef = useRef<any>(null);
 
@@ -743,10 +744,22 @@ export default function Index() {
 
   useEffect(() => {
     if (isLoggedIn) {
-      loadAllStats();
-      loadFinancialStats();
-      loadNotifications();
       loadBranding();
+      const t = setTimeout(() => {
+        loadAllStats();
+        loadFinancialStats();
+        loadNotifications();
+      }, 300);
+      return () => clearTimeout(t);
+    }
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      const t = setTimeout(() => setWsReady(true), 2000);
+      return () => clearTimeout(t);
+    } else {
+      setWsReady(false);
     }
   }, [isLoggedIn]);
 
@@ -769,7 +782,7 @@ export default function Index() {
     ].includes(msg.type)) {
       loadDashboardStats();
     }
-  });
+  }, wsReady);
 
   const reloadUserData = async () => {
     try {
@@ -785,8 +798,10 @@ export default function Index() {
   const checkAuthStatus = async () => {
     try {
       // K2 — Use apiService.getToken() which reads from SecureStore (not raw AsyncStorage)
-      const token = await apiService.getToken();
-      const userData = await AsyncStorage.getItem('user');
+      const [token, userData] = await Promise.all([
+        apiService.getToken(),
+        AsyncStorage.getItem('user'),
+      ]);
       if (token && userData) {
         const parsedUser = JSON.parse(userData);
         // Validate minimum required fields before trusting stored data
@@ -1189,7 +1204,7 @@ export default function Index() {
             )}
           </View>
         </ScrollView>
-        <Modal visible={forgotPasswordVisible} transparent animationType="fade" onRequestClose={() => setForgotPasswordVisible(false)}>
+        {forgotPasswordVisible && <Modal visible={true} transparent animationType="fade" onRequestClose={() => setForgotPasswordVisible(false)}>
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 }}>
             <View style={[styles.loginCard, { backgroundColor: colors.card }]}>
               <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700', marginBottom: 16 }}>Passwort zurücksetzen</Text>
@@ -1216,7 +1231,7 @@ export default function Index() {
               </TouchableOpacity>
             </View>
           </View>
-        </Modal>
+        </Modal>}
       </KeyboardAvoidingView>
     );
   }
@@ -1233,7 +1248,11 @@ export default function Index() {
   return (
     <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
-      <GlobalSearch visible={searchVisible} onClose={() => setSearchVisible(false)} />
+      {searchVisible && (
+        <React.Suspense fallback={null}>
+          <GlobalSearch visible={true} onClose={() => setSearchVisible(false)} />
+        </React.Suspense>
+      )}
 
       {/* Header with Company Logo & User Info */}
       <View style={styles.header}>
@@ -1730,7 +1749,7 @@ export default function Index() {
       </ScrollView>
 
       {/* Widget Customization Modal */}
-      <Modal visible={widgetCustomizeVisible} animationType="slide" transparent onRequestClose={() => setWidgetCustomizeVisible(false)}>
+      {widgetCustomizeVisible && <Modal visible={true} animationType="slide" transparent onRequestClose={() => setWidgetCustomizeVisible(false)}>
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -1761,10 +1780,10 @@ export default function Index() {
             ))}
           </View>
         </View>
-      </Modal>
+      </Modal>}
 
       {/* Notification Modal */}
-      <Modal visible={notifModalVisible} animationType="slide" transparent onRequestClose={() => setNotifModalVisible(false)}>
+      {notifModalVisible && <Modal visible={true} animationType="slide" transparent onRequestClose={() => setNotifModalVisible(false)}>
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <View style={{ backgroundColor: colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '70%' }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -1795,10 +1814,10 @@ export default function Index() {
             )}
           </View>
         </View>
-      </Modal>
+      </Modal>}
 
       {/* Session Warning Modal */}
-      <Modal visible={sessionWarningVisible} animationType="fade" transparent onRequestClose={() => setSessionWarningVisible(false)}>
+      {sessionWarningVisible && <Modal visible={true} animationType="fade" transparent onRequestClose={() => setSessionWarningVisible(false)}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 24 }}>
           <View style={{ backgroundColor: colors.card, borderRadius: 20, padding: 24, width: '100%', maxWidth: 340 }}>
             <View style={{ alignItems: 'center', marginBottom: 16 }}>
@@ -1835,7 +1854,7 @@ export default function Index() {
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </Modal>}
 
       {/* Bottom Navigation */}
       <View style={[styles.bottomNav, { paddingBottom: insets.bottom || 16 }]}>
