@@ -18,12 +18,13 @@ def test_frontend_jest_suite():
     if not os.path.isdir(FRONTEND_DIR):
         pytest.skip(f"Frontend-Verzeichnis nicht gefunden: {FRONTEND_DIR}")
 
+    timeout = 300 if os.name == "nt" else 120
     result = subprocess.run(
         ["npx", "jest", "__tests__/apiService.test.ts", "--no-coverage", "--forceExit", "--ci"],
         cwd=FRONTEND_DIR,
         capture_output=True,
         text=True,
-        timeout=120,
+        timeout=timeout,
         shell=True,  # Windows-kompatibel
     )
 
