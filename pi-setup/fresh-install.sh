@@ -73,44 +73,73 @@ echo "  Node:  $(node --version)"
 echo "  npm:   $(npm --version)"
 
 # === 3. MongoDB 8.0 installieren ===
+# Wichtig: MongoDB hat KEINE offiziellen Debian-ARM64 Pakete (nur amd64).
+# Für ARM64 nutzen wir Ubuntu jammy ARM-Build — kompatibel zu Debian ARM
+# da glibc abwärtskompatibel ist (Trixie 2.41 > Ubuntu 22.04 2.35).
 echo "[3/14] MongoDB 8.0 installieren..."
 if ! command -v mongod >/dev/null 2>&1; then
     ARCH=$(dpkg --print-architecture)
+    OS_CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
+    OS_ID=$(. /etc/os-release && echo "$ID")
+
+    sudo apt-get install -y -qq gnupg curl
+    curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
+
+    # Repo-URL bestimmen
+    REPO_LINE=""
     if [[ "$ARCH" == "arm64" ]]; then
-        # Pi OS 64-bit (empfohlen) — MongoDB 8.0 für ARM64
-        OS_CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
-        sudo apt-get install -y -qq gnupg curl
-        curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor
-        case "$OS_CODENAME" in
-            bookworm|trixie)
-                echo "deb [ arch=arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
-                ;;
-            jammy|focal|noble)
-                echo "deb [ arch=arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${OS_CODENAME}/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
-                ;;
-            *)
-                echo "  ⚠ Unbekanntes OS ($OS_CODENAME) — versuche Debian bookworm-Paket"
-                echo "deb [ arch=arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
-                ;;
-        esac
+        # ARM64 → Ubuntu jammy (offizieller MongoDB ARM-Build, läuft auch auf Debian ARM)
+        REPO_LINE="deb [ arch=arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse"
+        echo "  → ARM64 erkannt — nutze Ubuntu jammy Repo (offiziell für ARM64)"
+    elif [[ "$ARCH" == "amd64" ]]; then
+        # AMD64 → Debian bookworm (offiziell, auch für Trixie kompatibel)
+        REPO_LINE="deb [ arch=amd64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main"
+        echo "  → AMD64 erkannt — nutze Debian bookworm Repo"
+    else
+        echo "  ⚠ 32-bit / unbekannte Architektur ($ARCH) — installiere Distro-Paket"
+        sudo apt-get install -y -qq mongodb-server || {
+            echo "  ✗ MongoDB-Installation fehlgeschlagen. Bitte 64-bit OS verwenden!"
+            exit 1
+        }
+        REPO_LINE=""
+    fi
+
+    if [[ -n "$REPO_LINE" ]]; then
+        echo "$REPO_LINE" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
         sudo apt-get update -qq
         sudo apt-get install -y -qq mongodb-org || {
-            echo "  ⚠ MongoDB 8.0 fehlgeschlagen — versuche Distro-Paket"
-            sudo apt-get install -y -qq mongodb || {
-                echo "  ✗ MongoDB konnte nicht installiert werden!"
+            echo "  ⚠ MongoDB 8.0 fehlgeschlagen — Fallback auf Docker-Container"
+            # Letzter Fallback: MongoDB als Docker-Container
+            if ! command -v docker >/dev/null 2>&1; then
+                echo "  → Docker wird installiert..."
+                curl -fsSL https://get.docker.com | sudo sh
+                sudo usermod -aG docker "$USER"
+            fi
+            sudo docker run -d --restart unless-stopped \
+                --name mongodb \
+                -p 27017:27017 \
+                -v ~/mongo-data:/data/db \
+                mongo:8 || {
+                echo "  ✗ Auch Docker-Fallback fehlgeschlagen!"
                 exit 1
             }
-        }
-    else
-        echo "  ⚠ 32-bit Pi OS erkannt — installiere mongodb-server aus Debian-Repo (älter, eingeschränkt)"
-        sudo apt-get install -y -qq mongodb-server || {
-            echo "  ✗ MongoDB-Installation fehlgeschlagen. Bitte Pi OS 64-bit verwenden!"
-            exit 1
+            echo "  ✓ MongoDB läuft als Docker-Container"
+            # systemd-Service für Docker erstellen
         }
     fi
 fi
 sudo systemctl enable mongod 2>/dev/null || sudo systemctl enable mongodb 2>/dev/null || true
 sudo systemctl start mongod 2>/dev/null || sudo systemctl start mongodb 2>/dev/null || true
+
+# Verifizieren dass MongoDB läuft
+sleep 3
+if mongosh --quiet --eval "db.version()" 2>/dev/null | grep -q "^[0-9]"; then
+    echo "  ✓ MongoDB läuft: $(mongosh --quiet --eval 'db.version()' 2>/dev/null)"
+elif command -v mongo >/dev/null 2>&1 && mongo --quiet --eval "db.version()" 2>/dev/null | grep -q "^[0-9]"; then
+    echo "  ✓ MongoDB läuft (legacy mongo client)"
+else
+    echo "  ⚠ MongoDB-Verbindung kann nicht verifiziert werden — prüfe später mit: mongosh"
+fi
 
 # === 4. Repo klonen ===
 echo "[4/14] Repo klonen..."
