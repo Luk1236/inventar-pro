@@ -98,9 +98,30 @@ Das Skript installiert u. a.:
 
 Details + Troubleshooting: siehe [`setup-raspi.sh`](setup-raspi.sh) und den Design-Spec-Abschnitt in [`docs/`](docs/).
 
+### Feste IP-Adresse einrichten (empfohlen)
+
+Ohne feste IP kann sich die Adresse des Pi nach einem Router-Neustart ändern,
+was die Verbindung in der App unterbricht.
+
+**Option A – Script (konfiguriert den Pi direkt):**
+```bash
+sudo bash setup-static-ip.sh
+sudo reboot
+```
+Das Script erkennt automatisch Interface, Gateway und DNS,
+fragt nach der gewünschten IP, und aktualisiert `backend/.env`.
+
+**Option B – DHCP-Reservierung im Router (einfacher, kein Pi-Eingriff):**
+1. MAC-Adresse des Pi herausfinden: `ip link show eth0` (oder `wlan0`)
+2. Im Router-Interface (z. B. FritzBox: http://fritz.box) unter
+   „Heimnetz → Netzwerk" die MAC-Adresse einer festen IP zuweisen.
+3. Pi neu starten.
+
 **Port im Netzwerk freigeben (Cloudflare-Tunnel — optional):**
 ```bash
 ./setup-cloudflare-tunnel.sh
+# oder für sofortigen Test ohne Account:
+./quick-tunnel.sh
 ```
 
 ---
