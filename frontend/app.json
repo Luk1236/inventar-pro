@@ -2,18 +2,32 @@
   "expo": {
     "name": "Inventar Pro",
     "slug": "inventarpro",
-    "version": "1.0.69",
+    "version": "1.0.70",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "inventarpro",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.inventarpro.app",
+      "buildNumber": "1.0.69",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Inventar Pro nutzt die Kamera zum Scannen von Barcodes/QR-Codes und Aufnehmen von Artikel-Fotos.",
+        "NSPhotoLibraryUsageDescription": "Inventar Pro greift auf die Foto-Bibliothek zu, um Artikel-Bilder auszuwählen.",
+        "NSPhotoLibraryAddUsageDescription": "Inventar Pro speichert Etiketten und Berichte in der Foto-Bibliothek.",
+        "NSFaceIDUsageDescription": "Inventar Pro nutzt Face ID für schnellen, sicheren Login.",
+        "NSLocalNetworkUsageDescription": "Inventar Pro verbindet sich mit dem Backend-Server in deinem lokalen Netzwerk.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true
+        }
+      }
     },
     "android": {
       "package": "com.inventarpro.app",
-      "versionCode": 10069,
+      "versionCode": 10070,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#007AFF"
