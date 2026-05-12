@@ -3,7 +3,8 @@
 Inventar Pro — Pi Web-Dashboard
 Port: 8080  |  http://PI-IP:8080
 """
-import subprocess, os, time, threading, secrets, shlex, logging, json, smtplib
+import subprocess, os, time, threading, secrets, shlex, logging, json, smtplib, re
+from collections import deque
 from email.mime.text import MIMEText
 from fastapi import FastAPI, BackgroundTasks, Body, Request, Cookie
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -208,8 +209,8 @@ def _git_short_hash() -> str:
     except Exception:
         return ""
 
-_update_log: list[str] = []
-_backup_log: list[str] = []
+_update_log: deque[str] = deque(maxlen=500)
+_backup_log: deque[str] = deque(maxlen=500)
 _updating = False
 _backing_up = False
 _last_update: str = ""
@@ -611,14 +612,14 @@ def backup(request: Request, bg: BackgroundTasks):
             return {"ok": False, "msg": "Backup läuft bereits"}
         if _updating:
             return {"ok": False, "msg": "Update läuft — bitte warten"}
-        _backup_log = []
+        _backup_log = deque(maxlen=500)
         _backing_up = True
     bg.add_task(_do_backup)
     return {"ok": True, "msg": "Backup gestartet"}
 
 @app.get("/api/backup/log")
 def backup_log():
-    return {"running": _backing_up, "lines": _backup_log[-200:], "last": _last_backup}
+    return {"running": _backing_up, "lines": list(_backup_log), "last": _last_backup}
 
 
 @app.post("/api/update")
@@ -631,14 +632,14 @@ def update(request: Request, bg: BackgroundTasks):
             return {"ok": False, "msg": "Update läuft bereits"}
         if _backing_up:
             return {"ok": False, "msg": "Backup läuft — bitte warten"}
-        _update_log = []
+        _update_log = deque(maxlen=500)
         _updating = True
     bg.add_task(_do_update)
     return {"ok": True, "msg": "Update gestartet"}
 
 @app.get("/api/update/log")
 def update_log():
-    return {"running": _updating, "lines": _update_log[-200:], "last": _last_update}
+    return {"running": _updating, "lines": list(_update_log), "last": _last_update}
 
 @app.get("/api/versions")
 def versions():
@@ -658,13 +659,13 @@ def rollback(request: Request, bg: BackgroundTasks, body: dict = Body(...)):
     if not _check_auth(request):
         return JSONResponse({"ok": False, "msg": "Nicht angemeldet"}, 401)
     tag = body.get("tag", "").strip()
-    if not tag or not tag.startswith("v"):
+    if not tag or not re.fullmatch(r'v\d+(\.\d+)+', tag):
         return JSONResponse({"ok": False, "msg": "Ungültiger Tag"}, 400)
     global _updating, _update_log
     with _lock:
         if _updating or _backing_up:
             return {"ok": False, "msg": "Update/Backup läuft bereits"}
-        _update_log = []
+        _update_log = deque(maxlen=500)
         _updating = True
     bg.add_task(_do_rollback, tag)
     return {"ok": True, "msg": f"Rollback auf {tag} gestartet"}
