@@ -919,6 +919,7 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min
     <div class="last-upd" id="last-upd">–</div>
     <div style="display:flex;gap:4px;margin-top:4px">
       <button class="btn btn-gray" style="font-size:10px" onclick="toggleTheme()" id="theme-btn">🌙</button>
+      <span id="user-badge" style="font-size:10px;opacity:0.7;padding:2px 6px">👤 Admin</span>
       <button class="btn btn-gray" style="font-size:10px" onclick="doLogout()">🔒 Abmelden</button>
     </div>
   </div>
@@ -981,14 +982,6 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min
   </div>
 </div>
 
-<div class="card">
-  <h2>Werkzeuge</h2>
-  <button class="btn btn-purple btn-full" onclick="expoCache()">🔄 Frontend neu bauen</button>
-  <div class="btn-row" style="margin-top:6px">
-    <button class="btn btn-gray" onclick="openUrl('http://'+location.hostname+':8002/docs')">📄 API Docs</button>
-    <button class="btn btn-gray" onclick="openUrl('http://'+location.hostname+':8002')">🌐 App öffnen</button>
-  </div>
-</div>
 
 <div class="card" style="grid-column:1/-1">
   <h2>🖥 Remote Shell</h2>
