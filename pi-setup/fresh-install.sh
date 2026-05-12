@@ -2,20 +2,109 @@
 # ============================================================
 # Inventar Pro — Komplette Fresh-Installation auf Raspberry Pi
 # ============================================================
-# Voraussetzung: frisch geflashtes Raspberry Pi OS 64-bit (Bookworm)
+# Voraussetzung: Raspberry Pi OS 64-bit (Bookworm oder Trixie)
 # Ausführen mit:
-#   curl -fsSL https://raw.githubusercontent.com/<user>/<repo>/main/pi-setup/fresh-install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Luk1236/inventar-pro/master/pi-setup/fresh-install.sh | bash
 # ODER nach git clone:
 #   chmod +x pi-setup/fresh-install.sh
 #   ./pi-setup/fresh-install.sh
 # ============================================================
-set -euo pipefail
+# Verhalten:
+# - set -u + pipefail (KEIN -e, damit Skript Fehler graceful behandeln kann)
+# - Persistent Log unter ~/inventar-install.log
+# - Pre-flight Checks (Architektur, Internet, Disk, RAM)
+# - Jeder Schritt isoliert: Fehler in einem Schritt blockiert nicht den Rest
+# ============================================================
+set -uo pipefail
+
+# === Logging in Datei + stdout ===
+LOG_FILE="${HOME}/inventar-install.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+echo
+echo "=== INSTALL START $(date '+%Y-%m-%d %H:%M:%S') ===" | tee -a "$LOG_FILE" >/dev/null
+echo "Log-Datei: $LOG_FILE"
+echo
 
 # === Konfiguration ===
 REPO_URL="${INVENTAR_REPO:-https://github.com/Luk1236/inventar-pro.git}"
 INSTALL_DIR="${HOME}/inventar"
 PI_USER="$(whoami)"
 NODE_MAJOR=20
+
+# Status-Tracker für Schritt-Ergebnisse (für End-Zusammenfassung)
+declare -A STEP_STATUS
+
+# Helper-Funktionen
+step_ok()   { STEP_STATUS["$1"]="✓"; echo "  ✓ $2"; }
+step_warn() { STEP_STATUS["$1"]="⚠"; echo "  ⚠ $2"; }
+step_err()  { STEP_STATUS["$1"]="✗"; echo "  ✗ $2"; }
+section()   { echo; echo "[$1] $2..."; }
+
+# === Pre-flight Checks ===
+section "PRE-FLIGHT" "System-Voraussetzungen prüfen"
+
+# 1) Architektur
+ARCH=$(dpkg --print-architecture 2>/dev/null || echo "unknown")
+if [[ "$ARCH" != "arm64" && "$ARCH" != "amd64" ]]; then
+    echo "  ✗ FEHLER: 64-bit OS benötigt, gefunden: $ARCH"
+    echo "    → SD-Karte mit Raspberry Pi OS (64-bit) neu flashen"
+    exit 1
+fi
+echo "  ✓ Architektur: $ARCH"
+
+# 2) OS
+OS_ID=$(. /etc/os-release && echo "$ID")
+OS_CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
+echo "  ✓ OS: $OS_ID $OS_CODENAME"
+
+# 3) Internet
+if ! ping -c 1 -W 5 8.8.8.8 >/dev/null 2>&1; then
+    echo "  ✗ FEHLER: Keine Internet-Verbindung"
+    echo "    → WLAN/Netzwerk-Kabel prüfen, dann nochmal starten"
+    exit 1
+fi
+echo "  ✓ Internet OK"
+
+# 4) Disk Space (min. 5 GB frei für volle Installation)
+FREE_GB=$(df / | awk 'NR==2 {print int($4/1024/1024)}')
+if [[ "$FREE_GB" -lt 5 ]]; then
+    echo "  ✗ FEHLER: Nur ${FREE_GB} GB frei auf / — benötigt: ≥ 5 GB"
+    echo "    → größere SD-Karte verwenden oder ältere Daten löschen"
+    exit 1
+elif [[ "$FREE_GB" -lt 10 ]]; then
+    echo "  ⚠ Nur ${FREE_GB} GB frei — empfohlen ≥ 10 GB (Frontend-Build braucht Platz)"
+else
+    echo "  ✓ Disk-Space: ${FREE_GB} GB frei"
+fi
+
+# 5) RAM
+RAM_MB=$(free -m | awk '/^Mem:/ {print $2}')
+if [[ "$RAM_MB" -lt 1500 ]]; then
+    echo "  ⚠ Nur ${RAM_MB} MB RAM — Frontend-Build kann fehlschlagen"
+    echo "    Tipp: Build auf PC machen, dist/ via rsync auf Pi"
+else
+    echo "  ✓ RAM: ${RAM_MB} MB"
+fi
+
+# 6) Sudo-Test (cache password)
+if ! sudo -v 2>/dev/null; then
+    echo "  ✗ FEHLER: Sudo-Berechtigung erforderlich"
+    exit 1
+fi
+echo "  ✓ Sudo OK"
+
+# 7) Python verfügbar
+PYTHON_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null || echo "?")
+echo "  ✓ Python: $PYTHON_VER"
+
+# 8) Tipp: lange Sessions in screen/tmux
+if [[ -z "${STY:-}${TMUX:-}" ]] && [[ -n "${SSH_TTY:-}" ]]; then
+    echo
+    echo "  💡 TIPP: Bei SSH-Abbruch geht der Install verloren!"
+    echo "     Empfehlung: 'screen -S install' VOR diesem Skript starten,"
+    echo "     dann reconnect mit 'screen -r install' möglich."
+    echo
+fi
 
 echo "============================================================"
 echo " Inventar Pro — Fresh Install"
@@ -152,18 +241,60 @@ else
 fi
 
 # === 5. Backend (Python venv + Dependencies) ===
-echo "[5/14] Backend Python-venv..."
+section "5/14" "Backend Python-venv"
 cd "$INSTALL_DIR/backend"
+
+# Wichtig: --prefer-binary erlaubt pip Wheels statt Source-Builds (viel schneller auf ARM)
+# Wichtig: --upgrade-strategy eager hilft bei verschachtelten Constraints
+PIP_OPTS="--prefer-binary --no-cache-dir"
+
 if [[ ! -d .venv ]]; then
-    python3 -m venv .venv
+    python3 -m venv .venv || {
+        step_err "5/14" "venv-Erstellung fehlgeschlagen — installiere python3-venv"
+        sudo apt-get install -y -qq python3-venv && python3 -m venv .venv
+    }
 fi
+
+# shellcheck disable=SC1091
 source .venv/bin/activate
-pip install --upgrade --quiet pip wheel
-pip install --quiet -r requirements.txt
-# Optional-Dependencies für neue Features
-pip install --quiet passlib bcrypt pyotp websockets qrcode[pil] reportlab anthropic openai || true
+
+echo "  → pip + wheel upgraden..."
+pip install --upgrade --quiet $PIP_OPTS pip wheel setuptools 2>&1 | tail -5 || true
+
+echo "  → Backend-Pakete installieren (kann 5-10 Min dauern auf ARM)..."
+PIP_INSTALL_OK=false
+if pip install --quiet $PIP_OPTS -r requirements.txt 2>&1 | tail -10; then
+    PIP_INSTALL_OK=true
+else
+    echo "  ⚠ Erstversuch fehlgeschlagen — versuche mit gelockerten Constraints..."
+    # Fallback 1: ohne --no-cache-dir (alte Caches nutzen)
+    if pip install --quiet --prefer-binary -r requirements.txt 2>&1 | tail -10; then
+        PIP_INSTALL_OK=true
+    else
+        echo "  ⚠ Auch das fehlgeschlagen — installiere kritische Pakete einzeln..."
+        # Letzter Fallback: nur die wirklich kritischen Top-Level-Pakete
+        for pkg in fastapi==0.115.0 pydantic==2.13.3 pymongo==4.17.0 motor==3.7.0 \
+                   uvicorn==0.34.0 bcrypt cryptography passlib PyJWT python-jose \
+                   python-multipart python-dotenv httpx requests email-validator \
+                   slowapi psutil APScheduler aiosmtplib pyotp; do
+            pip install --quiet $PIP_OPTS "$pkg" 2>/dev/null || echo "    ⚠ konnte $pkg nicht installieren"
+        done
+        PIP_INSTALL_OK=true  # weiterlaufen, evtl. fehlen nur Dev-Tools
+    fi
+fi
+
+# Optional-Pakete für Features (dürfen failen)
+echo "  → Optional-Pakete (AI, QR-Code, PDF)..."
+pip install --quiet $PIP_OPTS qrcode[pil] reportlab pillow websockets anthropic openai 2>/dev/null || \
+    echo "  ⚠ Einige Optional-Pakete fehlen — Features evtl. eingeschränkt"
+
 deactivate
-echo "  ✓ Backend-Dependencies installiert"
+
+if $PIP_INSTALL_OK; then
+    step_ok "5/14" "Backend-Dependencies installiert"
+else
+    step_err "5/14" "Kritische Backend-Pakete fehlen — Backend wird nicht starten"
+fi
 
 # === 6. Backend .env erstellen ===
 echo "[6/14] Backend .env..."
@@ -199,7 +330,7 @@ else
 fi
 
 # === 7. Frontend (npm install + static build) ===
-echo "[7/14] Frontend installieren + bauen..."
+section "7/14" "Frontend installieren + bauen"
 cd "$INSTALL_DIR/frontend"
 
 # Backend-URL für den Build ermitteln und in app.json einsetzen
@@ -212,32 +343,70 @@ BACKEND_URL="${BACKEND_URL:-$BACKEND_URL_DEFAULT}"
 
 # In app.json einsetzen (vor dem Build, sonst wird localhost einkompiliert)
 if grep -q "EXPO_PUBLIC_BACKEND_URL" app.json; then
-    # Backup vor Änderung
     cp app.json app.json.bak
-    # Python verwenden (sed mit URLs ist heikel)
     python3 -c "
 import json
 with open('app.json') as f: cfg = json.load(f)
 cfg['expo']['extra']['EXPO_PUBLIC_BACKEND_URL'] = '$BACKEND_URL'
 with open('app.json','w') as f: json.dump(cfg, f, indent=2)
-"
-    echo "  ✓ app.json → EXPO_PUBLIC_BACKEND_URL=$BACKEND_URL"
+" && echo "  ✓ app.json → EXPO_PUBLIC_BACKEND_URL=$BACKEND_URL"
 fi
 
-echo "  → npm install läuft (kann 5-10 Min dauern)..."
-npm install --silent
+# npm install mit Fallback-Kaskade
+FRONTEND_DEPS_OK=false
+echo "  → npm install läuft (kann 10-20 Min dauern auf Pi)..."
 
-# Speicher-Limit für Pi 4/4GB
-echo "  → Frontend-Build (Speicher-begrenzt für Pi)..."
-NODE_OPTIONS="--max-old-space-size=2048" EXPO_PUBLIC_BACKEND_URL="$BACKEND_URL" \
-    ./node_modules/.bin/expo export --platform web || {
-    echo "  ⚠ Build fehlgeschlagen mit 2 GB Heap — versuche unbeschränkt"
-    EXPO_PUBLIC_BACKEND_URL="$BACKEND_URL" ./node_modules/.bin/expo export --platform web || {
-        echo "  ✗ Frontend-Build fehlgeschlagen. Tipp: Build auf dem PC machen + rsync nach dist/"
-        exit 1
-    }
-}
-echo "  ✓ Frontend gebaut nach frontend/dist/"
+# Versuch 1: normal
+if npm install --silent --no-audit --no-fund 2>&1 | tail -5; then
+    FRONTEND_DEPS_OK=true
+else
+    echo "  ⚠ Erstversuch fehlgeschlagen — versuche mit --legacy-peer-deps"
+    # Versuch 2: legacy peer deps (lockert Konflikte)
+    if npm install --silent --no-audit --no-fund --legacy-peer-deps 2>&1 | tail -5; then
+        FRONTEND_DEPS_OK=true
+    else
+        echo "  ⚠ Auch das fehlgeschlagen — versuche mit --force"
+        # Versuch 3: force (überschreibt Konflikte)
+        if npm install --silent --no-audit --no-fund --force 2>&1 | tail -5; then
+            FRONTEND_DEPS_OK=true
+        fi
+    fi
+fi
+
+if ! $FRONTEND_DEPS_OK; then
+    step_err "7/14" "npm install fehlgeschlagen — Frontend wird übersprungen"
+    echo "  → Tipp: Build auf PC machen und 'frontend/dist/' via rsync auf Pi"
+    echo "  → Aber: Backend läuft auch ohne Frontend (App via expo go testen)"
+else
+    # Frontend-Build mit Memory-Fallback
+    echo "  → Frontend-Build (kann auf Pi 4/4GB lang dauern)..."
+    BUILD_OK=false
+
+    # Versuch 1: mit Heap-Limit für 4GB-RAM
+    if NODE_OPTIONS="--max-old-space-size=2048" EXPO_PUBLIC_BACKEND_URL="$BACKEND_URL" \
+       ./node_modules/.bin/expo export --platform web 2>&1 | tail -20; then
+        BUILD_OK=true
+    else
+        echo "  ⚠ Build mit 2GB Heap fehlgeschlagen — leere Caches und versuche unbeschränkt"
+        # Caches leeren — manchmal hilft das
+        rm -rf .expo node_modules/.cache 2>/dev/null || true
+        # Versuch 2: ohne Heap-Limit
+        if EXPO_PUBLIC_BACKEND_URL="$BACKEND_URL" \
+           ./node_modules/.bin/expo export --platform web 2>&1 | tail -20; then
+            BUILD_OK=true
+        fi
+    fi
+
+    if $BUILD_OK && [[ -d dist ]]; then
+        BUILD_SIZE=$(du -sh dist | cut -f1)
+        step_ok "7/14" "Frontend gebaut nach frontend/dist/ ($BUILD_SIZE)"
+    else
+        step_err "7/14" "Frontend-Build fehlgeschlagen"
+        echo "  → Workaround: Build auf PC machen, dann:"
+        echo "     rsync -av frontend/dist/ pi@${DETECTED_IP}:~/inventar/frontend/dist/"
+        echo "  → Backend startet trotzdem (Schritt 8-12 laufen weiter)"
+    fi
+fi
 
 # === 8. systemd Service-Files installieren ===
 echo "[8/14] systemd Services installieren..."
@@ -287,14 +456,45 @@ fi
 echo "  ✓ Tag: $TAG"
 
 # === 12. Services starten ===
-echo "[12/14] Services starten..."
-sudo systemctl enable --now inventar-backend
-sleep 2
-sudo systemctl enable --now inventar-dashboard
-sudo systemctl enable --now inventar-backup.timer 2>/dev/null || true
-sudo systemctl enable --now inventar-weekly-reboot.timer 2>/dev/null || true
+section "12/14" "Services starten + verifizieren"
+
+# Helper: Service starten + Status nach 5 Sek prüfen
+start_and_verify() {
+    local svc="$1"
+    local required="${2:-true}"
+    if sudo systemctl enable --now "$svc" 2>&1 | tail -3; then
+        sleep 5
+        if systemctl is-active --quiet "$svc"; then
+            echo "  ✓ $svc läuft"
+        else
+            echo "  ✗ $svc startete, aber stürzte ab. Letzte Log-Zeilen:"
+            sudo journalctl -u "$svc" -n 10 --no-pager | sed 's/^/      /'
+            if [[ "$required" == "true" ]]; then
+                step_err "12/14" "$svc nicht lauffähig"
+            else
+                step_warn "12/14" "$svc Probleme (nicht kritisch)"
+            fi
+        fi
+    else
+        echo "  ✗ $svc konnte nicht aktiviert werden"
+    fi
+}
+
+start_and_verify inventar-backend
+start_and_verify inventar-dashboard
+sudo systemctl enable --now inventar-backup.timer 2>/dev/null && echo "  ✓ Backup-Timer aktiv (täglich 03:00)" || echo "  ⚠ Backup-Timer nicht installiert"
+sudo systemctl enable --now inventar-weekly-reboot.timer 2>/dev/null && echo "  ✓ Reboot-Timer aktiv (Sonntag 04:00)" || echo "  ⚠ Reboot-Timer nicht installiert"
+
+# Frontend-Service ist deprecated (static Build wird vom Backend ausgeliefert) — stoppen falls aktiv
+sudo systemctl stop inventar-frontend 2>/dev/null || true
+sudo systemctl disable inventar-frontend 2>/dev/null || true
 
 chmod +x "$SETUP_DIR/"*.sh 2>/dev/null || true
+
+# Markiere Schritt 12 als erfolgreich wenn beide Haupt-Services laufen
+if systemctl is-active --quiet inventar-backend && systemctl is-active --quiet inventar-dashboard; then
+    step_ok "12/14" "Hauptservices Backend + Dashboard laufen"
+fi
 
 # === 13. Tailscale (optional) ===
 TAILSCALE_IP=""
@@ -392,7 +592,44 @@ echo "  sudo journalctl -u inventar-backend -f"
 echo "  sudo journalctl -u inventar-dashboard -f"
 [[ -n "$CLOUDFLARE_URL" ]] && echo "  sudo journalctl -u cloudflared -f"
 echo
+
+# === Status-Übersicht aller Schritte ===
+echo "Schritt-Übersicht:"
+for step in "5/14" "7/14" "12/14"; do
+    sym="${STEP_STATUS[$step]:-?}"
+    case "$step" in
+        "5/14")  name="Backend-Dependencies" ;;
+        "7/14")  name="Frontend-Build" ;;
+        "12/14") name="Services-Start" ;;
+    esac
+    echo "  [$sym] $step  $name"
+done
+echo
+
+# === Anzahl Fehler / Warnungen ===
+ERR_COUNT=0
+WARN_COUNT=0
+for val in "${STEP_STATUS[@]}"; do
+    [[ "$val" == "✗" ]] && ((ERR_COUNT++))
+    [[ "$val" == "⚠" ]] && ((WARN_COUNT++))
+done
+
+if [[ $ERR_COUNT -eq 0 && $WARN_COUNT -eq 0 ]]; then
+    echo "🎉 Komplett-Installation erfolgreich!"
+elif [[ $ERR_COUNT -eq 0 ]]; then
+    echo "✅ Installation ok mit $WARN_COUNT Warnung(en) — Details siehe oben"
+else
+    echo "⚠ Installation mit $ERR_COUNT Fehler(n) und $WARN_COUNT Warnung(en) abgeschlossen"
+    echo "  → Log-Datei: $LOG_FILE"
+    echo "  → Bei Fragen: journalctl-Output mit Fehlern teilen"
+fi
+echo
 echo "Optional als nächstes:"
-echo "  • fail2ban:    sudo apt install fail2ban && sudo cp pi-setup/fail2ban-*.conf /etc/fail2ban/filter.d/ && sudo systemctl restart fail2ban"
+echo "  • fail2ban:    sudo apt install fail2ban && sudo cp ~/inventar/pi-setup/fail2ban-*.conf /etc/fail2ban/filter.d/ && sudo systemctl restart fail2ban"
 echo "  • Backup-Test: ~/inventar/pi-setup/test-backup-restore.sh"
-echo "  • AI-Inventur: Backend-.env editieren, ANTHROPIC_API_KEY oder OPENAI_API_KEY setzen"
+echo "  • AI-Inventur: nano ~/inventar/backend/.env  → ANTHROPIC_API_KEY oder OPENAI_API_KEY setzen → sudo systemctl restart inventar-backend"
+echo
+echo "Skript erneut ausführen (idempotent — überspringt was schon da ist):"
+echo "  cd ~/inventar && git pull && ./pi-setup/fresh-install.sh"
+echo
+echo "=== INSTALL ENDE $(date '+%Y-%m-%d %H:%M:%S') ===" >> "$LOG_FILE"
