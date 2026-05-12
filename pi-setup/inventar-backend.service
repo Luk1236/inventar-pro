@@ -1,9 +1,8 @@
 [Unit]
 Description=Inventar Pro Backend (FastAPI)
-After=network.target mongod.service
-Requires=mongod.service
-StartLimitIntervalSec=300
-StartLimitBurst=5
+After=network-online.target mongod.service
+Wants=network-online.target mongod.service
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
@@ -11,8 +10,8 @@ User=admin
 WorkingDirectory=/home/admin/inventar/backend
 Environment=PATH=/home/admin/inventar/backend/.venv/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=/home/admin/inventar/backend/.venv/bin/python3 server.py
-Restart=on-failure
-RestartSec=10
+Restart=always
+RestartSec=5
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=inventar-backend
@@ -20,8 +19,6 @@ ProtectSystem=full
 NoNewPrivileges=yes
 PrivateTmp=yes
 RestrictRealtime=yes
-# ProtectHome muss deaktiviert sein damit Backend in ~/inventar/ schreiben kann
-# (Logs, Backups, ggf. Uploads). Pfad ist via WorkingDirectory beschränkt.
 
 [Install]
 WantedBy=multi-user.target
