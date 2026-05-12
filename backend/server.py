@@ -1,3 +1,15 @@
+# bcrypt 5.0+ Kompatibilität für passlib 1.7.4
+# passlib versucht bcrypt.__about__.__version__ zu lesen, das es ab bcrypt 4.1 nicht mehr gibt.
+# Workaround: Shim-Klasse mit __version__ Attribut.
+try:
+    import bcrypt as _bcrypt
+    if not hasattr(_bcrypt, "__about__"):
+        class _BcryptAboutShim:
+            __version__ = getattr(_bcrypt, "__version__", "5.0.0")
+        _bcrypt.__about__ = _BcryptAboutShim
+except ImportError:
+    pass
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, Response, Query, Request
 from fastapi.responses import JSONResponse

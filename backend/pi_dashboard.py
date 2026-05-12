@@ -3,6 +3,16 @@
 Inventar Pro — Pi Web-Dashboard
 Port: 8080  |  http://PI-IP:8080
 """
+# bcrypt 5.0+ Kompatibilität für passlib 1.7.4 (passlib liest bcrypt.__about__.__version__)
+try:
+    import bcrypt as _bcrypt
+    if not hasattr(_bcrypt, "__about__"):
+        class _BcryptAboutShim:
+            __version__ = getattr(_bcrypt, "__version__", "5.0.0")
+        _bcrypt.__about__ = _BcryptAboutShim
+except ImportError:
+    pass
+
 import subprocess, os, time, threading, secrets, shlex, logging, json, smtplib
 from email.mime.text import MIMEText
 from fastapi import FastAPI, BackgroundTasks, Body, Request, Cookie
