@@ -8,8 +8,16 @@ BACKUP_ROOT="${HOME}/inventar-backup"
 DATE=$(date +%Y%m%d_%H%M%S)
 DEST="${BACKUP_ROOT}/${DATE}"
 
+# DB-Name aus .env lesen (Fallback: inventar)
+ENV_FILE="${HOME}/inventar/backend/.env"
+DB_NAME="inventar"
+if [[ -f "$ENV_FILE" ]]; then
+  _db=$(grep -E '^DB_NAME=' "$ENV_FILE" | cut -d= -f2 | tr -d '[:space:]')
+  [[ -n "$_db" ]] && DB_NAME="$_db"
+fi
+
 mkdir -p "${DEST}"
-mongodump --db inventory_db --out "${DEST}" --quiet
+mongodump --db "${DB_NAME}" --out "${DEST}" --quiet
 
 # Komprimieren
 tar -czf "${DEST}.tar.gz" -C "${BACKUP_ROOT}" "${DATE}"

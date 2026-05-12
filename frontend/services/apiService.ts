@@ -253,8 +253,12 @@ class ApiService {
       if (response.status === 401 && !skipAuth) {
         if (!this.isRefreshing) {
           this.isRefreshing = true;
-          const newToken = await this.refreshAccessToken();
-          this.isRefreshing = false;
+          let newToken: string | null = null;
+          try {
+            newToken = await this.refreshAccessToken();
+          } finally {
+            this.isRefreshing = false;
+          }
 
           if (newToken) {
             return this._doRequest<T>(endpoint, options, config);

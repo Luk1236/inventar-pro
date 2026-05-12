@@ -970,7 +970,7 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest):
             except Exception as e:
                 logging.error("Passwort-Reset E-Mail konnte nicht gesendet werden: %s", e)
         else:
-            logging.info("[RESET] Token für %s: %s", body.email, token)
+            logging.info("[RESET] Token generiert für %s (SMTP nicht konfiguriert)", body.email)
     return {"message": "Falls ein Konto mit dieser E-Mail existiert, wurde ein Reset-Link gesendet."}
 
 @api_router.post("/auth/reset-password")

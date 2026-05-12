@@ -46,10 +46,10 @@ ok "npm-Pakete aktuell"
 
 # ── Services neu starten ──────────────────────────────────────
 info "Services neu starten ..."
-sudo systemctl restart inventar-backend inventar-frontend
+sudo systemctl restart inventar-backend
+sudo systemctl restart inventar-dashboard 2>/dev/null || true
 ok "Services gestartet"
 
 echo ""
 sudo systemctl status inventar-backend --no-pager -l | tail -3
-sudo systemctl status inventar-frontend --no-pager -l | tail -3
 echo -e "\n${GREEN}  ✓ Update abgeschlossen!${NC}"
