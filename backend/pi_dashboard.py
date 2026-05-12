@@ -180,7 +180,12 @@ def _verify_totp(code: str) -> bool:
     except Exception:
         return False
 
-SERVICES     = ["inventar-backend", "mongod"]
+SERVICES     = ["inventar-backend", "mongod", "inventar-dashboard"]
+SERVICE_PORTS = {
+    "inventar-backend": 8002,
+    "mongod": 27017,
+    "inventar-dashboard": 8080,
+}
 INSTALL      = os.path.expanduser("~/inventar")
 VERSION_FILE = os.path.join(INSTALL, "VERSION")
 UPDATE_SH    = os.path.join(INSTALL, "pi-setup", "update.sh")
@@ -403,9 +408,24 @@ def check_update():
 
 @app.get("/api/status")
 def status():
-    result = {s: _svc_status(s) for s in SERVICES}
+    _, local_ip_raw = _run(["hostname", "-I"])
+    local_ip = local_ip_raw.split()[0] if local_ip_raw.split() else "localhost"
+    result = {}
+    for s in SERVICES:
+        port = SERVICE_PORTS.get(s)
+        result[s] = {
+            "status": _svc_status(s),
+            "ip": local_ip,
+            "port": port,
+            "url": f"http://{local_ip}:{port}" if port else None,
+        }
     dist_dir = os.path.join(INSTALL, "frontend", "dist")
-    result["frontend-build"] = "running" if os.path.isdir(dist_dir) else "stopped"
+    result["frontend-build"] = {
+        "status": "running" if os.path.isdir(dist_dir) else "stopped",
+        "ip": local_ip,
+        "port": 8002,
+        "url": f"http://{local_ip}:8002",
+    }
     return result
 
 @app.get("/api/backend-health")
@@ -423,9 +443,12 @@ def backend_health():
 def svc_action(svc: str, action: str, request: Request):
     if not _check_auth(request):
         return JSONResponse({"ok": False, "msg": "Nicht angemeldet"}, 401)
-    if svc not in SERVICES or action not in ("start", "stop", "restart"):
+    allowed_svcs = SERVICES + ["frontend-build"]
+    if svc not in allowed_svcs or action not in ("start", "stop", "restart"):
         return JSONResponse({"ok": False, "msg": "Ungültig"}, 400)
-    rc, out = _run(["sudo", "systemctl", action, svc])
+    # frontend-build hat keinen eigenen Service — Backend-Neustart reicht
+    real_svc = "inventar-backend" if svc == "frontend-build" else svc
+    rc, out = _run(["sudo", "systemctl", action, real_svc])
     _audit("svc_action", ip=request.client.host if request.client else "?", svc=svc, action=action, ok=rc == 0)
     return {"ok": rc == 0, "msg": out or "OK"}
 
@@ -1014,7 +1037,7 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script>
 let logSvc='inventar-backend';
-const SVC_LABELS={'inventar-backend':'Backend','frontend-build':'Frontend (Build)','mongod':'MongoDB'};
+const SVC_LABELS={'inventar-backend':'Backend','frontend-build':'Frontend (Build)','mongod':'MongoDB','inventar-dashboard':'Dashboard'};
 let _pollPaused=false;
 let _pendingTotpSecret=null;
 
@@ -1109,16 +1132,27 @@ function renderSparkline(data,width=120,height=24){
 async function refreshStatus(){
   const d=await api('/api/status');if(!d)return;
   const el=document.getElementById('svc-list');
-  el.innerHTML=Object.entries(d).map(([s,st])=>`
-    <div class="svc">
+  el.innerHTML=Object.entries(d).map(([s,info])=>{
+    const st=typeof info==='object'?info.status:info;
+    const url=typeof info==='object'?info.url:null;
+    const port=typeof info==='object'?info.port:null;
+    const isBuild=s==='frontend-build';
+    const statusTxt=isBuild?(st==='running'?'vorhanden':'fehlt'):st;
+    const urlHtml=url?`<a href="${url}" target="_blank" style="font-size:10px;color:#58a6ff;text-decoration:none" title="Öffnen">${url}</a>`:'';
+    return `<div class="svc">
       <div class="dot ${st}"></div>
-      <div class="svc-name">${SVC_LABELS[s]||s}<br><span style="font-size:10px;color:#8b949e">${s==='frontend-build'?(st==='running'?'vorhanden':'fehlt'):st}</span></div>
-      ${s!=='frontend-build'?`<div class="svc-btns">
+      <div class="svc-name" style="flex:1">
+        ${SVC_LABELS[s]||s}
+        <span style="font-size:10px;color:#8b949e;margin-left:4px">${statusTxt}</span><br>
+        ${urlHtml}
+      </div>
+      <div class="svc-btns">
         <button class="btn btn-green" title="Starten" onclick="svcAct('${s}','start')">▶</button>
         <button class="btn btn-red" title="Stoppen" onclick="svcAct('${s}','stop')">■</button>
         <button class="btn btn-blue" title="Neustart" onclick="svcAct('${s}','restart')">↺</button>
-      </div>`:''}
-    </div>`).join('');
+      </div>
+    </div>`;
+  }).join('');
 }
 
 async function svcAct(svc,action){
