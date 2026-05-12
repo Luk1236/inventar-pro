@@ -620,15 +620,6 @@ def backup(request: Request, bg: BackgroundTasks):
 def backup_log():
     return {"running": _backing_up, "lines": _backup_log[-200:], "last": _last_backup}
 
-@app.post("/api/expo-clear")
-def expo_clear(request: Request):
-    if not _check_auth(request):
-        return JSONResponse({"ok": False, "msg": "Nicht angemeldet"}, 401)
-    rc, out = _run(["bash", "-c", f"cd {INSTALL}/frontend && npx expo export --platform web"], timeout=120)
-    if rc == 0:
-        _run(["sudo", "systemctl", "restart", "inventar-backend"])
-        return {"ok": True, "msg": "Frontend neu gebaut und Backend neugestartet"}
-    return {"ok": False, "msg": out}
 
 @app.post("/api/update")
 def update(request: Request, bg: BackgroundTasks):
@@ -1195,12 +1186,6 @@ function setLogSvc(svc,btn){
 }
 
 function openUrl(url){window.open(url,'_blank')}
-
-async function expoCache(){
-  const r=await apiPost('/api/expo-clear');
-  toast(r.ok?r.msg:r.msg,!r.ok);
-  setTimeout(refreshStatus,2000);
-}
 
 function _startTask(btn,label,logEl){
   btn.disabled=true;btn.innerHTML=`<span class="spinner"></span> ${label}`;
