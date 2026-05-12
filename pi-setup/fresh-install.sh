@@ -298,15 +298,38 @@ fi
 
 # === 6. Backend .env erstellen ===
 echo "[6/14] Backend .env..."
-if [[ ! -f "$INSTALL_DIR/backend/.env" ]]; then
-    SECRET_KEY=$(python3 -c "import secrets;print(secrets.token_urlsafe(32))")
-    cat > "$INSTALL_DIR/backend/.env" <<EOF
+ENV_FILE="$INSTALL_DIR/backend/.env"
+
+# Helper: Variable in .env hinzufügen falls nicht da
+ensure_env_var() {
+    local key="$1"
+    local value="$2"
+    if ! grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
+        echo "${key}=${value}" >> "$ENV_FILE"
+        echo "  + ${key} hinzugefügt"
+    fi
+}
+
+# Zufalls-Generator (Python für sichere Tokens)
+gen_secret() {
+    python3 -c "import secrets;print(secrets.token_urlsafe(${1:-32}))"
+}
+
+if [[ ! -f "$ENV_FILE" ]]; then
+    SECRET_KEY=$(gen_secret 32)
+    ADMIN_PASSWORD=$(gen_secret 24)
+    cat > "$ENV_FILE" <<EOF
 # Auto-generiert beim Fresh-Install
 SECRET_KEY=${SECRET_KEY}
 MONGO_URL=mongodb://localhost:27017
 DB_NAME=inventar
 ALLOWED_ORIGINS=http://localhost:8002,http://${PI_USER}:8002
 ENVIRONMENT=production
+
+# Initialer Admin-Account (wird beim ersten Start angelegt)
+ADMIN_USERNAME=admin
+ADMIN_EMAIL=admin@local.invalid
+ADMIN_PASSWORD=${ADMIN_PASSWORD}
 
 # Optional: für AI-Inventur (ChatGPT/Claude Vision)
 # ANTHROPIC_API_KEY=
@@ -323,10 +346,56 @@ ENVIRONMENT=production
 # LABEL_PRINTER_HOST=
 # LABEL_PRINTER_PORT=9100
 EOF
-    chmod 600 "$INSTALL_DIR/backend/.env"
-    echo "  ✓ .env erstellt (SECRET_KEY zufällig generiert)"
+    chmod 600 "$ENV_FILE"
+    echo "  ✓ .env erstellt mit zufälligem SECRET_KEY + ADMIN_PASSWORD"
+    echo ""
+    echo "  ⚠ ADMIN-Zugangsdaten (UNBEDINGT NOTIEREN!):"
+    echo "     Username: admin"
+    echo "     Passwort: $ADMIN_PASSWORD"
+    echo ""
+    # Auch ins Install-Log schreiben für späteres Nachschauen
+    {
+        echo ""
+        echo "=== ADMIN-Zugangsdaten ==="
+        echo "Username: admin"
+        echo "Passwort: $ADMIN_PASSWORD"
+        echo ""
+    } >> "$LOG_FILE"
 else
-    echo "  ✓ .env existiert bereits"
+    echo "  ℹ .env existiert bereits — prüfe ob alle benötigten Felder da sind"
+    # Fehlende kritische Felder ergänzen
+    grep -q "^SECRET_KEY=" "$ENV_FILE" || ensure_env_var "SECRET_KEY" "$(gen_secret 32)"
+    grep -q "^MONGO_URL=" "$ENV_FILE" || ensure_env_var "MONGO_URL" "mongodb://localhost:27017"
+    grep -q "^DB_NAME=" "$ENV_FILE" || ensure_env_var "DB_NAME" "inventar"
+    grep -q "^ENVIRONMENT=" "$ENV_FILE" || ensure_env_var "ENVIRONMENT" "production"
+    grep -q "^ADMIN_USERNAME=" "$ENV_FILE" || ensure_env_var "ADMIN_USERNAME" "admin"
+    grep -q "^ADMIN_EMAIL=" "$ENV_FILE" || ensure_env_var "ADMIN_EMAIL" "admin@local.invalid"
+
+    # ADMIN_PASSWORD nur ergänzen wenn fehlt oder zu schwach (< 12 Zeichen)
+    CURRENT_PW=$(grep "^ADMIN_PASSWORD=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2-)
+    if [[ -z "$CURRENT_PW" ]] || [[ ${#CURRENT_PW} -lt 12 ]]; then
+        NEW_PW=$(gen_secret 24)
+        if [[ -z "$CURRENT_PW" ]]; then
+            echo "ADMIN_PASSWORD=${NEW_PW}" >> "$ENV_FILE"
+        else
+            sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=${NEW_PW}|" "$ENV_FILE"
+        fi
+        echo "  + ADMIN_PASSWORD neu generiert (war fehlend/zu schwach)"
+        echo ""
+        echo "  ⚠ NEUE ADMIN-Zugangsdaten (UNBEDINGT NOTIEREN!):"
+        echo "     Username: admin"
+        echo "     Passwort: $NEW_PW"
+        echo ""
+        {
+            echo ""
+            echo "=== ADMIN-Zugangsdaten (neu generiert $(date)) ==="
+            echo "Username: admin"
+            echo "Passwort: $NEW_PW"
+            echo ""
+        } >> "$LOG_FILE"
+    fi
+    chmod 600 "$ENV_FILE"
+    echo "  ✓ .env vollständig"
 fi
 
 # === 7. Frontend (npm install + static build) ===
