@@ -1,15 +1,3 @@
-# bcrypt 5.0+ Kompatibilität für passlib 1.7.4
-# passlib versucht bcrypt.__about__.__version__ zu lesen, das es ab bcrypt 4.1 nicht mehr gibt.
-# Workaround: Shim-Klasse mit __version__ Attribut.
-try:
-    import bcrypt as _bcrypt
-    if not hasattr(_bcrypt, "__about__"):
-        class _BcryptAboutShim:
-            __version__ = getattr(_bcrypt, "__version__", "5.0.0")
-        _bcrypt.__about__ = _BcryptAboutShim
-except ImportError:
-    pass
-
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, Response, Query, Request
 from fastapi.responses import JSONResponse
@@ -20,7 +8,6 @@ from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr, field_validator
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta, timezone
-from passlib.context import CryptContext
 from jose import JWTError, jwt
 from uuid import UUID
 import os
@@ -86,7 +73,37 @@ ROOT_DIR = Path(__file__).parent
 # Rate Limiter - Protects against brute force and DoS
 limiter = Limiter(key_func=get_remote_address)
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Direkte bcrypt-Nutzung statt passlib.CryptContext.
+# Grund: passlib 1.7.4 inkompatibel mit bcrypt 5.0+ (kein __about__ Attribut,
+# strikteres 72-byte limit beim wrap-bug-detection Test).
+# Diese Wrapper-Klasse bietet die gleiche API (.hash() + .verify()) wie passlib.
+import bcrypt as _bcrypt_module
+
+class _BcryptDirectContext:
+    """Drop-in replacement for passlib's CryptContext — robust against bcrypt 5.0+."""
+
+    @staticmethod
+    def _to_bytes(s) -> bytes:
+        if isinstance(s, bytes):
+            return s[:72]
+        return s.encode('utf-8')[:72]  # bcrypt limit von 72 bytes
+
+    def hash(self, password) -> str:
+        return _bcrypt_module.hashpw(
+            self._to_bytes(password),
+            _bcrypt_module.gensalt(12)
+        ).decode('utf-8')
+
+    def verify(self, plain, hashed) -> bool:
+        if not plain or not hashed:
+            return False
+        try:
+            hashed_bytes = hashed.encode('utf-8') if isinstance(hashed, str) else hashed
+            return _bcrypt_module.checkpw(self._to_bytes(plain), hashed_bytes)
+        except (ValueError, TypeError):
+            return False
+
+pwd_context = _BcryptDirectContext()
 
 # Settings are loaded + validated in app.config (imported above). The names
 # below are module-level aliases kept for backward compatibility with the rest

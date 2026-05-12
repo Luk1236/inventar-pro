@@ -3,22 +3,45 @@
 Inventar Pro — Pi Web-Dashboard
 Port: 8080  |  http://PI-IP:8080
 """
-# bcrypt 5.0+ Kompatibilität für passlib 1.7.4 (passlib liest bcrypt.__about__.__version__)
-try:
-    import bcrypt as _bcrypt
-    if not hasattr(_bcrypt, "__about__"):
-        class _BcryptAboutShim:
-            __version__ = getattr(_bcrypt, "__version__", "5.0.0")
-        _bcrypt.__about__ = _BcryptAboutShim
-except ImportError:
-    pass
-
 import subprocess, os, time, threading, secrets, shlex, logging, json, smtplib
 from email.mime.text import MIMEText
 from fastapi import FastAPI, BackgroundTasks, Body, Request, Cookie
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
-from passlib.context import CryptContext
+
+# Direkte bcrypt-Nutzung statt passlib (passlib 1.7.4 ist inkompatibel mit bcrypt 5.0+)
+import bcrypt as _bcrypt_module
+
+class _BcryptDirectContext:
+    """Drop-in replacement for passlib's CryptContext — robust against bcrypt 5.0+."""
+
+    @staticmethod
+    def _to_bytes(s) -> bytes:
+        if isinstance(s, bytes):
+            return s[:72]
+        return s.encode('utf-8')[:72]
+
+    def hash(self, password) -> str:
+        return _bcrypt_module.hashpw(
+            self._to_bytes(password),
+            _bcrypt_module.gensalt(12)
+        ).decode('utf-8')
+
+    def verify(self, plain, hashed) -> bool:
+        if not plain or not hashed:
+            return False
+        try:
+            hashed_bytes = hashed.encode('utf-8') if isinstance(hashed, str) else hashed
+            return _bcrypt_module.checkpw(self._to_bytes(plain), hashed_bytes)
+        except (ValueError, TypeError):
+            return False
+
+class CryptContext:  # noqa: F811 — Compat-Klasse, ersetzt passlib.CryptContext
+    """passlib.CryptContext Drop-in für bcrypt — ignoriert Schemes-Argument."""
+    def __init__(self, *_args, **_kwargs):
+        self._ctx = _BcryptDirectContext()
+    def hash(self, p): return self._ctx.hash(p)
+    def verify(self, p, h): return self._ctx.verify(p, h)
 import uvicorn, psutil
 
 logger = logging.getLogger("dashboard")
