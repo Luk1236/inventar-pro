@@ -8480,6 +8480,7 @@ async def get_public_quote(request: Request, token: str):
 
 # ── Einladungen: öffentlicher RSVP-Endpunkt (KEIN Auth) ───────────────────────
 @app.put("/api/invitations/public/{token}/respond")
+@limiter.limit("10/minute")
 async def respond_to_invitation(token: str, body: dict, request: Request):
     # M2: Basic CSRF protection — verify Origin header is from a known origin
     origin = request.headers.get("Origin") or request.headers.get("Referer", "")
