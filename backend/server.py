@@ -8687,8 +8687,8 @@ async def delete_absence_request(req_id: str, current_user: dict = Depends(get_c
     existing = await db.absence_requests.find_one({"_id": req_id})
     if not existing:
         raise HTTPException(status_code=404, detail="Antrag nicht gefunden")
-    user_id = str(current_user.get("id") or current_user.get("_id", ""))
-    is_admin = current_user.get("role") in ("admin", "manager")
+    user_id = str(current_user.id)
+    is_admin = current_user.role in ("admin", "manager")
     if not is_admin and existing.get("user_id") != user_id:
         raise HTTPException(status_code=403, detail="Kein Zugriff auf diesen Antrag")
     await db.absence_requests.delete_one({"_id": req_id})
