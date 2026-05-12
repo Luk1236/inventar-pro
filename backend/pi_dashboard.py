@@ -661,7 +661,7 @@ def _do_rollback(tag: str):
     try:
         _update_log.append(f"=== Rollback auf {tag} ===")
         cmd = ["bash", "-c",
-               f"cd {INSTALL} && git fetch --tags && git checkout {tag} && "
+               f"cd {INSTALL} && git stash && git fetch --tags && git checkout {tag} && "
                f"source backend/.venv/bin/activate && "
                f"pip install --quiet --prefer-binary -r backend/requirements.txt && "
                f"cd frontend && npm install --silent && "
@@ -753,7 +753,7 @@ def _do_update():
     try:
         _update_log.append("=== Update gestartet ===")
         cmd = ["bash", "-c",
-               f"cd {INSTALL} && git pull && "
+               f"cd {INSTALL} && git stash && git pull && git stash pop; "
                f"source backend/.venv/bin/activate && "
                f"pip install --quiet --prefer-binary -r backend/requirements.txt && "
                f"cd frontend && npm install --silent && "
