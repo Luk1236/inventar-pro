@@ -1240,31 +1240,38 @@ async def get_operating_hours_alerts(
     current_user: User = Depends(get_current_user)
 ):
     """Get articles approaching or exceeding max operating hours"""
-    articles = await db.articles.find({
-        "max_operating_hours": {"$gt": 0}
-    }).to_list(1000)
-    
-    alerts = []
-    for article in articles:
-        current = article.get("operating_hours", 0) or 0
-        max_hours = article.get("max_operating_hours", 0) or 0
-        
-        if max_hours > 0:
-            percentage = (current / max_hours) * 100
-            if percentage >= threshold_percent:
-                alerts.append({
-                    "article_id": article["id"],
-                    "article_name": article["name"],
-                    "inventory_code": article.get("inventory_code", ""),
-                    "current_hours": current,
-                    "max_hours": max_hours,
-                    "percentage": round(percentage, 1),
-                    "hours_remaining": max(0, max_hours - current),
-                    "status": "critical" if percentage >= 100 else ("warning" if percentage >= 90 else "attention")
-                })
-    
-    # Sort by percentage (highest first)
-    alerts.sort(key=lambda x: x["percentage"], reverse=True)
+    pipeline = [
+        {"$match": {"max_operating_hours": {"$gt": 0}}},
+        {"$addFields": {
+            "operating_hours_safe": {"$ifNull": ["$operating_hours", 0]},
+            "percentage": {
+                "$multiply": [
+                    {"$divide": [{"$ifNull": ["$operating_hours", 0]}, "$max_operating_hours"]},
+                    100
+                ]
+            }
+        }},
+        {"$match": {"percentage": {"$gte": threshold_percent}}},
+        {"$addFields": {
+            "status": {"$switch": {"branches": [
+                {"case": {"$gte": ["$percentage", 100]}, "then": "critical"},
+                {"case": {"$gte": ["$percentage", 90]}, "then": "warning"}
+            ], "default": "attention"}}
+        }},
+        {"$sort": {"percentage": -1}},
+        {"$project": {
+            "article_id": "$id",
+            "article_name": "$name",
+            "inventory_code": {"$ifNull": ["$inventory_code", ""]},
+            "current_hours": "$operating_hours_safe",
+            "max_hours": "$max_operating_hours",
+            "percentage": {"$round": ["$percentage", 1]},
+            "hours_remaining": {"$max": [0, {"$subtract": ["$max_operating_hours", "$operating_hours_safe"]}]},
+            "status": 1,
+            "_id": 0
+        }}
+    ]
+    alerts = await db.articles.aggregate(pipeline).to_list(500)
     
     return {
         "total_alerts": len(alerts),
@@ -1500,7 +1507,7 @@ async def add_article_image(
 async def delete_article_image(
     article_id: UUID,
     image_index: int,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_permission(Permission.EDIT_ARTICLE))
 ):
     """Remove image at given index from article.images list."""
     article = await db.articles.find_one({"id": str(article_id)})
@@ -8677,9 +8684,14 @@ async def update_absence_request(req_id: str, req: AbsenceRequestCreate, current
 
 @app.delete("/api/absence-requests/{req_id}")
 async def delete_absence_request(req_id: str, current_user: dict = Depends(get_current_user)):
-    result = await db.absence_requests.delete_one({"_id": req_id})
-    if result.deleted_count == 0:
+    existing = await db.absence_requests.find_one({"_id": req_id})
+    if not existing:
         raise HTTPException(status_code=404, detail="Antrag nicht gefunden")
+    user_id = str(current_user.get("id") or current_user.get("_id", ""))
+    is_admin = current_user.get("role") in ("admin", "manager")
+    if not is_admin and existing.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Kein Zugriff auf diesen Antrag")
+    await db.absence_requests.delete_one({"_id": req_id})
     return {"message": "Antrag gelöscht"}
 
 # ===========================

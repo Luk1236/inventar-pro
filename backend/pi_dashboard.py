@@ -80,8 +80,10 @@ ALLOWED_SHELL_COMMANDS = {
     "git", "npm", "python3", "pip", "node",
     "mongodump", "mongorestore", "mongo", "mongosh",
     "date", "whoami", "pwd", "env", "echo", "which",
-    "docker", "tailscale", "sudo",
+    "docker", "tailscale",
 }
+# Shell-Injection-Muster die immer blockiert werden (unabhängig vom Basisbefehl)
+_SHELL_INJECTION_RE = re.compile(r'[;`]|&&|\|\||(\$\()|\bsudo\b')
 
 def _write_password_file(content: str):
     with open(DASH_PASSWORD_FILE, "w") as f:
@@ -150,6 +152,8 @@ def _check_auth(request: Request) -> bool:
 
 def _is_command_allowed(cmd: str) -> bool:
     try:
+        if _SHELL_INJECTION_RE.search(cmd):
+            return False
         tokens = shlex.split(cmd.strip())
         if not tokens:
             return False
