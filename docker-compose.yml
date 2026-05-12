@@ -39,7 +39,7 @@ services:
 
   # ── MongoDB ──────────────────────────────────────────────────────────────────
   mongodb:
-    image: mongo:8
+    image: mongo:8.0
     container_name: inventarpro-mongodb
     restart: unless-stopped
     ports:
@@ -55,12 +55,12 @@ services:
 
   # ── Redis (optionaler Cache) ─────────────────────────────────────────────────
   redis:
-    image: redis:7-alpine
+    image: redis:7.2-alpine
     container_name: inventarpro-redis
     restart: unless-stopped
     ports:
       - "6379:6379"
-    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
 

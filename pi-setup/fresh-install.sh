@@ -323,7 +323,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
 SECRET_KEY=${SECRET_KEY}
 MONGO_URL=mongodb://localhost:27017
 DB_NAME=inventar
-ALLOWED_ORIGINS=http://localhost:8002,http://${PI_USER}:8002
+ALLOWED_ORIGINS=http://localhost:8002,http://$(hostname -I | awk '{print $1}'):8002
 ENVIRONMENT=production
 
 # Initialer Admin-Account (wird beim ersten Start angelegt)

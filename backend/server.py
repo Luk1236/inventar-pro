@@ -724,7 +724,7 @@ async def register(request: Request, user_data: UserCreate):
     await db.users.insert_one(user_with_password)
     
     # Log registration
-    logging.info(f"New user registered: {user.username} from IP: {request.client.host}")
+    logging.info(f"New user registered: {user.username} from IP: {request.client.host if request.client else 'unknown'}")
     
     # Send email notification to admin
     await send_user_registration_email(user.username, user.email, user.role)
@@ -742,7 +742,7 @@ async def login(request: Request, user_credentials: UserLogin):
     user = await db.users.find_one({"username": user_credentials.username})
     if not user or not verify_password(user_credentials.password, user["hashed_password"]):
         # SECURITY: Log failed login attempts
-        logging.warning(f"Failed login attempt for user: {user_credentials.username} from IP: {request.client.host}")
+        logging.warning(f"Failed login attempt for user: {user_credentials.username} from IP: {request.client.host if request.client else 'unknown'}")
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     # Check if user is approved
@@ -3462,7 +3462,7 @@ async def get_crew_conflicts(current_user: User = Depends(get_current_user)):
         if isinstance(v, str):
             try:
                 return dt.fromisoformat(v.replace("Z", "+00:00"))
-            except:
+            except (ValueError, TypeError):
                 return None
         return v
 
@@ -8082,7 +8082,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; "
             "font-src 'self'; "
-            "connect-src 'self' ws: wss: http://localhost:8002 ws://localhost:8002; "
+            "connect-src 'self' ws: wss: " + " ".join(ALLOWED_ORIGINS) + "; "
             "frame-ancestors 'none';"
         )
         return response
@@ -8326,20 +8326,16 @@ async def send_overdue_returns_email():
         logging.error("overdue_returns_email job failed: %s", e, exc_info=True)
 
 
-def scheduled_backup_job():
+async def scheduled_backup_job():
     """Job to run daily backup"""
-    loop = asyncio.new_event_loop()
     try:
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(create_database_backup())
+        result = await create_database_backup()
         if result:
             logging.info("Scheduled backup completed successfully")
         else:
             logging.error("Scheduled backup FAILED — create_database_backup returned False")
     except Exception as e:
         logging.error(f"Scheduled backup job error: {e}", exc_info=True)
-    finally:
-        loop.close()
 
 # ===========================================
 # RATE LIMITER ERROR HANDLER

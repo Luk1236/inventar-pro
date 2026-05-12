@@ -2,7 +2,7 @@
   "expo": {
     "name": "Inventar Pro",
     "slug": "inventarpro",
-    "version": "1.0.73",
+    "version": "1.0.74",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "inventarpro",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.inventarpro.app",
-      "buildNumber": "1.0.69",
+      "buildNumber": "1.0.73",
       "infoPlist": {
         "NSCameraUsageDescription": "Inventar Pro nutzt die Kamera zum Scannen von Barcodes/QR-Codes und Aufnehmen von Artikel-Fotos.",
         "NSPhotoLibraryUsageDescription": "Inventar Pro greift auf die Foto-Bibliothek zu, um Artikel-Bilder auszuwählen.",
@@ -27,7 +27,7 @@
     },
     "android": {
       "package": "com.inventarpro.app",
-      "versionCode": 10073,
+      "versionCode": 10074,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#007AFF"
