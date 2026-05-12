@@ -17,10 +17,11 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=inventar-backend
 ProtectSystem=full
-ProtectHome=read-only
 NoNewPrivileges=yes
 PrivateTmp=yes
 RestrictRealtime=yes
+# ProtectHome muss deaktiviert sein damit Backend in ~/inventar/ schreiben kann
+# (Logs, Backups, ggf. Uploads). Pfad ist via WorkingDirectory beschränkt.
 
 [Install]
 WantedBy=multi-user.target

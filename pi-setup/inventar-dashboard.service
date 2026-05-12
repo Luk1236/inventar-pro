@@ -16,10 +16,10 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=inventar-dashboard
 ProtectSystem=full
-ProtectHome=read-only
 NoNewPrivileges=yes
 PrivateTmp=yes
 RestrictRealtime=yes
+# ProtectHome deaktiviert: Dashboard schreibt audit-log + password-file in ~/
 
 [Install]
 WantedBy=multi-user.target
