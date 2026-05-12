@@ -458,25 +458,33 @@ echo "  ✓ Tag: $TAG"
 # === 12. Services starten ===
 section "12/14" "Services starten + verifizieren"
 
-# Helper: Service starten + Status nach 5 Sek prüfen
+# Helper: Service starten + Status nach 5 Sek prüfen + Diagnose
 start_and_verify() {
     local svc="$1"
     local required="${2:-true}"
-    if sudo systemctl enable --now "$svc" 2>&1 | tail -3; then
-        sleep 5
-        if systemctl is-active --quiet "$svc"; then
-            echo "  ✓ $svc läuft"
-        else
-            echo "  ✗ $svc startete, aber stürzte ab. Letzte Log-Zeilen:"
-            sudo journalctl -u "$svc" -n 10 --no-pager | sed 's/^/      /'
-            if [[ "$required" == "true" ]]; then
-                step_err "12/14" "$svc nicht lauffähig"
-            else
-                step_warn "12/14" "$svc Probleme (nicht kritisch)"
-            fi
-        fi
+
+    # enable + start versuchen (Errors NICHT verschlucken)
+    sudo systemctl enable --now "$svc" 2>&1 | tail -3 || true
+    sleep 5
+
+    if systemctl is-active --quiet "$svc"; then
+        echo "  ✓ $svc läuft"
     else
-        echo "  ✗ $svc konnte nicht aktiviert werden"
+        echo "  ✗ $svc nicht lauffähig — letzte 20 Log-Zeilen:"
+        echo "      ────────────────────────────────────────────────────"
+        sudo journalctl -u "$svc" -n 20 --no-pager 2>&1 | sed 's/^/      /'
+        echo "      ────────────────────────────────────────────────────"
+        echo "  💡 Debug:"
+        echo "     sudo journalctl -u $svc -n 100 --no-pager"
+        if [[ "$svc" == "inventar-backend" ]]; then
+            echo "     # ODER direkt starten zum sehen welcher Import failt:"
+            echo "     cd ~/inventar/backend && source .venv/bin/activate && python3 server.py"
+        fi
+        if [[ "$required" == "true" ]]; then
+            step_err "12/14" "$svc nicht lauffähig"
+        else
+            step_warn "12/14" "$svc Probleme (nicht kritisch)"
+        fi
     fi
 }
 
@@ -528,9 +536,12 @@ fi
 CLOUDFLARE_URL=""
 if [[ "$ENABLE_CLOUDFLARE" =~ ^[Yy]$ ]]; then
     echo "[14/14] Cloudflare Tunnel einrichten..."
-    if [[ -x "$INSTALL_DIR/setup-cloudflare-tunnel.sh" ]]; then
+    CF_SCRIPT="$INSTALL_DIR/setup-cloudflare-tunnel.sh"
+    if [[ -f "$CF_SCRIPT" ]]; then
+        # Ausführbar machen (git speichert manchmal kein +x)
+        chmod +x "$CF_SCRIPT" 2>/dev/null || sudo chmod +x "$CF_SCRIPT"
         # Skript läuft interaktiv (Cloudflare-Login im Browser)
-        sudo "$INSTALL_DIR/setup-cloudflare-tunnel.sh" || {
+        sudo "$CF_SCRIPT" || {
             echo "  ⚠ Cloudflare-Setup abgebrochen oder fehlgeschlagen"
             ENABLE_CLOUDFLARE="n"
         }

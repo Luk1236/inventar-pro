@@ -32,20 +32,38 @@ module.exports = () => {
       backendUrl !== undefined ? backendUrl : 'http://localhost:8002',
   };
 
+  // === Sentry-Plugin nur einbinden wenn Modul installiert ist ===
+  // Verhindert: "Failed to resolve plugin for module '@sentry/react-native/expo'"
+  // wenn @sentry/react-native nicht in node_modules ist.
+  let sentryAvailable = false;
+  if (!isExpoGoMode) {
+    try {
+      require.resolve('@sentry/react-native/expo');
+      sentryAvailable = true;
+    } catch {
+      sentryAvailable = false;
+    }
+  }
+
+  // === Plugins-Filter ===
+  expo.plugins = (expo.plugins || []).filter((p) => {
+    const name = typeof p === 'string' ? p : Array.isArray(p) ? p[0] : null;
+    // Sentry-Plugin nur wenn verfügbar UND nicht im Expo-Go-Mode
+    if (name === '@sentry/react-native/expo') {
+      return sentryAvailable;
+    }
+    return true;
+  });
+
   // === Expo-Go-Kompatibilität ===
   if (isExpoGoMode) {
     console.log('🟢 EXPO GO MODE: Sentry deaktiviert, New Architecture aus');
-
-    // Sentry-Plugin entfernen (kann in Expo Go nicht geladen werden)
-    expo.plugins = (expo.plugins || []).filter((p) => {
-      const name = typeof p === 'string' ? p : Array.isArray(p) ? p[0] : null;
-      return name !== '@sentry/react-native/expo';
-    });
-
     // New Architecture deaktivieren — Expo Go nutzt eigene Architektur
     expo.newArchEnabled = false;
-  } else {
+  } else if (sentryAvailable) {
     console.log('🔵 NATIVE BUILD MODE: Volle Features inkl. Sentry');
+  } else {
+    console.log('🟡 NATIVE BUILD MODE: Sentry-Modul nicht installiert — Plugin übersprungen');
   }
 
   return { expo };
