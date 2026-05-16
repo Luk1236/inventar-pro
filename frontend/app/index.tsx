@@ -1068,6 +1068,8 @@ export default function Index() {
               value={username}
               onChangeText={setUsername}
               autoCapitalize="none"
+              returnKeyType="next"
+              onSubmitEditing={() => isLogin ? handleLogin(totpRequired ? totpInput : undefined) : handleRegister()}
             />
             {!isLogin && (
               <TextInput
@@ -1078,6 +1080,8 @@ export default function Index() {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                returnKeyType="next"
+                onSubmitEditing={() => handleRegister()}
               />
             )}
             <TextInput
@@ -1087,6 +1091,8 @@ export default function Index() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              returnKeyType="done"
+              onSubmitEditing={() => isLogin ? handleLogin(totpRequired ? totpInput : undefined) : handleRegister()}
             />
             {isLogin && (
               <TouchableOpacity

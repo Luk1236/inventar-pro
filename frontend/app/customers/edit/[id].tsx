@@ -101,15 +101,25 @@ export default function EditCustomerPage() {
   };
 
   const handleDelete = () => {
-    Alert.alert('Kunde löschen', `Möchten Sie "${formData.company_name}" wirklich löschen?`, [
-      { text: 'Abbrechen', style: 'cancel' },
-      { text: 'Löschen', style: 'destructive', onPress: async () => {
-        try {
-          await apiService.delete(`/api/customers/${id}`);
-          Alert.alert('✅ Erfolg', 'Kunde wurde gelöscht', [{ text: 'OK', onPress: () => router.replace('/customers') }]);
-        } catch { Alert.alert('Fehler', 'Löschen fehlgeschlagen'); }
-      }},
-    ]);
+    const msg = `Möchten Sie "${formData.company_name}" wirklich löschen?`;
+    
+    const executeDelete = async () => {
+      try {
+        await apiService.delete(`/api/customers/${id}`);
+        Alert.alert('✅ Erfolg', 'Kunde wurde gelöscht', [{ text: 'OK', onPress: () => router.replace('/customers') }]);
+      } catch { Alert.alert('Fehler', 'Löschen fehlgeschlagen'); }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Kunde löschen\n\n${msg}`)) {
+        executeDelete();
+      }
+    } else {
+      Alert.alert('Kunde löschen', msg, [
+        { text: 'Abbrechen', style: 'cancel' },
+        { text: 'Löschen', style: 'destructive', onPress: executeDelete },
+      ]);
+    }
   };
 
   if (loading) {

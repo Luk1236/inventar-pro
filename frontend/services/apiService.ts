@@ -8,7 +8,7 @@ import { Alert } from 'react-native';
 const DEFAULT_BACKEND_URL: string =
   process.env.EXPO_PUBLIC_BACKEND_URL ??
   Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL ??
-  'http://localhost:8002';
+  (Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8002');
 
 // Runtime override (set by settings screen or Electron bridge)
 // Always start with the configured default so stale mocks or cached values are ignored

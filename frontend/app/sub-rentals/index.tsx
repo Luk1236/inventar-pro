@@ -95,6 +95,12 @@ export default function SubRentalsPage() {
     loadData();
   }, []);
 
+  useWebSocket((msg) => {
+    if (msg.type === 'sub_rental_created' || msg.type === 'sub_rental_updated' || msg.type === 'sub_rental_deleted') {
+      loadData();
+    }
+  });
+
   const loadData = async () => {
     try {
       const subRentalsData = await apiService.get<{
@@ -409,6 +415,30 @@ export default function SubRentalsPage() {
                       </Text>
                     </View>
                   </View>
+
+                  {record.status !== 'cancelled' && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 16, paddingHorizontal: 10 }}>
+                      {['requested', 'confirmed', 'delivered', 'returned'].map((step, index, arr) => {
+                        const currentIndex = arr.indexOf(record.status.toLowerCase());
+                        const isCompleted = currentIndex >= index;
+                        const isActive = currentIndex === index;
+                        let icon = 'ellipse-outline';
+                        if (isCompleted) icon = 'checkmark-circle';
+                        if (isActive && step !== 'returned') icon = 'radio-button-on';
+                        
+                        return (
+                          <React.Fragment key={step}>
+                            <View style={{ alignItems: 'center' }}>
+                              <Ionicons name={icon as any} size={22} color={isCompleted ? colors.primary : colors.textSecondary} />
+                            </View>
+                            {index < arr.length - 1 && (
+                              <View style={{ flex: 1, height: 2, backgroundColor: currentIndex > index ? colors.primary : colors.border, marginHorizontal: 4 }} />
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </View>
+                  )}
 
                   <View style={styles.recordDetails}>
                     <View style={styles.recordDetailRow}>

@@ -185,11 +185,12 @@ def _verify_totp(code: str) -> bool:
     except Exception:
         return False
 
-SERVICES     = ["inventar-backend", "mongod", "inventar-dashboard"]
+SERVICES     = ["inventar-backend", "mongod", "inventar-dashboard", "cloudflared"]
 SERVICE_PORTS = {
     "inventar-backend": 8002,
     "mongod": 27017,
     "inventar-dashboard": 8080,
+    "cloudflared": None,
 }
 INSTALL      = os.path.expanduser("~/inventar")
 VERSION_FILE = os.path.join(INSTALL, "VERSION")
@@ -222,6 +223,45 @@ _last_backup: str = ""
 _lock = threading.Lock()
 _temp_history: list[float] = []
 _TEMP_HISTORY_MAX = 60
+
+_cf_state = {"running": False, "url": "", "error": ""}
+_ts_state = {"running": False, "url": "", "error": ""}
+
+def _cf_login_worker():
+    global _cf_state
+    _cf_state = {"running": True, "url": "", "error": ""}
+    try:
+        proc = subprocess.Popen(["cloudflared", "tunnel", "login"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        for line in proc.stdout:
+            if "https://" in line and "cloudflare" in line:
+                match = re.search(r'(https://[^\s]+)', line)
+                if match:
+                    _cf_state["url"] = match.group(1)
+        proc.wait()
+        if proc.returncode != 0:
+            _cf_state["error"] = f"Fehler Code {proc.returncode}"
+    except Exception as e:
+        _cf_state["error"] = str(e)
+    finally:
+        _cf_state["running"] = False
+
+def _ts_login_worker():
+    global _ts_state
+    _ts_state = {"running": True, "url": "", "error": ""}
+    try:
+        proc = subprocess.Popen(["sudo", "tailscale", "up"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        for line in proc.stdout:
+            if "https://login.tailscale.com" in line:
+                match = re.search(r'(https://login\.tailscale\.com[^\s]+)', line)
+                if match:
+                    _ts_state["url"] = match.group(1)
+        proc.wait()
+        if proc.returncode != 0:
+            _ts_state["error"] = f"Fehler Code {proc.returncode}"
+    except Exception as e:
+        _ts_state["error"] = str(e)
+    finally:
+        _ts_state["running"] = False
 
 # ── Helpers ────────────────────────────────────────────────────
 
@@ -606,6 +646,55 @@ def audit_log(request: Request, limit: int = 100):
     except Exception as e:
         return JSONResponse({"error": str(e)}, 500)
 
+@app.post("/api/access/{service}/login")
+def access_login(request: Request, service: str, bg: BackgroundTasks):
+    if not _check_auth(request):
+        return JSONResponse({"ok": False, "msg": "Nicht angemeldet"}, 401)
+    if service == "cloudflare":
+        if _cf_state["running"]: return {"ok": False, "msg": "Login läuft bereits"}
+        bg.add_task(_cf_login_worker)
+        return {"ok": True}
+    elif service == "tailscale":
+        if _ts_state["running"]: return {"ok": False, "msg": "Login läuft bereits"}
+        bg.add_task(_ts_login_worker)
+        return {"ok": True}
+    return JSONResponse({"ok": False, "msg": "Unbekannter Dienst"}, 400)
+
+@app.post("/api/access/{service}/logout")
+def access_logout(request: Request, service: str):
+    if not _check_auth(request):
+        return JSONResponse({"ok": False, "msg": "Nicht angemeldet"}, 401)
+    if service == "cloudflare":
+        try:
+            cert = os.path.expanduser("~/.cloudflared/cert.pem")
+            if os.path.exists(cert): os.remove(cert)
+            _run(["sudo", "systemctl", "stop", "cloudflared"])
+            return {"ok": True, "msg": "Zertifikat gelöscht & Dienst gestoppt"}
+        except Exception as e:
+            return {"ok": False, "msg": str(e)}
+    elif service == "tailscale":
+        rc, out = _run(["sudo", "tailscale", "logout"])
+        return {"ok": rc == 0, "msg": out or "Abgemeldet"}
+    return JSONResponse({"ok": False, "msg": "Unbekannter Dienst"}, 400)
+
+@app.get("/api/access/status")
+def access_status(request: Request):
+    if not _check_auth(request):
+        return JSONResponse({"ok": False}, 401)
+    return {
+        "cloudflare": {
+            "login_running": _cf_state["running"],
+            "login_url": _cf_state["url"],
+            "login_error": _cf_state["error"],
+            "has_cert": os.path.exists(os.path.expanduser("~/.cloudflared/cert.pem"))
+        },
+        "tailscale": {
+            "login_running": _ts_state["running"],
+            "login_url": _ts_state["url"],
+            "login_error": _ts_state["error"]
+        }
+    }
+
 @app.post("/api/backup")
 def backup(request: Request, bg: BackgroundTasks):
     if not _check_auth(request):
@@ -958,6 +1047,39 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min
   <div id="ts-peers" style="font-size:12px"><div style="color:#8b949e">Lädt...</div></div>
 </div>
 
+<div class="card">
+  <h2>🌍 Externer Zugriff</h2>
+  <div style="font-size:12px;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #21262d">
+      <div>
+        <span style="font-weight:600;color:#58a6ff">Cloudflare Tunnel</span><br>
+        <span style="color:#8b949e" id="cf-status">Status lädt...</span>
+      </div>
+      <div>
+        <button class="btn btn-green" onclick="doAccessLogin('cloudflare')" id="cf-btn-login">Anmelden</button>
+        <button class="btn btn-gray" onclick="doAccessLogout('cloudflare')" id="cf-btn-logout">Abmelden</button>
+      </div>
+    </div>
+    <div id="cf-url-box" style="display:none;background:#21262d;padding:8px;border-radius:6px;margin:6px 0;text-align:center">
+      <a href="#" id="cf-url-link" target="_blank" style="color:#58a6ff;font-weight:600;text-decoration:none">👉 Hier klicken zum Anmelden</a>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0">
+      <div>
+        <span style="font-weight:600;color:#58a6ff">Tailscale VPN</span><br>
+        <span style="color:#8b949e" id="ts-status">Status lädt...</span>
+      </div>
+      <div>
+        <button class="btn btn-green" onclick="doAccessLogin('tailscale')" id="ts-btn-login">Anmelden</button>
+        <button class="btn btn-gray" onclick="doAccessLogout('tailscale')" id="ts-btn-logout">Abmelden</button>
+      </div>
+    </div>
+    <div id="ts-url-box" style="display:none;background:#21262d;padding:8px;border-radius:6px;margin:6px 0;text-align:center">
+      <a href="#" id="ts-url-link" target="_blank" style="color:#58a6ff;font-weight:600;text-decoration:none">👉 Hier klicken zum Anmelden</a>
+    </div>
+  </div>
+</div>
+
 <div class="card" style="grid-column:1/-1">
   <h2>📋 Audit-Log</h2>
   <div id="audit-list" class="log-box" style="max-height:240px"><div style="color:#8b949e">Lädt...</div></div>
@@ -1026,7 +1148,7 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script>
 let logSvc='inventar-backend';
-const SVC_LABELS={'inventar-backend':'Backend','frontend-build':'Frontend (Build)','mongod':'MongoDB','inventar-dashboard':'Dashboard'};
+const SVC_LABELS={'inventar-backend':'Backend','frontend-build':'Frontend (Build)','mongod':'MongoDB','inventar-dashboard':'Dashboard','cloudflared':'Cloudflare'};
 let _pollPaused=false;
 let _pendingTotpSecret=null;
 
@@ -1313,6 +1435,61 @@ async function loadTailscalePeers(){
     </div>`).join('');
 }
 
+async function doAccessLogin(svc){
+  const r = await apiPost('/api/access/'+svc+'/login');
+  if(!r.ok) toast(r.msg||'Fehler', true);
+  else toast('Login-Prozess gestartet...');
+  pollAccessStatus();
+}
+
+async function doAccessLogout(svc){
+  const r = await apiPost('/api/access/'+svc+'/logout');
+  toast(r.ok ? r.msg||'Abgemeldet' : r.msg||'Fehler', !r.ok);
+  pollAccessStatus();
+  if (svc === 'tailscale') {
+    setTimeout(loadTailscalePeers, 2000);
+    setTimeout(refreshNet, 2000);
+  }
+}
+
+async function pollAccessStatus(){
+  const d = await api('/api/access/status');
+  if(!d) return;
+  
+  // Cloudflare
+  const cfStatus = document.getElementById('cf-status');
+  const cfUrlBox = document.getElementById('cf-url-box');
+  const cfUrlLink = document.getElementById('cf-url-link');
+  if(d.cloudflare.login_running){
+    cfStatus.textContent = "Login läuft (Warte auf Browser...)";
+    if(d.cloudflare.login_url){
+      cfUrlBox.style.display = 'block';
+      cfUrlLink.href = d.cloudflare.login_url;
+    }
+  } else {
+    cfUrlBox.style.display = 'none';
+    if(d.cloudflare.has_cert) cfStatus.innerHTML = '<span style="color:#3fb950">Eingeloggt (Zertifikat vorhanden)</span>';
+    else if(d.cloudflare.login_error) cfStatus.innerHTML = '<span style="color:#f85149">'+escHtml(d.cloudflare.login_error)+'</span>';
+    else cfStatus.textContent = "Nicht angemeldet";
+  }
+
+  // Tailscale
+  const tsStatus = document.getElementById('ts-status');
+  const tsUrlBox = document.getElementById('ts-url-box');
+  const tsUrlLink = document.getElementById('ts-url-link');
+  if(d.tailscale.login_running){
+    tsStatus.textContent = "Login läuft (Warte auf Browser...)";
+    if(d.tailscale.login_url){
+      tsUrlBox.style.display = 'block';
+      tsUrlLink.href = d.tailscale.login_url;
+    }
+  } else {
+    tsUrlBox.style.display = 'none';
+    if(d.tailscale.login_error) tsStatus.innerHTML = '<span style="color:#f85149">'+escHtml(d.tailscale.login_error)+'</span>';
+    else tsStatus.textContent = "Bereit (siehe Netzwerk-Status)";
+  }
+}
+
 async function loadDiskUsage(){
   const d=await api('/api/disk-usage');
   const el=document.getElementById('disk-list');
@@ -1467,9 +1644,11 @@ function initDashboard(){
   loadVersion();loadLastTimes();loadVersions();
   loadDiskUsage();loadAuditLog();loadTailscalePeers();
   refreshBackendHealth();loadTotpStatus();
+  pollAccessStatus();
   checkForUpdate();renderQR();
   setInterval(()=>{if(!_pollPaused)refreshStatus()},3000);
   setInterval(()=>{if(!_pollPaused)refreshSys()},3000);
+  setInterval(()=>{if(!_pollPaused)pollAccessStatus()},3000);
   setInterval(()=>{if(!_pollPaused)refreshNet()},15000);
   setInterval(()=>{if(!_pollPaused)refreshLog()},3000);
   setInterval(()=>{if(!_pollPaused)refreshBackendHealth()},5000);

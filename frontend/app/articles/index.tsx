@@ -25,6 +25,7 @@ import apiService, { getToken, getBackendUrl } from '../../services/apiService';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { useTheme } from '../../contexts/ThemeContext';
+import { Platform } from 'react-native';
 
 interface Article {
   id: string;
@@ -527,23 +528,31 @@ export default function ArticlesPage() {
 
   const bulkDelete = () => {
     if (selectedIds.size === 0) return;
-    Alert.alert(
-      'Artikel löschen',
-      `${selectedIds.size} Artikel wirklich löschen?`,
-      [
-        { text: 'Abbrechen', style: 'cancel' },
-        {
-          text: 'Löschen', style: 'destructive', onPress: async () => {
-            setBulkLoading(true);
-            const ids = [...selectedIds];
-            await Promise.all(ids.map(id => apiService.delete(`/api/articles/${id}`, { showErrorAlert: false }).catch(() => {})));
-            setArticles(prev => prev.filter(a => !selectedIds.has(a.id)));
-            clearSelection();
-            setBulkLoading(false);
-          }
-        }
-      ]
-    );
+    const msg = `${selectedIds.size} Artikel wirklich löschen?`;
+    
+    const executeDelete = async () => {
+      setBulkLoading(true);
+      const ids = [...selectedIds];
+      await Promise.all(ids.map(id => apiService.delete(`/api/articles/${id}`, { showErrorAlert: false }).catch(() => {})));
+      setArticles(prev => prev.filter(a => !selectedIds.has(a.id)));
+      clearSelection();
+      setBulkLoading(false);
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Artikel löschen\n\n${msg}`)) {
+        executeDelete();
+      }
+    } else {
+      Alert.alert(
+        'Artikel löschen',
+        msg,
+        [
+          { text: 'Abbrechen', style: 'cancel' },
+          { text: 'Löschen', style: 'destructive', onPress: executeDelete }
+        ]
+      );
+    }
   };
 
   const bulkSetStatus = async (status: string) => {
@@ -577,10 +586,17 @@ export default function ArticlesPage() {
           <Animated.View style={{ width: 80, transform: [{ translateX: trans }] }}>
             <TouchableOpacity
               style={{ flex: 1, backgroundColor: '#FF3B30', justifyContent: 'center', alignItems: 'center', borderRadius: 12, margin: 4 }}
-              onPress={() => Alert.alert('Artikel löschen', `"${article.name}" wirklich löschen?`, [
-                { text: 'Abbrechen', style: 'cancel' },
-                { text: 'Löschen', style: 'destructive', onPress: () => handleDeleteArticle(article.id) },
-              ])}
+              onPress={() => {
+                const msg = `"${article.name}" wirklich löschen?`;
+                if (Platform.OS === 'web') {
+                  if (window.confirm(`Artikel löschen\n\n${msg}`)) handleDeleteArticle(article.id);
+                } else {
+                  Alert.alert('Artikel löschen', msg, [
+                    { text: 'Abbrechen', style: 'cancel' },
+                    { text: 'Löschen', style: 'destructive', onPress: () => handleDeleteArticle(article.id) },
+                  ]);
+                }
+              }}
             >
               <Ionicons name="trash" size={24} color="white" />
             </TouchableOpacity>
@@ -658,14 +674,19 @@ export default function ArticlesPage() {
         <TouchableOpacity
           style={styles.deleteButtonLarge}
           onPress={() => {
-            Alert.alert(
-              'Artikel löschen',
-              `Artikel "${article.name}" wirklich löschen?`,
-              [
-                { text: 'Abbrechen', style: 'cancel' },
-                { text: 'Löschen', style: 'destructive', onPress: () => handleDeleteArticle(article.id) },
-              ]
-            );
+            const msg = `Artikel "${article.name}" wirklich löschen?`;
+            if (Platform.OS === 'web') {
+              if (window.confirm(`Artikel löschen\n\n${msg}`)) handleDeleteArticle(article.id);
+            } else {
+              Alert.alert(
+                'Artikel löschen',
+                msg,
+                [
+                  { text: 'Abbrechen', style: 'cancel' },
+                  { text: 'Löschen', style: 'destructive', onPress: () => handleDeleteArticle(article.id) },
+                ]
+              );
+            }
           }}
           activeOpacity={0.6}
         >

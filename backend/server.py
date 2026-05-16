@@ -8351,6 +8351,44 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ===========================
+# WAREHOUSE LAYOUT
+# ===========================
+
+@app.get("/api/warehouse-layout/main")
+async def get_warehouse_layout(current_user: User = Depends(get_current_user)):
+    doc = await db.warehouse_layouts.find_one({"_id": "main"})
+    if not doc:
+        return {"items": [], "grid": {"width": 40, "height": 30}}
+    doc.pop("_id", None)
+    return doc
+
+@app.put("/api/warehouse-layout/main")
+async def update_warehouse_layout(layout: dict, current_user: User = Depends(get_current_user)):
+    await db.warehouse_layouts.update_one(
+        {"_id": "main"},
+        {"$set": layout},
+        upsert=True
+    )
+    return {"message": "Layout saved successfully"}
+
+@app.get("/api/warehouse-stock/main")
+async def get_warehouse_stock(current_user: User = Depends(get_current_user)):
+    doc = await db.warehouse_stock.find_one({"_id": "main"})
+    if not doc:
+        return {"mapping": []}
+    doc.pop("_id", None)
+    return doc
+
+@app.put("/api/warehouse-stock/main")
+async def update_warehouse_stock(stock: dict, current_user: User = Depends(get_current_user)):
+    await db.warehouse_stock.update_one(
+        {"_id": "main"},
+        {"$set": stock},
+        upsert=True
+    )
+    return {"message": "Stock saved successfully"}
+
+# ===========================
 # APP SETTINGS
 # ===========================
 
@@ -9207,6 +9245,46 @@ async def delete_rental_request(item_id: str, current_user: User = Depends(get_c
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Rental request not found")
     return {"message": "Deleted"}
+
+@app.get("/api/admin/smtp-config")
+async def get_smtp_config(current_user: User = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Nur Admins können diese Einstellungen sehen")
+    return {
+        "configured": bool(SMTP_USERNAME and SMTP_PASSWORD),
+        "server": SMTP_SERVER,
+        "port": SMTP_PORT,
+        "username": SMTP_USERNAME,
+        "admin_email": ADMIN_EMAIL
+    }
+
+@app.post("/api/admin/smtp-test")
+async def test_smtp(current_user: User = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Nur Admins können E-Mails testen")
+    if not SMTP_USERNAME or not SMTP_PASSWORD:
+        raise HTTPException(status_code=400, detail="SMTP is not configured in backend.")
+    import aiosmtplib
+    from email.message import EmailMessage
+    msg = EmailMessage()
+    msg.set_content("Dies ist eine Test-E-Mail von Inventar Pro.")
+    msg["Subject"] = "Inventar Pro SMTP Test"
+    msg["From"] = SMTP_USERNAME
+    msg["To"] = current_user.email
+    try:
+        await aiosmtplib.send(
+            msg,
+            hostname=SMTP_SERVER,
+            port=SMTP_PORT,
+            username=SMTP_USERNAME,
+            password=SMTP_PASSWORD,
+            start_tls=True
+        )
+        return {"message": f"Test-E-Mail an {current_user.email} gesendet."}
+    except Exception as e:
+        logging.error(f"SMTP Test Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 # Startup event to ensure admin user exists

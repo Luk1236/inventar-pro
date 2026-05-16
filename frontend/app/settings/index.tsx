@@ -204,9 +204,8 @@ export default function SettingsPage() {
 
   // ── Kommunikation ───────────────────────────────────────────────────────────
   const [showEmail, setShowEmail] = useState(false);
-  const [smtpServer, setSmtpServer] = useState('');
-  const [smtpPort, setSmtpPort] = useState('587');
-  const [smtpSender, setSmtpSender] = useState('');
+  const [smtpConfig, setSmtpConfig] = useState({ configured: false, server: '', port: '', username: '', admin_email: '' });
+  const [smtpTesting, setSmtpTesting] = useState(false);
 
   const [showAnrede, setShowAnrede] = useState(false);
   const [defaultSalutation, setDefaultSalutation] = useState('Sehr geehrte/r');
@@ -378,10 +377,13 @@ export default function SettingsPage() {
       setOvertimeTracking(!!s.overtime_tracking);
       setAbsenceApprovalRequired(!!s.absence_approval_required);
 
-      // SMTP
-      setSmtpServer(s.smtp_server || '');
-      setSmtpPort(String(s.smtp_port || 587));
-      setSmtpSender(s.smtp_sender || '');
+      // SMTP status
+      try {
+        const smtpData = await apiService.get<any>('/api/admin/smtp-config', { showErrorAlert: false });
+        if (smtpData) setSmtpConfig(smtpData);
+      } catch (e) {
+        // Only admins can access this, so ignore if 403
+      }
 
       // Anrede
       setDefaultSalutation(s.default_salutation || 'Sehr geehrte/r');
@@ -1349,35 +1351,46 @@ export default function SettingsPage() {
             {renderSectionToggleRow('mail-outline', 'E-Mail', showEmail, () => setShowEmail(!showEmail))}
             {showEmail && (
               <View style={[styles.inlineForm, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+                <Text style={[styles.formLabel(colors), { marginTop: 0 }]}>Status</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                  <Ionicons name={smtpConfig.configured ? "checkmark-circle" : "alert-circle"} size={20} color={smtpConfig.configured ? colors.success : colors.danger} />
+                  <Text style={{ color: smtpConfig.configured ? colors.success : colors.danger, marginLeft: 8, fontWeight: '600' }}>
+                    {smtpConfig.configured ? "Konfiguriert & Aktiv" : "Nicht konfiguriert (in backend/.env anpassen)"}
+                  </Text>
+                </View>
+
                 <Text style={styles.formLabel(colors)}>SMTP-Server</Text>
                 <TextInput
-                  style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-                  placeholder="mail.example.com"
-                  placeholderTextColor={colors.textSecondary}
-                  value={smtpServer}
-                  onChangeText={setSmtpServer}
-                  autoCapitalize="none"
+                  style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textSecondary }]}
+                  value={smtpConfig.server || 'Nicht gesetzt'}
+                  editable={false}
                 />
-                <Text style={styles.formLabel(colors)}>SMTP-Port</Text>
+                
+                <Text style={styles.formLabel(colors)}>Absender / Benutzername</Text>
                 <TextInput
-                  style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-                  placeholder="587"
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="number-pad"
-                  value={smtpPort}
-                  onChangeText={setSmtpPort}
+                  style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textSecondary }]}
+                  value={smtpConfig.username || 'Nicht gesetzt'}
+                  editable={false}
                 />
-                <Text style={styles.formLabel(colors)}>Absender-E-Mail</Text>
-                <TextInput
-                  style={[styles.formInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
-                  placeholder="noreply@example.com"
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  value={smtpSender}
-                  onChangeText={setSmtpSender}
-                />
-                {renderSaveButton(() => saveSettings({ smtp_server: smtpServer, smtp_port: parseInt(smtpPort) || 587, smtp_sender: smtpSender }))}
+
+                <TouchableOpacity
+                  style={[styles.saveButton, { backgroundColor: colors.primary, marginTop: 16, opacity: (!smtpConfig.configured || smtpTesting) ? 0.6 : 1 }]}
+                  onPress={async () => {
+                    if (!smtpConfig.configured) return;
+                    setSmtpTesting(true);
+                    try {
+                      const res = await apiService.post<any>('/api/admin/smtp-test', {});
+                      Alert.alert('Erfolg', res.message || 'Test-E-Mail gesendet!');
+                    } catch (e: any) {
+                      Alert.alert('Fehler', e.message || 'Test-E-Mail fehlgeschlagen');
+                    } finally {
+                      setSmtpTesting(false);
+                    }
+                  }}
+                  disabled={!smtpConfig.configured || smtpTesting}
+                >
+                  {smtpTesting ? <ActivityIndicator color="white" size="small" /> : <Text style={styles.saveButtonText}>Test E-Mail senden</Text>}
+                </TouchableOpacity>
               </View>
             )}
 
