@@ -26,14 +26,14 @@ python-jose>=3.5.0
 pyotp>=2.9.0
 
 # === HTTP & Forms ===
-httpx>=0.27.0
+httpx>=0.28.1
 python-multipart>=0.0.20
 requests>=2.32.0
 email-validator>=2.3.0
 
 # === Utilities ===
-aiosmtplib>=4.0.0
-APScheduler>=3.11.0
+aiosmtplib>=5.1.0
+APScheduler>=3.11.2
 psutil>=6.1.0
 python-dotenv>=1.1.0
 slowapi>=0.1.9
