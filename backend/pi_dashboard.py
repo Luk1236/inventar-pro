@@ -548,6 +548,23 @@ def sysinfo():
             build_size = f"{total / 1024**2:.1f} MB"
     except Exception:
         pass
+    # A3: Backup-Alter berechnen
+    backup_age_days = None
+    backup_log_path = os.path.expanduser("~/.last_backup")
+    try:
+        if os.path.exists(backup_log_path):
+            mtime = os.path.getmtime(backup_log_path)
+            backup_age_days = int((time.time() - mtime) / 86400)
+        else:
+            # Fallback: Backup-Verzeichnis prüfen
+            bak_dir = os.path.join(INSTALL, "backups")
+            if os.path.isdir(bak_dir):
+                files = [os.path.join(bak_dir, f) for f in os.listdir(bak_dir)]
+                if files:
+                    newest = max(files, key=os.path.getmtime)
+                    backup_age_days = int((time.time() - os.path.getmtime(newest)) / 86400)
+    except Exception:
+        pass
     return {
         "cpu": round(cpu, 1),
         "ram_used": round(mem.used / 1024**3, 2),
@@ -561,6 +578,7 @@ def sysinfo():
         "db_size": db_size,
         "build_size": build_size,
         "temp_history": _temp_history,
+        "backup_age_days": backup_age_days,
     }
 
 @app.get("/api/disk-usage")
@@ -625,6 +643,38 @@ def tailscale_peers(request: Request):
         return {"peers": peers, "self": data.get("Self", {}).get("HostName", "?")}
     except Exception as e:
         return {"peers": [], "error": str(e)}
+
+@app.get("/api/access/tunnel-info")
+def access_tunnel_info(request: Request):
+    """A2: Gibt die aktuelle öffentliche Cloudflare-Tunnel-URL zurück."""
+    if not _check_auth(request):
+        return JSONResponse({"ok": False}, 401)
+    # Tunnel-ID aus config.yml lesen
+    config_path = os.path.expanduser("~/.cloudflared/config.yml")
+    tunnel_url = ""
+    tunnel_id = ""
+    cf_running = _svc_status("cloudflared") == "running"
+    try:
+        if os.path.exists(config_path):
+            with open(config_path) as f:
+                for line in f:
+                    if line.strip().startswith("tunnel:"):
+                        tunnel_id = line.split(":", 1)[1].strip()
+                    if line.strip().startswith("hostname:") or line.strip().startswith("- hostname:"):
+                        hn = line.split(":", 1)[1].strip()
+                        if hn:
+                            tunnel_url = f"https://{hn}" if not hn.startswith("http") else hn
+    except Exception:
+        pass
+    # Fallback: ID.cfargotunnel.com
+    if tunnel_id and not tunnel_url:
+        tunnel_url = f"https://{tunnel_id}.cfargotunnel.com"
+    return {
+        "running": cf_running,
+        "tunnel_id": tunnel_id,
+        "tunnel_url": tunnel_url,
+        "has_cert": os.path.exists(os.path.expanduser("~/.cloudflared/cert.pem")),
+    }
 
 @app.get("/api/audit-log")
 def audit_log(request: Request, limit: int = 100):
@@ -1029,6 +1079,7 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min
 <div class="card">
   <h2>Update &amp; Backup</h2>
   <div id="upd-banner" style="display:none;background:#0d2818;border:1px solid #238636;border-radius:6px;padding:8px;margin-bottom:8px;font-size:11px"></div>
+  <div id="bak-age-banner" style="display:none;background:#2d1e00;border:1px solid #9e6a03;border-radius:6px;padding:8px;margin-bottom:8px;font-size:11px;color:#e3b341">⚠️ Letztes Backup ist zu alt! Bitte jetzt ein Backup erstellen.</div>
   <button class="btn btn-blue btn-full" onclick="doUpdate()" id="upd-btn">⬇ Update von GitHub</button>
   <div class="status-line" id="upd-last"></div>
   <button class="btn btn-teal btn-full" onclick="doBackup()" id="bak-btn">💾 Backup erstellen</button>
@@ -1059,6 +1110,11 @@ body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;min
         <button class="btn btn-green" onclick="doAccessLogin('cloudflare')" id="cf-btn-login">Anmelden</button>
         <button class="btn btn-gray" onclick="doAccessLogout('cloudflare')" id="cf-btn-logout">Abmelden</button>
       </div>
+    </div>
+    <div id="cf-tunnel-url-box" style="display:none;margin:6px 0 2px;padding:8px;background:#0d1117;border-radius:6px;text-align:center">
+      🌐 <a href="#" id="cf-tunnel-url-link" target="_blank" style="color:#3fb950;font-weight:600;text-decoration:none">Tunnel-URL</a>
+      <button onclick="copyCfUrl()" class="btn btn-gray" style="margin-left:8px;padding:3px 8px;font-size:10px">📋 Kopieren</button>
+    </div>
     </div>
     <div id="cf-url-box" style="display:none;background:#21262d;padding:8px;border-radius:6px;margin:6px 0;text-align:center">
       <a href="#" id="cf-url-link" target="_blank" style="color:#58a6ff;font-weight:600;text-decoration:none">👉 Hier klicken zum Anmelden</a>
@@ -1456,7 +1512,7 @@ async function pollAccessStatus(){
   const d = await api('/api/access/status');
   if(!d) return;
   
-  // Cloudflare
+  // Cloudflare Login-Flow
   const cfStatus = document.getElementById('cf-status');
   const cfUrlBox = document.getElementById('cf-url-box');
   const cfUrlLink = document.getElementById('cf-url-link');
@@ -1468,10 +1524,11 @@ async function pollAccessStatus(){
     }
   } else {
     cfUrlBox.style.display = 'none';
-    if(d.cloudflare.has_cert) cfStatus.innerHTML = '<span style="color:#3fb950">Eingeloggt (Zertifikat vorhanden)</span>';
-    else if(d.cloudflare.login_error) cfStatus.innerHTML = '<span style="color:#f85149">'+escHtml(d.cloudflare.login_error)+'</span>';
-    else cfStatus.textContent = "Nicht angemeldet";
+    if(d.cloudflare.login_error) cfStatus.innerHTML = '<span style="color:#f85149">'+escHtml(d.cloudflare.login_error)+'</span>';
+    else cfStatus.textContent = "";
   }
+  // A2: Cloudflare Tunnel-URL anzeigen wenn Dienst läuft
+  loadTunnelUrl();
 
   // Tailscale
   const tsStatus = document.getElementById('ts-status');
@@ -1488,6 +1545,30 @@ async function pollAccessStatus(){
     if(d.tailscale.login_error) tsStatus.innerHTML = '<span style="color:#f85149">'+escHtml(d.tailscale.login_error)+'</span>';
     else tsStatus.textContent = "Bereit (siehe Netzwerk-Status)";
   }
+}
+
+async function loadTunnelUrl(){
+  const d = await api('/api/access/tunnel-info');
+  if(!d) return;
+  const box = document.getElementById('cf-tunnel-url-box');
+  const link = document.getElementById('cf-tunnel-url-link');
+  const cfStatus = document.getElementById('cf-status');
+  if(d.running && d.tunnel_url){
+    box.style.display = 'block';
+    link.href = d.tunnel_url;
+    link.textContent = d.tunnel_url;
+    cfStatus.innerHTML = '<span style="color:#3fb950">✓ Online &mdash; Tunnel aktiv</span>';
+  } else {
+    box.style.display = 'none';
+    if(d.has_cert && !d.running) cfStatus.innerHTML = '<span style="color:#e3b341">Eingeloggt, aber Tunnel gestoppt</span>';
+    else if(!d.has_cert) cfStatus.textContent = 'Nicht angemeldet';
+  }
+}
+
+function copyCfUrl(){
+  const link = document.getElementById('cf-tunnel-url-link');
+  if(!link||!link.href||link.href==='#') return;
+  navigator.clipboard.writeText(link.href).then(()=>toast('URL kopiert!')).catch(()=>toast('Kopieren fehlgeschlagen',true));
 }
 
 async function loadDiskUsage(){
@@ -1522,6 +1603,20 @@ async function checkForUpdate(){
     banner.style.display='block';
     banner.innerHTML=`<span style="color:#3fb950;font-weight:600">⬇ Update verfügbar</span> · ${d.commits_behind} neue Commit${d.commits_behind===1?'':'s'} · <span style="color:#8b949e">${escHtml(d.latest_msg||'')}</span>`;
   }else{banner.style.display='none'}
+}
+
+async function checkBackupAge(){
+  // A3: Backup-Alter aus sysinfo prüfen
+  const d = await api('/api/sysinfo');
+  if(!d) return;
+  const ageBanner = document.getElementById('bak-age-banner');
+  if(!ageBanner) return;
+  if(d.backup_age_days !== null && d.backup_age_days !== undefined && d.backup_age_days > 7){
+    ageBanner.style.display = 'block';
+    ageBanner.textContent = `⚠️ Letztes Backup vor ${d.backup_age_days} Tagen! Bitte jetzt ein Backup erstellen.`;
+  } else {
+    ageBanner.style.display = 'none';
+  }
 }
 
 async function loadTotpStatus(){
@@ -1644,7 +1739,7 @@ function initDashboard(){
   loadVersion();loadLastTimes();loadVersions();
   loadDiskUsage();loadAuditLog();loadTailscalePeers();
   refreshBackendHealth();loadTotpStatus();
-  pollAccessStatus();
+  pollAccessStatus();checkBackupAge();
   checkForUpdate();renderQR();
   setInterval(()=>{if(!_pollPaused)refreshStatus()},3000);
   setInterval(()=>{if(!_pollPaused)refreshSys()},3000);
@@ -1654,6 +1749,7 @@ function initDashboard(){
   setInterval(()=>{if(!_pollPaused)refreshBackendHealth()},5000);
   setInterval(()=>{if(!_pollPaused)loadTailscalePeers()},30000);
   setInterval(()=>{if(!_pollPaused)checkForUpdate()},600000);
+  setInterval(()=>{if(!_pollPaused)checkBackupAge()},300000);
   setInterval(updateTimestamp,1000);
 }
 </script>

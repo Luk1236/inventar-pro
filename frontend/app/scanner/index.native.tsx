@@ -9,9 +9,9 @@ import {
   Modal,
   ActivityIndicator,
   Dimensions,
-  Vibration,
   TextInput,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -39,10 +39,9 @@ export default function ScannerPageNative() {
 
   const handleBarcodeScanned = async ({ type, data }: { type: string; data: string }) => {
     if (scanned) return;
-    
     setScanned(true);
-    Vibration.vibrate(100);
-    
+    // Kurzes haptisches Feedback beim Scan-Erkennen
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     console.log(`Scanned ${type} with data: ${data}`);
     await processScannedData(data);
   };
@@ -63,14 +62,17 @@ export default function ScannerPageNative() {
           article.serial_number === scannedData
         );
 
-        if (foundArticle) {
-          result = { type: 'article', data: foundArticle };
-          setScanResult(result);
-          setShowResult(true);
-          setLoading(false);
-          return;
-        }
+      // Found article
+      if (foundArticle) {
+        result = { type: 'article', data: foundArticle };
+        setScanResult(result);
+        setShowResult(true);
+        setLoading(false);
+        // Erfolgs-Feedback
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        return;
       }
+    }
 
       // Search in storage locations
       const locations = await apiService.get<any[]>('/api/storage-locations', { showErrorAlert: false });
@@ -86,17 +88,21 @@ export default function ScannerPageNative() {
           setScanResult(result);
           setShowResult(true);
           setLoading(false);
+          // Erfolgs-Feedback
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           return;
         }
       }
 
-      // Not found
+      // Not found — Fehler-Feedback
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       result = { type: 'unknown', data: { scannedCode: scannedData } };
       setScanResult(result);
       setShowResult(true);
       
     } catch (error) {
       console.error('Error processing scan:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Fehler', 'Fehler bei der Verarbeitung des Scans');
     } finally {
       setLoading(false);

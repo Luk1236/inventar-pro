@@ -152,43 +152,43 @@ export default function ExportsPage() {
           
           <TouchableOpacity
             style={[styles.exportCard, { backgroundColor: colors.card }]}
-            onPress={() => downloadFile('/api/reports/inventory-excel', 'Inventar')}
+            onPress={() => downloadFile('/api/reports/articles-xlsx', 'Artikel.xlsx')}
             disabled={exporting !== null}
           >
             <View style={[styles.iconBox, { backgroundColor: '#34C75920' }]}>
               <Ionicons name="grid-outline" size={24} color="#34C759" />
             </View>
             <View style={styles.cardContent}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Inventar-Liste</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Artikel-Liste (.xlsx)</Text>
               <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>
                 Alle Artikel mit Bestand, Preisen, Status
               </Text>
             </View>
-            {exporting === '/api/reports/inventory-excel' ? (
+            {exporting === '/api/reports/articles-xlsx' ? (
               <ActivityIndicator color={colors.primary} />
             ) : (
-              <Ionicons name="download-outline" size={24} color={colors.primary} />
+              <Ionicons name="download-outline" size={24} color="#34C759" />
             )}
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.exportCard, { backgroundColor: colors.card }]}
-            onPress={() => downloadFile('/api/reports/events-excel', 'Events')}
+            onPress={() => downloadFile('/api/reports/bookings-xlsx', 'Buchungen.xlsx')}
             disabled={exporting !== null}
           >
             <View style={[styles.iconBox, { backgroundColor: '#5856D620' }]}>
               <Ionicons name="calendar-outline" size={24} color="#5856D6" />
             </View>
             <View style={styles.cardContent}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Event-Liste</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Buchungen (.xlsx)</Text>
               <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>
-                Alle Events mit Kunden, Daten, Status
+                Alle Buchungen mit Artikeln, Daten, Status
               </Text>
             </View>
-            {exporting === '/api/reports/events-excel' ? (
+            {exporting === '/api/reports/bookings-xlsx' ? (
               <ActivityIndicator color={colors.primary} />
             ) : (
-              <Ionicons name="download-outline" size={24} color={colors.primary} />
+              <Ionicons name="download-outline" size={24} color="#5856D6" />
             )}
           </TouchableOpacity>
         </View>

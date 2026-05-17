@@ -417,3 +417,121 @@ export default apiService;
 export const getToken = async (): Promise<string | null> => {
   return secureGet('auth_token');
 };
+
+// ─── C7: WebSocket-Client ────────────────────────────────────────────────────
+
+type WsHandler = (data: any) => void;
+
+class WebSocketClient {
+  private ws: WebSocket | null = null;
+  private handlers: Map<string, WsHandler[]> = new Map();
+  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  private reconnectDelay = 1000;
+  private maxDelay = 30000;
+  private _connected = false;
+  private _stopped = false;
+
+  get connected() { return this._connected; }
+
+  async connect(): Promise<void> {
+    this._stopped = false;
+    const token = await secureGet('auth_token');
+    if (!token) return;
+
+    const baseUrl = await AsyncStorage.getItem('backend_url') ||
+      process.env.EXPO_PUBLIC_BACKEND_URL || '';
+    if (!baseUrl) return;
+
+    const wsUrl = baseUrl.replace(/^http/, 'ws') + `/api/ws?token=${token}`;
+    try {
+      this.ws = new WebSocket(wsUrl);
+
+      this.ws.onopen = () => {
+        this._connected = true;
+        this.reconnectDelay = 1000;
+        if (__DEV__) console.log('[WS] Verbunden');
+      };
+
+      this.ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'ping') return;
+          const handlers = this.handlers.get(msg.type) || [];
+          handlers.forEach(h => h(msg.data ?? msg));
+          // Wildcard handlers
+          const allHandlers = this.handlers.get('*') || [];
+          allHandlers.forEach(h => h(msg));
+        } catch { /* Kein JSON */ }
+      };
+
+      this.ws.onclose = () => {
+        this._connected = false;
+        if (!this._stopped) this._scheduleReconnect();
+      };
+
+      this.ws.onerror = () => {
+        this._connected = false;
+        this.ws?.close();
+      };
+    } catch (e) {
+      if (__DEV__) console.warn('[WS] Verbindung fehlgeschlagen:', e);
+      if (!this._stopped) this._scheduleReconnect();
+    }
+  }
+
+  private _scheduleReconnect() {
+    if (this.reconnectTimeout) return;
+    this.reconnectTimeout = setTimeout(() => {
+      this.reconnectTimeout = null;
+      this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxDelay);
+      this.connect();
+    }, this.reconnectDelay);
+  }
+
+  disconnect() {
+    this._stopped = true;
+    if (this.reconnectTimeout) { clearTimeout(this.reconnectTimeout); this.reconnectTimeout = null; }
+    this.ws?.close();
+    this._connected = false;
+  }
+
+  on(type: string, handler: WsHandler) {
+    if (!this.handlers.has(type)) this.handlers.set(type, []);
+    this.handlers.get(type)!.push(handler);
+  }
+
+  off(type: string, handler: WsHandler) {
+    const list = this.handlers.get(type) || [];
+    this.handlers.set(type, list.filter(h => h !== handler));
+  }
+}
+
+export const wsClient = new WebSocketClient();
+
+// ─── C8: Push-Token Registrierung ────────────────────────────────────────────
+
+export async function registerPushToken(): Promise<void> {
+  try {
+    // Nur auf nativen Geräten verfügbar
+    const { Platform } = require('react-native');
+    if (Platform.OS === 'web') return;
+
+    const Notifications = require('expo-notifications');
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== 'granted') return;
+
+    const tokenData = await Notifications.getExpoPushTokenAsync();
+    const pushToken = tokenData.data;
+
+    // Token ans Backend senden
+    await apiService.put('/api/users/me/push-token', { push_token: pushToken }, { showErrorAlert: false });
+    if (__DEV__) console.log('[Push] Token registriert:', pushToken);
+  } catch (e) {
+    if (__DEV__) console.warn('[Push] Token-Registrierung fehlgeschlagen:', e);
+  }
+}

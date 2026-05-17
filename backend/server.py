@@ -1055,6 +1055,22 @@ async def register_notification_token(
     )
     return {"message": "Token registered successfully"}
 
+# C8: Alias-Endpunkt für Frontend (apiService.put('/api/users/me/push-token'))
+@api_router.put("/users/me/push-token")
+async def update_my_push_token(
+    body: dict,
+    current_user: User = Depends(get_current_user)
+):
+    """C8: Push-Token des eingeloggten Users speichern."""
+    push_token = body.get("push_token", "").strip()
+    if not push_token:
+        raise HTTPException(status_code=400, detail="push_token fehlt")
+    await db.users.update_one(
+        {"username": current_user.username},
+        {"$set": {"push_token": push_token}}
+    )
+    return {"ok": True}
+
 @api_router.get("/notifications/pending")
 async def get_pending_notifications(current_user: User = Depends(get_current_user)):
     """Get pending maintenance reminders and unread messages"""
@@ -5087,27 +5103,23 @@ async def export_packing_list_pdf(
     event_id: str,
     current_user: User = Depends(get_current_user)
 ):
-    """Export packing list as PDF"""
+    """Export packing list as PDF with article thumbnails (B6)"""
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import cm
     from io import BytesIO
+    import base64
     
     try:
-        # Get event
         event = await db.events.find_one({"id": event_id})
         if not event:
             raise HTTPException(status_code=404, detail="Event nicht gefunden")
         
-        # Get customer
         customer = await db.customers.find_one({"id": event.get("customer_id")})
-        
-        # Get bookings
         bookings = await db.bookings.find({"event_id": event_id, "status": "booked"}).to_list(500)
         
-        # Build items list with article details
         items = []
         total_weight = 0.0
         total_power = 0
@@ -5120,32 +5132,44 @@ async def export_packing_list_pdf(
                 power = (article.get("power_watt") or 0) * booking.get("quantity", 1)
                 total_weight += weight
                 total_power += power
+
+                # B6: Erstes Artikel-Bild als Thumbnail
+                thumb = None
+                raw_images = article.get("images") or article.get("before_images") or []
+                if raw_images:
+                    try:
+                        raw = raw_images[0]
+                        if "," in raw:
+                            raw = raw.split(",", 1)[1]
+                        img_bytes = base64.b64decode(raw)
+                        img_io = BytesIO(img_bytes)
+                        thumb = RLImage(img_io, width=1.2*cm, height=1.2*cm)
+                        thumb.hAlign = "CENTER"
+                    except Exception:
+                        thumb = None
                 
                 items.append({
-                    "name": article.get("name"),
-                    "code": article.get("inventory_code"),
+                    "name": article.get("name", ""),
+                    "code": article.get("inventory_code", ""),
                     "qty": booking.get("quantity", 1),
                     "location": location.get("name") if location else "-",
                     "weight": f"{weight:.1f} kg",
-                    "status": "☐"  # Checkbox for packing
+                    "status": "☐",
+                    "thumb": thumb,
                 })
         
-        # Create PDF
         buffer = BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=1.5*cm, bottomMargin=1.5*cm)
         styles = getSampleStyleSheet()
         elements = []
         
-        # Title
         title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=18, spaceAfter=20)
         elements.append(Paragraph("📦 Packliste", title_style))
         
-        # Event Info
         info_style = ParagraphStyle('Info', parent=styles['Normal'], fontSize=10, spaceAfter=5)
         elements.append(Paragraph(f"<b>Event:</b> {event.get('event_name')} ({event.get('event_number')})", info_style))
         elements.append(Paragraph(f"<b>Kunde:</b> {customer.get('company_name') if customer else 'N/A'}", info_style))
         
-        # Format dates safely
         start_date = event.get('start_date', '')
         end_date = event.get('end_date', '')
         if hasattr(start_date, 'strftime'):
@@ -5158,29 +5182,40 @@ async def export_packing_list_pdf(
             end_date = end_date[:10]
         
         elements.append(Paragraph(f"<b>Datum:</b> {start_date} - {end_date}", info_style))
-        elements.append(Paragraph(f"<b>Ort:</b> {event.get('location')}", info_style))
+        elements.append(Paragraph(f"<b>Ort:</b> {event.get('location', '')}", info_style))
         elements.append(Spacer(1, 0.5*cm))
-        
-        # Summary
         elements.append(Paragraph(f"<b>Gesamt:</b> {len(items)} Positionen | {total_weight:.1f} kg | {total_power} W", info_style))
         elements.append(Spacer(1, 0.5*cm))
         
-        # Items Table
-        table_data = [["✓", "Artikel", "Code", "Menge", "Lagerort", "Gewicht"]]
+        # B6: Tabelle mit Foto-Spalte wenn Bilder vorhanden
+        has_thumbs = any(item.get("thumb") for item in items)
+        if has_thumbs:
+            headers = ["✓", "Foto", "Artikel", "Code", "Menge", "Lagerort", "Gewicht"]
+            col_widths = [1*cm, 1.4*cm, 5.5*cm, 2.8*cm, 1.5*cm, 2.8*cm, 2*cm]
+        else:
+            headers = ["✓", "Artikel", "Code", "Menge", "Lagerort", "Gewicht"]
+            col_widths = [1*cm, 7*cm, 3*cm, 1.5*cm, 3*cm, 2*cm]
+
+        table_data = [headers]
+        name_style = ParagraphStyle('cell', fontSize=9)
         for item in items:
-            table_data.append([item["status"], item["name"][:30], item["code"], str(item["qty"]), item["location"], item["weight"]])
+            name_para = Paragraph(item["name"][:40], name_style)
+            row = [item["status"]]
+            if has_thumbs:
+                row.append(item["thumb"] or "")
+            row += [name_para, item["code"], str(item["qty"]), item["location"], item["weight"]]
+            table_data.append(row)
         
-        table = Table(table_data, colWidths=[1*cm, 7*cm, 3*cm, 1.5*cm, 3*cm, 2*cm])
+        table = Table(table_data, colWidths=col_widths, repeatRows=1)
         table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#007AFF')),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('FONTSIZE', (0, 0), (-1, -1), 9),
             ('FONTSIZE', (0, 0), (-1, 0), 10),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('ALIGN', (3, 0), (3, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
             ('TOPPADDING', (0, 0), (-1, -1), 6),
         ]))

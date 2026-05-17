@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { initSentry } from '../services/sentryService';
 
 initSentry();
@@ -9,8 +9,23 @@ import { ThemeProvider } from '../contexts/ThemeContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { wsClient, registerPushToken } from '../services/apiService';
+import apiService from '../services/apiService';
 
 export default function RootLayout() {
+  useEffect(() => {
+    // C7: WebSocket-Verbindung starten (nur wenn eingeloggt)
+    const initConnections = async () => {
+      const isAuth = await apiService.isAuthenticated();
+      if (isAuth) {
+        wsClient.connect();
+        // C8: Push-Token registrieren
+        registerPushToken();
+      }
+    };
+    initConnections();
+    return () => { wsClient.disconnect(); };
+  }, []);
   return (
     <ErrorBoundary>
     <GestureHandlerRootView style={{ flex: 1 }}>
