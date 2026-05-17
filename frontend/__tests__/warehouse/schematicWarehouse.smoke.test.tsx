@@ -9,6 +9,7 @@
  * component can render in node-jest without a real DOM/native bridge.
  * We don't assert on visual output — render-doesn't-throw is the contract.
  */
+/* eslint-disable react/display-name */
 
 // Mock react-native-svg primitives as no-op pass-throughs.
 jest.mock('react-native-svg', () => {

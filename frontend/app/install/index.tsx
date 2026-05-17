@@ -195,7 +195,7 @@ export default function AppInstallationPage() {
               <Text style={styles.stepNumberText}>3</Text>
             </View>
             <Text style={[styles.stepText, { color: colors.text }]}>
-              "App installieren" bestätigen
+              {'"'}App installieren{'"'} bestätigen
             </Text>
           </View>
         </View>

@@ -216,7 +216,7 @@ export default function WarehouseScreen() {
       <View style={styles.center}>
         <Ionicons name="business-outline" size={48} color={colors.textSecondary} />
         <Text style={styles.emptyText}>Keine Lagerplätze angelegt.</Text>
-        <Text style={styles.emptySubText}>Bitte zuerst Zonen unter „Lagerorte" erstellen.</Text>
+        <Text style={styles.emptySubText}>Bitte zuerst Zonen unter „Lagerorte{'"'} erstellen.</Text>
       </View>
     );
   }

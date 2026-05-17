@@ -93,7 +93,7 @@ export default function LocationPanel({
 
       {movingArticle && (
         <View style={styles.movePanel}>
-          <Text style={styles.movePanelTitle}>„{movingArticle.name}" verschieben nach:</Text>
+          <Text style={styles.movePanelTitle}>„{movingArticle.name}{'"'} verschieben nach:</Text>
           <ScrollView style={styles.locationList}>
             {otherLocations.map(loc => (
               <TouchableOpacity

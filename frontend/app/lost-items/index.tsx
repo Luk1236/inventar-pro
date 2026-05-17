@@ -86,7 +86,7 @@ export default function LostItemsPage() {
           <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Ionicons name="information-circle-outline" size={18} color={colors.primary} />
             <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-              Artikel mit Status 'Verloren'
+              Artikel mit Status {'‘'}Verloren{'’'}
             </Text>
           </View>
 

@@ -1088,7 +1088,7 @@ export default function AddArticlePage() {
               {warehouses.length === 0 && (
                 <View style={styles.modalItem}>
                   <Text style={styles.modalItemSubtext}>
-                    Noch keine Lager angelegt. Unter "Lager / Standorte" anlegen.
+                    Noch keine Lager angelegt. Unter {'"'}Lager / Standorte{'"'} anlegen.
                   </Text>
                 </View>
               )}

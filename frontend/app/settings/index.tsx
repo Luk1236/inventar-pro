@@ -1479,7 +1479,7 @@ export default function SettingsPage() {
 
                 <View style={{ backgroundColor: colors.card, borderRadius: 8, padding: 12, marginTop: 4 }}>
                   <Text style={{ color: colors.textSecondary, fontSize: 12, lineHeight: 18 }}>
-                    Mit dem "Teilen"-Button in der Angebotsliste erzeugen Sie einen öffentlichen Link. Kunden können das Angebot ohne Login einsehen.
+                    Mit dem {'"'}Teilen{'"'}-Button in der Angebotsliste erzeugen Sie einen öffentlichen Link. Kunden können das Angebot ohne Login einsehen.
                   </Text>
                 </View>
                 {renderSaveButton(() => saveSettings({ online_quotes_expiry_days: parseInt(onlineQuotesExpiryDays) || 30, online_quotes_enabled: onlineQuotesEnabled }))}
