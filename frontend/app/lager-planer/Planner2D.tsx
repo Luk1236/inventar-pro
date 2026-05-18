@@ -262,7 +262,7 @@ export default function Planner2D({ layout, setLayout, stock, setStock, articles
                 </div>
               )}
             </>
-          ) : (
+          ) : activeTab === 'inventory' ? (
             <div>
               <div style={{ color: T.textDim, fontSize: 13, marginBottom: 16 }}>1. Regal auswählen.<br/>2. Fach anklicken.<br/>3. Artikel zuweisen.</div>
               {!selectedItem || !['rack', 'cantilever', 'shelf', 'cablerack'].includes(selectedItem.type) ? (
